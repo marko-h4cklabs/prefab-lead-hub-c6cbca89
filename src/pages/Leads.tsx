@@ -5,11 +5,10 @@ import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 const CHANNELS = [
+  { value: "messenger", label: "Messenger" },
   { value: "instagram", label: "Instagram" },
   { value: "whatsapp", label: "WhatsApp" },
   { value: "telegram", label: "Telegram" },
-  { value: "facebook", label: "Facebook" },
-  { value: "web", label: "Web" },
   { value: "email", label: "Email" },
 ];
 
