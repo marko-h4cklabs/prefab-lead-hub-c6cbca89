@@ -94,6 +94,11 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  aiReply: (companyId: string, leadId: string) =>
+    request<any>(`/api/companies/${companyId}/leads/${leadId}/ai-reply`, {
+      method: "POST",
+    }),
+
   getFields: (companyId: string) =>
     request<any>(`/api/companies/${companyId}/fields`),
 

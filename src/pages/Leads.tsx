@@ -83,6 +83,7 @@ const Leads = () => {
           <thead>
             <tr>
               <th>Channel</th>
+              <th>External ID</th>
               <th>Score</th>
               <th>Status</th>
               <th>Created</th>
@@ -90,9 +91,9 @@ const Leads = () => {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={4} className="text-center py-8 text-muted-foreground">Loading…</td></tr>
+              <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">Loading…</td></tr>
             ) : leads.length === 0 ? (
-              <tr><td colSpan={4} className="text-center py-8 text-muted-foreground">No leads found</td></tr>
+              <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">No leads found</td></tr>
             ) : (
               leads.map((lead) => (
                 <tr
@@ -101,6 +102,7 @@ const Leads = () => {
                   onClick={() => navigate(`/leads/${lead.id}`)}
                 >
                   <td className="font-mono text-sm">{lead.channel}</td>
+                  <td className="font-mono text-sm truncate max-w-[200px]">{lead.external_id ?? "—"}</td>
                   <td className="font-mono">{lead.score ?? "—"}</td>
                   <td><span className={statusClass(lead.status)}>{lead.status}</span></td>
                   <td className="text-muted-foreground text-xs font-mono">
