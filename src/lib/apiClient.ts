@@ -48,8 +48,15 @@ async function request<T>(
   }
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`API error ${res.status}: ${body}`);
+    let message = `API error ${res.status}`;
+    try {
+      const json = await res.json();
+      message = json.error || json.message || JSON.stringify(json);
+    } catch {
+      const text = await res.text();
+      if (text) message = text;
+    }
+    throw new Error(message);
   }
 
   if (res.status === 204) return undefined as T;
