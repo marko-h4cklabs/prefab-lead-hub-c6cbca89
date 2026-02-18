@@ -2,6 +2,16 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, requireCompanyId } from "@/lib/apiClient";
 import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+
+const CHANNELS = [
+  { value: "instagram", label: "Instagram" },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "telegram", label: "Telegram" },
+  { value: "facebook", label: "Facebook" },
+  { value: "web", label: "Web" },
+  { value: "email", label: "Email" },
+];
 
 const PAGE_SIZE = 20;
 
@@ -25,6 +35,7 @@ const Leads = () => {
   const [newChannel, setNewChannel] = useState("");
   const [newExternalId, setNewExternalId] = useState("");
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
 
   const fetchLeads = () => {
     setLoading(true);
@@ -42,14 +53,20 @@ const Leads = () => {
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     setCreating(true);
-    api.createLead(companyId, { channel: newChannel, external_id: newExternalId })
+    setCreateError("");
+    const normalizedChannel = newChannel.trim().toLowerCase();
+    api.createLead(companyId, { channel: normalizedChannel, external_id: newExternalId.trim() })
       .then(() => {
         setShowModal(false);
         setNewChannel("");
         setNewExternalId("");
+        setCreateError("");
         fetchLeads();
+        toast({ title: "Lead created successfully" });
       })
-      .catch(() => {})
+      .catch((err: Error) => {
+        setCreateError(err.message || "Failed to create lead");
+      })
       .finally(() => setCreating(false));
   };
 
@@ -144,9 +161,20 @@ const Leads = () => {
           <div className="industrial-card w-full max-w-md p-6">
             <h2 className="text-lg font-bold mb-4">Create Lead</h2>
             <form onSubmit={handleCreate} className="space-y-4">
+              {createError && (
+                <div className="rounded-sm border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {createError}
+                </div>
+              )}
               <div>
                 <label className="mb-1 block text-xs font-mono uppercase tracking-wider text-muted-foreground">Channel</label>
-                <input value={newChannel} onChange={(e) => setNewChannel(e.target.value)} className="industrial-input w-full" required />
+                <select value={newChannel} onChange={(e) => setNewChannel(e.target.value)} className="industrial-input w-full" required>
+                  <option value="" disabled>Select channel…</option>
+                  {CHANNELS.map((ch) => (
+                    <option key={ch.value} value={ch.value}>{ch.label}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-muted-foreground">Channel is case-insensitive; values are normalized automatically.</p>
               </div>
               <div>
                 <label className="mb-1 block text-xs font-mono uppercase tracking-wider text-muted-foreground">External ID</label>
