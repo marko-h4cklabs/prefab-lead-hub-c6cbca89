@@ -33,12 +33,14 @@ const Fields = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyField);
   const [saving, setSaving] = useState(false);
+  const [fetchError, setFetchError] = useState("");
 
   const fetchFields = () => {
     setLoading(true);
+    setFetchError("");
     api.getFields(companyId)
       .then((res) => setFields(res.data || res.fields || res || []))
-      .catch(() => {})
+      .catch((err: Error) => setFetchError(err.message || "Failed to load fields"))
       .finally(() => setLoading(false));
   };
 
@@ -109,6 +111,12 @@ const Fields = () => {
           <Plus size={16} /> New Field
         </button>
       </div>
+
+      {fetchError && (
+        <div className="mb-4 rounded-sm border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {fetchError}
+        </div>
+      )}
 
       <div className="industrial-card overflow-hidden">
         <table className="industrial-table">

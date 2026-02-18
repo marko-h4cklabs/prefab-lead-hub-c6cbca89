@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
-import { api, requireCompanyId, clearCompanyId } from "@/lib/apiClient";
+import { api, requireCompanyId, clearAuth } from "@/lib/apiClient";
 import { LayoutList, SlidersHorizontal, Settings, LogOut } from "lucide-react";
 
 const navItems = [
@@ -21,7 +21,7 @@ const AppLayout = () => {
   }, []);
 
   const handleLogout = () => {
-    clearCompanyId();
+    clearAuth();
     navigate("/login");
   };
 

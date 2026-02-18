@@ -35,15 +35,17 @@ const Leads = () => {
   const [newExternalId, setNewExternalId] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
+  const [fetchError, setFetchError] = useState("");
 
   const fetchLeads = () => {
     setLoading(true);
+    setFetchError("");
     api.getLeads(companyId, { status: statusFilter || undefined, limit: PAGE_SIZE, offset })
       .then((res) => {
         setLeads(res.data || res.leads || res || []);
         setTotal(res.total ?? res.count ?? (res.data?.length || 0));
       })
-      .catch(() => {})
+      .catch((err: Error) => setFetchError(err.message || "Failed to load leads"))
       .finally(() => setLoading(false));
   };
 
@@ -92,6 +94,12 @@ const Leads = () => {
           <option value="pending_review">Pending Review</option>
         </select>
       </div>
+
+      {fetchError && (
+        <div className="mb-4 rounded-sm border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {fetchError}
+        </div>
+      )}
 
       {/* Table */}
       <div className="industrial-card overflow-hidden">
