@@ -1,15 +1,27 @@
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
-function getCompanyId(): string | null {
+// --- Token management ---
+
+export function getAuthToken(): string | null {
+  return localStorage.getItem("authToken");
+}
+
+export function setAuthToken(token: string) {
+  localStorage.setItem("authToken", token);
+}
+
+export function clearAuth() {
+  localStorage.removeItem("authToken");
+  localStorage.removeItem("companyId"); // clean up legacy key
+}
+
+/** Returns stored companyId (legacy helper used by pages to build URLs). */
+export function getCompanyId(): string | null {
   return localStorage.getItem("companyId");
 }
 
 export function setCompanyId(id: string) {
   localStorage.setItem("companyId", id);
-}
-
-export function clearCompanyId() {
-  localStorage.removeItem("companyId");
 }
 
 export function requireCompanyId(): string {
@@ -21,20 +33,31 @@ export function requireCompanyId(): string {
   return id;
 }
 
+// Legacy export kept so existing call-sites don't break
+export function clearCompanyId() {
+  localStorage.removeItem("companyId");
+}
+
+// --- HTTP wrapper ---
+
+import { toast } from "@/hooks/use-toast";
+
 async function request<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const companyId = getCompanyId();
+  const token = getAuthToken();
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
 
-  if (companyId) {
-    headers["x-company-id"] = companyId;
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
+
+  // x-company-id is no longer sent — tenant is derived from JWT on the backend.
 
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
@@ -42,9 +65,21 @@ async function request<T>(
   });
 
   if (res.status === 401) {
-    clearCompanyId();
+    clearAuth();
     window.location.href = "/login";
     throw new Error("Unauthorized");
+  }
+
+  if (res.status === 403) {
+    let message = "Not authorized";
+    try {
+      const json = await res.json();
+      message = json.error || json.message || message;
+    } catch {
+      // ignore
+    }
+    toast({ title: "Access denied", description: message, variant: "destructive" });
+    throw new Error(message);
   }
 
   if (!res.ok) {
@@ -53,8 +88,12 @@ async function request<T>(
       const json = await res.json();
       message = json.error || json.message || JSON.stringify(json);
     } catch {
-      const text = await res.text();
-      if (text) message = text;
+      try {
+        const text = await res.text();
+        if (text) message = text;
+      } catch {
+        // ignore
+      }
     }
     throw new Error(message);
   }
@@ -124,5 +163,12 @@ export const api = {
   deleteField: (companyId: string, fieldId: string) =>
     request<any>(`/api/companies/${companyId}/fields/${fieldId}`, {
       method: "DELETE",
+    }),
+
+  // --- Auth ---
+  login: (companyId: string) =>
+    request<{ token: string; company_id: string }>("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ company_id: companyId }),
     }),
 };

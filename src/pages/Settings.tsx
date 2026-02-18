@@ -8,6 +8,7 @@ const Settings = () => {
   const [duration, setDuration] = useState("");
   const [forbiddenTopics, setForbiddenTopics] = useState("");
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -23,7 +24,7 @@ const Settings = () => {
             : style.forbidden_topics || ""
         );
       })
-      .catch(() => {})
+      .catch((err: Error) => setFetchError(err.message || "Failed to load settings"))
       .finally(() => setLoading(false));
   }, []);
 
@@ -50,6 +51,12 @@ const Settings = () => {
   };
 
   if (loading) return <div className="text-muted-foreground">Loading…</div>;
+  if (fetchError) return (
+    <div className="max-w-xl">
+      <h1 className="text-xl font-bold mb-6">Settings</h1>
+      <div className="rounded-sm border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">{fetchError}</div>
+    </div>
+  );
 
   return (
     <div className="max-w-xl">
