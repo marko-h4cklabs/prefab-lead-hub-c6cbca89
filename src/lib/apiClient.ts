@@ -88,6 +88,12 @@ export const api = {
   getConversation: (companyId: string, leadId: string) =>
     request<any>(`/api/companies/${companyId}/leads/${leadId}/conversation`),
 
+  sendMessage: (companyId: string, leadId: string, data: { role: string; content: string }) =>
+    request<any>(`/api/companies/${companyId}/leads/${leadId}/messages`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
   getFields: (companyId: string) =>
     request<any>(`/api/companies/${companyId}/fields`),
 
