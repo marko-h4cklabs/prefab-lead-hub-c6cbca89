@@ -95,6 +95,7 @@ async function request<T>(
         // ignore
       }
     }
+    toast({ title: `Error ${res.status}`, description: message, variant: "destructive" });
     throw new Error(message);
   }
 
