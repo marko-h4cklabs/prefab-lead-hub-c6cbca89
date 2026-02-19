@@ -190,6 +190,46 @@ export const api = {
       method: "DELETE",
     }),
 
+  // --- Chatbot ---
+  getCompanyInfo: () =>
+    request<any>("/api/chatbot/company-info"),
+
+  putCompanyInfo: (data: { website_url?: string; business_description?: string; additional_notes?: string }) =>
+    request<any>("/api/chatbot/company-info", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  scrapeCompanyInfo: () =>
+    request<any>("/api/chatbot/company-info/scrape", { method: "POST" }),
+
+  getChatbotBehavior: () =>
+    request<any>("/api/chatbot/behavior"),
+
+  putChatbotBehavior: (data: {
+    tone?: string;
+    response_length?: string;
+    emojis_enabled?: boolean;
+    persona_style?: string;
+    forbidden_topics?: string[];
+  }) =>
+    request<any>("/api/chatbot/behavior", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  getQuoteFields: () =>
+    request<any>("/api/chatbot/quote-fields"),
+
+  putQuoteFields: (data: { fields: any[] }) =>
+    request<any>("/api/chatbot/quote-fields", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  getSystemContext: () =>
+    request<any>("/api/chatbot/system-context"),
+
   // --- Admin ---
   runSnapshot: () =>
     request<any>("/api/admin/snapshot", { method: "POST" }),
