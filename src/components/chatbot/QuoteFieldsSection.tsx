@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { api } from "@/lib/apiClient";
 import { toast } from "@/hooks/use-toast";
 import { Save, Plus, Trash2 } from "lucide-react";
@@ -23,47 +23,58 @@ const QuoteFieldsSection = () => {
   const [fields, setFields] = useState<QuoteField[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const initialRef = useRef<string>("");
 
   useEffect(() => {
     api.getQuoteFields()
       .then((res) => {
         const data = res.fields || res.data || res || [];
-        setFields(
-          Array.isArray(data)
-            ? data.map((f: any) => ({
-                field_name: f.field_name || "",
-                field_type: f.field_type || "text",
-                units: f.units || "",
-                priority: f.priority ?? f.display_order ?? 0,
-                required: f.required ?? true,
-              }))
-            : []
-        );
+        const parsed = Array.isArray(data)
+          ? data.map((f: any) => ({
+              field_name: f.field_name || "",
+              field_type: f.field_type === "number" ? "number" : "text",
+              units: f.units || "",
+              priority: f.priority ?? f.display_order ?? 0,
+              required: f.required ?? true,
+            }))
+          : [];
+        setFields(parsed);
+        initialRef.current = JSON.stringify(parsed);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
+  const setFieldsAndDirty = (next: QuoteField[]) => {
+    setFields(next);
+    setIsDirty(JSON.stringify(next) !== initialRef.current);
+  };
+
   const handleSave = () => {
     setSaving(true);
     const sorted = [...fields].sort((a, b) => a.priority - b.priority);
     api.putQuoteFields({ fields: sorted })
-      .then(() => toast({ title: "Saved", description: "Quote fields updated." }))
+      .then(() => {
+        toast({ title: "Saved", description: "Quote fields updated." });
+        initialRef.current = JSON.stringify(fields);
+        setIsDirty(false);
+      })
       .catch(() => {})
       .finally(() => setSaving(false));
   };
 
   const addField = () => {
     const maxPriority = fields.reduce((max, f) => Math.max(max, f.priority), 0);
-    setFields([...fields, { ...emptyField, priority: maxPriority + 1 }]);
+    setFieldsAndDirty([...fields, { ...emptyField, priority: maxPriority + 1 }]);
   };
 
   const removeField = (index: number) => {
-    setFields(fields.filter((_, i) => i !== index));
+    setFieldsAndDirty(fields.filter((_, i) => i !== index));
   };
 
   const updateField = (index: number, patch: Partial<QuoteField>) => {
-    setFields(fields.map((f, i) => (i === index ? { ...f, ...patch } : f)));
+    setFieldsAndDirty(fields.map((f, i) => (i === index ? { ...f, ...patch } : f)));
   };
 
   if (loading) return <div className="industrial-card p-6 text-muted-foreground text-sm">Loading…</div>;
@@ -113,10 +124,8 @@ const QuoteFieldsSection = () => {
                       onChange={(e) => updateField(i, { field_type: e.target.value })}
                       className="industrial-input w-full"
                     >
-                      <option value="text">text</option>
-                      <option value="number">number</option>
-                      <option value="boolean">boolean</option>
-                      <option value="select">select</option>
+                      <option value="text">Text</option>
+                      <option value="number">Number</option>
                     </select>
                   </td>
                   <td>
@@ -160,7 +169,11 @@ const QuoteFieldsSection = () => {
         </table>
       </div>
 
-      <button onClick={handleSave} disabled={saving} className="industrial-btn-accent">
+      <button
+        onClick={handleSave}
+        disabled={saving || !isDirty}
+        className={isDirty ? "industrial-btn-accent" : "industrial-btn bg-muted text-muted-foreground"}
+      >
         <Save size={16} /> {saving ? "Saving…" : "Save"}
       </button>
     </div>

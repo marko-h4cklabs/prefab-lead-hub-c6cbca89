@@ -1,7 +1,6 @@
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import { api } from "@/lib/apiClient";
-import { toast } from "@/hooks/use-toast";
-import { Save, Plus, Trash2, ChevronDown, Loader2 } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import CompanyInfoSection from "@/components/chatbot/CompanyInfoSection";
 import ChatbotBehaviorSection from "@/components/chatbot/ChatbotBehaviorSection";
 import QuoteFieldsSection from "@/components/chatbot/QuoteFieldsSection";
@@ -19,10 +18,19 @@ const Fields = () => {
     setContextLoading(true);
     api.getSystemContext()
       .then((res) => {
-        setSystemContext(typeof res === "string" ? res : JSON.stringify(res, null, 2));
+        let ctx = "";
+        if (typeof res === "string") {
+          ctx = res;
+        } else if (res && typeof res === "object") {
+          const r = res as Record<string, unknown>;
+          if (typeof r.systemContext === "string") ctx = r.systemContext;
+          else if (typeof r.system_context === "string") ctx = r.system_context;
+          else ctx = JSON.stringify(res, null, 2);
+        }
+        setSystemContext(ctx);
         setContextOpen(true);
       })
-      .catch(() => setSystemContext("Failed to load system context."))
+      .catch(() => setSystemContext(""))
       .finally(() => setContextLoading(false));
   };
 
@@ -47,11 +55,17 @@ const Fields = () => {
             <ChevronDown size={14} className={`transition-transform ${contextOpen ? "rotate-180" : ""}`} />
           )}
         </button>
-        {contextOpen && systemContext && (
+        {contextOpen && (
           <div className="px-6 pb-4">
-            <pre className="overflow-auto max-h-64 rounded-sm bg-muted p-4 text-xs font-mono whitespace-pre-wrap">
-              {systemContext}
-            </pre>
+            {systemContext ? (
+              <pre className="overflow-auto max-h-64 rounded-sm bg-muted p-4 text-xs font-mono whitespace-pre-wrap">
+                {systemContext}
+              </pre>
+            ) : (
+              <p className="text-sm text-muted-foreground py-4">
+                No context yet — fill Company info / Behavior / Quote requirements and Save.
+              </p>
+            )}
           </div>
         )}
       </div>
