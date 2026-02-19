@@ -172,4 +172,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ company_id: companyId }),
     }),
+
+  // --- Admin ---
+  runSnapshot: () =>
+    request<any>("/api/admin/snapshot", { method: "POST" }),
 };
