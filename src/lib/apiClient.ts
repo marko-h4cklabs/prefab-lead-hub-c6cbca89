@@ -3,28 +3,29 @@ const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
 // --- Token management ---
 
 export function getAuthToken(): string | null {
-  return localStorage.getItem("plcs_token");
+  return localStorage.getItem("auth_token") || localStorage.getItem("plcs_token");
 }
 
 export function setAuthToken(token: string) {
-  localStorage.setItem("plcs_token", token);
+  localStorage.setItem("auth_token", token);
 }
 
 export function clearAuth() {
+  localStorage.removeItem("auth_token");
+  localStorage.removeItem("company_id");
   localStorage.removeItem("plcs_token");
   localStorage.removeItem("plcs_company_id");
-  // clean up legacy keys
   localStorage.removeItem("authToken");
   localStorage.removeItem("companyId");
 }
 
 /** Returns stored companyId. */
 export function getCompanyId(): string | null {
-  return localStorage.getItem("plcs_company_id") || localStorage.getItem("companyId");
+  return localStorage.getItem("company_id") || localStorage.getItem("plcs_company_id") || localStorage.getItem("companyId");
 }
 
 export function setCompanyId(id: string) {
-  localStorage.setItem("plcs_company_id", id);
+  localStorage.setItem("company_id", id);
 }
 
 export function requireCompanyId(): string {
@@ -36,7 +37,6 @@ export function requireCompanyId(): string {
   return id;
 }
 
-// Legacy export kept so existing call-sites don't break
 export function clearCompanyId() {
   localStorage.removeItem("companyId");
 }
@@ -50,6 +50,7 @@ async function request<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const token = getAuthToken();
+  const companyId = getCompanyId();
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -60,7 +61,9 @@ async function request<T>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  // x-company-id is no longer sent — tenant is derived from JWT on the backend.
+  if (companyId) {
+    headers["x-company-id"] = companyId;
+  }
 
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
@@ -78,9 +81,7 @@ async function request<T>(
     try {
       const json = await res.json();
       message = json.error || json.message || message;
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
     clearAuth();
     window.location.href = "/login";
     toast({ title: "Access denied", description: message, variant: "destructive" });
@@ -97,9 +98,7 @@ async function request<T>(
       try {
         const text = await res.text();
         if (text) message = text;
-      } catch {
-        // ignore
-      }
+      } catch { /* ignore */ }
     }
     toast({ title: `Error ${res.status}`, description: String(message), variant: "destructive" });
     throw new Error(String(message));
@@ -117,6 +116,12 @@ export const api = {
     request<{ token: string; company_id: string }>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
+    }),
+
+  signup: (companyName: string, email: string, password: string) =>
+    request<{ token: string; companyId: string }>("/api/auth/signup", {
+      method: "POST",
+      body: JSON.stringify({ companyName, email, password }),
     }),
 
   me: () =>

@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api } from "@/lib/apiClient";
 
-const Login = () => {
+const Signup = () => {
+  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -11,7 +12,9 @@ const Login = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmedCompany = companyName.trim();
     const trimmedEmail = email.trim();
+    if (!trimmedCompany) { setError("Company name is required"); return; }
     if (!trimmedEmail) { setError("Email is required"); return; }
     if (!password) { setError("Password is required"); return; }
 
@@ -19,13 +22,13 @@ const Login = () => {
     setError("");
 
     try {
-      const res = await api.login(trimmedEmail, password);
+      const res = await api.signup(trimmedCompany, trimmedEmail, password);
       localStorage.setItem("auth_token", res.token);
-      if (res.company_id) localStorage.setItem("company_id", res.company_id);
+      if (res.companyId) localStorage.setItem("company_id", res.companyId);
       navigate("/leads");
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Login failed";
-      setError(typeof message === "string" ? message : "Login failed");
+      const message = err instanceof Error ? err.message : "Signup failed";
+      setError(typeof message === "string" ? message : "Signup failed");
     } finally {
       setLoading(false);
     }
@@ -39,10 +42,25 @@ const Login = () => {
             <div className="mb-2 font-mono text-xs uppercase tracking-[0.3em] text-muted-foreground">
               Prefab Lead Control
             </div>
-            <h1 className="text-2xl font-bold text-foreground">System Login</h1>
+            <h1 className="text-2xl font-bold text-foreground">Create Account</h1>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                Company Name
+              </label>
+              <input
+                type="text"
+                value={companyName}
+                onChange={(e) => { setCompanyName(e.target.value); setError(""); }}
+                placeholder="Acme Inc."
+                className="industrial-input w-full"
+                autoFocus
+                disabled={loading}
+              />
+            </div>
+
             <div>
               <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">
                 Email
@@ -53,7 +71,6 @@ const Login = () => {
                 onChange={(e) => { setEmail(e.target.value); setError(""); }}
                 placeholder="you@company.com"
                 className="industrial-input w-full"
-                autoFocus
                 disabled={loading}
               />
             </div>
@@ -77,12 +94,12 @@ const Login = () => {
             )}
 
             <button type="submit" disabled={loading} className="industrial-btn-accent w-full">
-              {loading ? "Logging in…" : "Log in"}
+              {loading ? "Creating…" : "Create account"}
             </button>
 
             <div className="text-center">
-              <Link to="/signup" className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors">
-                Create account
+              <Link to="/login" className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors">
+                Back to login
               </Link>
             </div>
           </form>
@@ -92,4 +109,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default Signup;
