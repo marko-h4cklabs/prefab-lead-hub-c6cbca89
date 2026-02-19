@@ -4,6 +4,8 @@ import { setCompanyId, setAuthToken, api } from "@/lib/apiClient";
 
 const Login = () => {
   const [value, setValue] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -11,6 +13,16 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = value.trim();
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password;
+    if (!trimmedEmail) {
+      setError("Email is required");
+      return;
+    }
+    if (!trimmedPassword) {
+      setError("Password is required");
+      return;
+    }
     if (!trimmed) {
       setError("Company ID is required");
       return;
@@ -25,7 +37,7 @@ const Login = () => {
     setError("");
 
     try {
-      const res = await api.login(trimmed);
+      const res = await api.login(trimmed, trimmedEmail, trimmedPassword);
       setAuthToken(res.token);
       setCompanyId(res.company_id || trimmed);
       navigate("/leads");
@@ -53,6 +65,35 @@ const Login = () => {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                Email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                placeholder="you@company.com"
+                className="industrial-input w-full"
+                autoFocus
+                disabled={loading}
+              />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                placeholder="••••••••"
+                className="industrial-input w-full"
+                disabled={loading}
+              />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">
                 Company ID
               </label>
               <input
@@ -61,13 +102,13 @@ const Login = () => {
                 onChange={(e) => { setValue(e.target.value); setError(""); }}
                 placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                 className="industrial-input w-full"
-                autoFocus
                 disabled={loading}
               />
-              {error && (
-                <p className="mt-1.5 text-xs text-destructive font-mono">{error}</p>
-              )}
             </div>
+
+            {error && (
+              <p className="mt-1.5 text-xs text-destructive font-mono">{error}</p>
+            )}
 
             <button type="submit" disabled={loading} className="industrial-btn-accent w-full">
               {loading ? "Connecting…" : "Connect"}
