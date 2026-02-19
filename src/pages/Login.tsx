@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api } from "@/lib/apiClient";
+import { Eye, EyeOff } from "lucide-react";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmedEmail = email.trim();
+    const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail) { setError("Email is required"); return; }
     if (!password) { setError("Password is required"); return; }
 
@@ -22,6 +24,7 @@ const Login = () => {
       const res = await api.login(trimmedEmail, password);
       localStorage.setItem("auth_token", res.token);
       if (res.company_id) localStorage.setItem("company_id", res.company_id);
+      if (res.role) localStorage.setItem("user_role", res.role);
       navigate("/leads");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Login failed";
@@ -62,14 +65,24 @@ const Login = () => {
               <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">
                 Password
               </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setError(""); }}
-                placeholder="••••••••"
-                className="industrial-input w-full"
-                disabled={loading}
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                  placeholder="••••••••"
+                  className="industrial-input w-full pr-10"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             {error && (

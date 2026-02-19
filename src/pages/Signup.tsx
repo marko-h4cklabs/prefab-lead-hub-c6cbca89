@@ -1,22 +1,31 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api } from "@/lib/apiClient";
+import { Eye, EyeOff } from "lucide-react";
 
 const Signup = () => {
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  const passwordsMatch = password === confirmPassword;
+  const canSubmit = companyName.trim() && email.trim() && password && confirmPassword && passwordsMatch && !loading;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedCompany = companyName.trim();
-    const trimmedEmail = email.trim();
+    const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedCompany) { setError("Company name is required"); return; }
     if (!trimmedEmail) { setError("Email is required"); return; }
     if (!password) { setError("Password is required"); return; }
+    if (!confirmPassword) { setError("Please confirm your password"); return; }
+    if (!passwordsMatch) { setError("Passwords do not match"); return; }
 
     setLoading(true);
     setError("");
@@ -79,21 +88,58 @@ const Signup = () => {
               <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">
                 Password
               </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setError(""); }}
-                placeholder="••••••••"
-                className="industrial-input w-full"
-                disabled={loading}
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                  placeholder="••••••••"
+                  className="industrial-input w-full pr-10"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                Confirm Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showConfirm ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => { setConfirmPassword(e.target.value); setError(""); }}
+                  placeholder="••••••••"
+                  className="industrial-input w-full pr-10"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm(!showConfirm)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              {confirmPassword && !passwordsMatch && (
+                <p className="mt-1.5 text-xs text-destructive font-mono">Passwords do not match</p>
+              )}
             </div>
 
             {error && (
               <p className="mt-1.5 text-xs text-destructive font-mono">{error}</p>
             )}
 
-            <button type="submit" disabled={loading} className="industrial-btn-accent w-full">
+            <button type="submit" disabled={!canSubmit} className="industrial-btn-accent w-full">
               {loading ? "Creating…" : "Create account"}
             </button>
 
