@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api } from "@/lib/apiClient";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -31,8 +31,12 @@ const Login = () => {
       console.log("[auth] stored token key=auth_token tokenLen=" + token.length);
       navigate("/leads", { replace: true });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Login failed";
-      setError(typeof message === "string" ? message : "Login failed");
+      if (err instanceof TypeError) {
+        setError("Backend unreachable. Please try again or contact support.");
+      } else {
+        const message = err instanceof Error ? err.message : "Login failed";
+        setError(typeof message === "string" ? message : "Login failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -93,8 +97,8 @@ const Login = () => {
               <p className="mt-1.5 text-xs text-destructive font-mono">{error}</p>
             )}
 
-            <button type="submit" disabled={loading} className="industrial-btn-accent w-full">
-              {loading ? "Logging in…" : "Log in"}
+            <button type="submit" disabled={loading} className="industrial-btn-accent w-full flex items-center justify-center gap-2">
+              {loading ? <><Loader2 size={16} className="animate-spin" /> Logging in…</> : "Log in"}
             </button>
 
             <div className="text-center">
