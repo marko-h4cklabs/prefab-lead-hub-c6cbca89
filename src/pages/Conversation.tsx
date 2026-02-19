@@ -23,6 +23,13 @@ interface FieldDef {
   required?: boolean;
 }
 
+interface InfoItem {
+  name: string;
+  type?: string;
+  units?: string;
+  value?: any;
+}
+
 const Conversation = () => {
   const { leadId } = useParams();
   const navigate = useNavigate();
@@ -40,6 +47,9 @@ const Conversation = () => {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [aiReplying, setAiReplying] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [requiredInfos, setRequiredInfos] = useState<InfoItem[]>([]);
+  const [collectedInfos, setCollectedInfos] = useState<InfoItem[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -66,16 +76,62 @@ const Conversation = () => {
     scrollToBottom();
   }, [data?.messages]);
 
+  const applyBackendResponse = (res: any) => {
+    // Handle new contract: { assistant_message, conversation_id, required_infos, collected_infos }
+    if (res?.assistant_message !== undefined) {
+      if (res.conversation_id) setConversationId(res.conversation_id);
+      if (Array.isArray(res.required_infos)) setRequiredInfos(res.required_infos);
+      if (Array.isArray(res.collected_infos)) setCollectedInfos(res.collected_infos);
+
+      // Append user + assistant messages to local state
+      setData((prev) => {
+        const msgs = prev?.messages || [];
+        // The user message was already optimistically added before send,
+        // but if not, we just append the assistant reply
+        return {
+          ...prev,
+          lead_id: prev?.lead_id || leadId || "",
+          messages: [...msgs, { role: "assistant", content: res.assistant_message }],
+          parsed_fields: prev?.parsed_fields || {},
+          current_step: prev?.current_step ?? 0,
+        };
+      });
+    } else {
+      // Legacy contract: full conversation object
+      setData(res);
+    }
+  };
+
   const handleSend = async () => {
     if (!draft.trim() || !leadId || sending) return;
     const content = draft.trim();
     setSending(true);
     setDraft("");
+
+    // Optimistically add user message
+    setData((prev) => ({
+      ...prev,
+      lead_id: prev?.lead_id || leadId || "",
+      messages: [...(prev?.messages || []), { role: "user", content }],
+      parsed_fields: prev?.parsed_fields || {},
+      current_step: prev?.current_step ?? 0,
+    }));
+
     try {
-      const updated = await api.sendMessage(companyId, leadId, { role: "user", content });
-      setData(updated);
+      const body: any = { role: "user", content };
+      if (conversationId) body.conversation_id = conversationId;
+      const res = await api.sendMessage(companyId, leadId, body);
+      applyBackendResponse(res);
     } catch {
       toast({ title: "Error", description: "Failed to send message", variant: "destructive" });
+      // Remove optimistic user message and restore draft
+      setData((prev) => ({
+        ...prev,
+        lead_id: prev?.lead_id || leadId || "",
+        messages: (prev?.messages || []).slice(0, -1),
+        parsed_fields: prev?.parsed_fields || {},
+        current_step: prev?.current_step ?? 0,
+      }));
       setDraft(content);
     } finally {
       setSending(false);
@@ -86,8 +142,8 @@ const Conversation = () => {
     if (!leadId || aiReplying) return;
     setAiReplying(true);
     try {
-      const updated = await api.aiReply(companyId, leadId);
-      setData(updated);
+      const res = await api.aiReply(companyId, leadId);
+      applyBackendResponse(res);
     } catch {
       toast({ title: "Error", description: "Failed to get AI reply", variant: "destructive" });
     } finally {
@@ -114,11 +170,85 @@ const Conversation = () => {
   const parsedFields = data?.parsed_fields || {};
   const currentStep = data?.current_step ?? 0;
 
-  const requiredFields = fields.filter((f) => f.required);
-  const missingFields = requiredFields.filter((f) => {
+  const requiredFieldDefs = fields.filter((f) => f.required);
+  const missingFields = requiredFieldDefs.filter((f) => {
     const val = parsedFields[f.name];
     return val === undefined || val === null || val === "";
   });
+
+  const InfoPanel = () => (
+    <div className="space-y-4">
+      {/* Required infos (missing) */}
+      <div>
+        <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">
+          Required Infos (missing)
+        </h3>
+        {requiredInfos.length === 0 ? (
+          <p className="text-xs text-muted-foreground">None</p>
+        ) : (
+          <ul className="space-y-1">
+            {requiredInfos.map((item, i) => (
+              <li key={i} className="text-xs font-mono">
+                <span className="text-foreground">{item.name}</span>
+                <span className="text-muted-foreground ml-1">({item.type || "text"})</span>
+                {item.units && <span className="text-muted-foreground ml-1">· {item.units}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Collected infos */}
+      <div>
+        <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">
+          Collected Infos
+        </h3>
+        {collectedInfos.length === 0 ? (
+          <p className="text-xs text-muted-foreground">None yet</p>
+        ) : (
+          <dl className="space-y-1">
+            {collectedInfos.map((item, i) => (
+              <div key={i} className="text-xs font-mono">
+                <dt className="text-muted-foreground inline">{item.name}: </dt>
+                <dd className="inline text-foreground font-medium">{String(item.value ?? "—")}</dd>
+                {item.units && <span className="text-muted-foreground ml-1">({item.units})</span>}
+              </div>
+            ))}
+          </dl>
+        )}
+      </div>
+
+      {/* Legacy captured fields */}
+      {Object.keys(parsedFields).length > 0 && (
+        <div>
+          <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-3">
+            Captured Fields
+          </h3>
+          <dl className="space-y-2">
+            {Object.entries(parsedFields).map(([k, v]) => (
+              <div key={k}>
+                <dt className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">{k}</dt>
+                <dd className="text-sm font-medium">{String(v ?? "—")}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+
+      {missingFields.length > 0 && (
+        <div>
+          <h3 className="text-xs font-mono uppercase tracking-wider text-destructive mb-2">
+            Missing Required Fields
+          </h3>
+          <ul className="space-y-1">
+            {missingFields.map((f) => (
+              <li key={f.id} className="text-xs font-mono text-destructive/80">• {f.name}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="flex flex-col h-[calc(100vh-73px)]">
@@ -206,67 +336,26 @@ const Conversation = () => {
           </div>
         </div>
 
-        {/* Sidebar: Captured Fields */}
+        {/* Sidebar: Required & Collected Infos */}
         <aside className="hidden md:block w-64 shrink-0 overflow-y-auto">
-          <div className="industrial-card p-4 space-y-4">
-            <div>
-              <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-3">
-                Captured Fields
-              </h3>
-              {Object.keys(parsedFields).length === 0 ? (
-                <p className="text-xs text-muted-foreground">No fields captured yet</p>
-              ) : (
-                <dl className="space-y-2">
-                  {Object.entries(parsedFields).map(([k, v]) => (
-                    <div key={k}>
-                      <dt className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">{k}</dt>
-                      <dd className="text-sm font-medium">{String(v ?? "—")}</dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
-            </div>
-
-            {missingFields.length > 0 && (
-              <div>
-                <h3 className="text-xs font-mono uppercase tracking-wider text-destructive mb-2">
-                  Missing Required Fields
-                </h3>
-                <ul className="space-y-1">
-                  {missingFields.map((f) => (
-                    <li key={f.id} className="text-xs font-mono text-destructive/80">• {f.name}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+          <div className="industrial-card p-4">
+            <InfoPanel />
           </div>
         </aside>
       </div>
 
-      {/* Mobile fields */}
+      {/* Mobile infos panel */}
       <div className="md:hidden mt-3 shrink-0">
-        {(Object.keys(parsedFields).length > 0 || missingFields.length > 0) && (
+        {(requiredInfos.length > 0 || collectedInfos.length > 0 || Object.keys(parsedFields).length > 0 || missingFields.length > 0) && (
           <details className="industrial-card p-3">
             <summary className="text-xs font-mono uppercase tracking-wider text-muted-foreground cursor-pointer">
-              Captured Fields ({Object.keys(parsedFields).length})
-              {missingFields.length > 0 && ` · ${missingFields.length} missing`}
+              Required & Collected Infos
+              {requiredInfos.length > 0 && ` · ${requiredInfos.length} missing`}
+              {collectedInfos.length > 0 && ` · ${collectedInfos.length} collected`}
             </summary>
-            <dl className="grid grid-cols-2 gap-2 mt-2">
-              {Object.entries(parsedFields).map(([k, v]) => (
-                <div key={k}>
-                  <dt className="text-[10px] font-mono uppercase text-muted-foreground">{k}</dt>
-                  <dd className="text-sm font-medium">{String(v ?? "—")}</dd>
-                </div>
-              ))}
-            </dl>
-            {missingFields.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-border">
-                <p className="text-[10px] font-mono uppercase text-destructive mb-1">Missing required</p>
-                {missingFields.map((f) => (
-                  <span key={f.id} className="text-xs font-mono text-destructive/80 mr-2">• {f.name}</span>
-                ))}
-              </div>
-            )}
+            <div className="mt-2">
+              <InfoPanel />
+            </div>
           </details>
         )}
       </div>
