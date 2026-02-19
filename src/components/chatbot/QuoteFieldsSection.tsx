@@ -4,20 +4,12 @@ import { toast } from "@/hooks/use-toast";
 import { Save, Plus, Trash2 } from "lucide-react";
 
 interface QuoteField {
-  field_name: string;
-  field_type: string;
+  name: string;
+  type: string;
   units: string;
   priority: number;
   required: boolean;
 }
-
-const emptyField: QuoteField = {
-  field_name: "",
-  field_type: "text",
-  units: "",
-  priority: 0,
-  required: true,
-};
 
 const QuoteFieldsSection = () => {
   const [fields, setFields] = useState<QuoteField[]>([]);
@@ -30,12 +22,12 @@ const QuoteFieldsSection = () => {
     api.getQuoteFields()
       .then((res) => {
         const data = res.fields || res.data || res || [];
-        const parsed = Array.isArray(data)
-          ? data.map((f: any) => ({
-              field_name: f.field_name || "",
-              field_type: f.field_type === "number" ? "number" : "text",
+        const parsed: QuoteField[] = Array.isArray(data)
+          ? data.map((f: any, idx: number) => ({
+              name: f.name || f.field_name || "",
+              type: f.type === "number" || f.field_type === "number" ? "number" : "text",
               units: f.units || "",
-              priority: f.priority ?? f.display_order ?? 0,
+              priority: f.priority ?? f.display_order ?? (idx + 1) * 10,
               required: f.required ?? true,
             }))
           : [];
@@ -66,7 +58,8 @@ const QuoteFieldsSection = () => {
 
   const addField = () => {
     const maxPriority = fields.reduce((max, f) => Math.max(max, f.priority), 0);
-    setFieldsAndDirty([...fields, { ...emptyField, priority: maxPriority + 1 }]);
+    const nextPriority = maxPriority > 0 ? maxPriority + 10 : 10;
+    setFieldsAndDirty([...fields, { name: "", type: "text", units: "", priority: nextPriority, required: true }]);
   };
 
   const removeField = (index: number) => {
@@ -112,16 +105,16 @@ const QuoteFieldsSection = () => {
                 <tr key={i}>
                   <td>
                     <input
-                      value={f.field_name}
-                      onChange={(e) => updateField(i, { field_name: e.target.value })}
+                      value={f.name}
+                      onChange={(e) => updateField(i, { name: e.target.value })}
                       className="industrial-input w-full"
                       placeholder="Field name"
                     />
                   </td>
                   <td>
                     <select
-                      value={f.field_type}
-                      onChange={(e) => updateField(i, { field_type: e.target.value })}
+                      value={f.type}
+                      onChange={(e) => updateField(i, { type: e.target.value })}
                       className="industrial-input w-full"
                     >
                       <option value="text">Text</option>
