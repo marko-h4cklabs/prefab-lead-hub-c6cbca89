@@ -3,25 +3,28 @@ const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
 // --- Token management ---
 
 export function getAuthToken(): string | null {
-  return localStorage.getItem("authToken");
+  return localStorage.getItem("plcs_token");
 }
 
 export function setAuthToken(token: string) {
-  localStorage.setItem("authToken", token);
+  localStorage.setItem("plcs_token", token);
 }
 
 export function clearAuth() {
+  localStorage.removeItem("plcs_token");
+  localStorage.removeItem("plcs_company_id");
+  // clean up legacy keys
   localStorage.removeItem("authToken");
-  localStorage.removeItem("companyId"); // clean up legacy key
+  localStorage.removeItem("companyId");
 }
 
-/** Returns stored companyId (legacy helper used by pages to build URLs). */
+/** Returns stored companyId. */
 export function getCompanyId(): string | null {
-  return localStorage.getItem("companyId");
+  return localStorage.getItem("plcs_company_id") || localStorage.getItem("companyId");
 }
 
 export function setCompanyId(id: string) {
-  localStorage.setItem("companyId", id);
+  localStorage.setItem("plcs_company_id", id);
 }
 
 export function requireCompanyId(): string {
@@ -83,6 +86,8 @@ async function request<T>(
     } catch {
       // ignore
     }
+    clearAuth();
+    window.location.href = "/login";
     toast({ title: "Access denied", description: message, variant: "destructive" });
     throw new Error(message);
   }
@@ -174,11 +179,11 @@ export const api = {
     }),
 
   // --- Auth ---
-  login: (companyId: string) =>
+  login: (companyId: string, email: string, password: string) =>
     request<{ token: string; company_id: string }>("/api/auth/login", {
       method: "POST",
       headers: { "x-company-id": companyId },
-      body: JSON.stringify({ email: "", password: "", companyId }),
+      body: JSON.stringify({ email, password, companyId }),
     }),
 
   // --- Admin ---
