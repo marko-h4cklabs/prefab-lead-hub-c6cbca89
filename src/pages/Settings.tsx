@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, requireCompanyId } from "@/lib/apiClient";
-import { Save } from "lucide-react";
+import { Save, Activity, Loader2 } from "lucide-react";
 
 const Settings = () => {
   const companyId = requireCompanyId();
@@ -11,6 +11,10 @@ const Settings = () => {
   const [fetchError, setFetchError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [companyRole, setCompanyRole] = useState("");
+  const [snapshotLoading, setSnapshotLoading] = useState(false);
+  const [snapshotData, setSnapshotData] = useState<any>(null);
+  const [snapshotError, setSnapshotError] = useState("");
 
   useEffect(() => {
     api.getCompany(companyId)
@@ -23,6 +27,7 @@ const Settings = () => {
             ? style.forbidden_topics.join(", ")
             : style.forbidden_topics || ""
         );
+        setCompanyRole(c.role || c.user_role || "");
       })
       .catch((err: Error) => setFetchError(err.message || "Failed to load settings"))
       .finally(() => setLoading(false));
@@ -107,6 +112,43 @@ const Settings = () => {
           {saved && <span className="text-xs font-mono text-success">✓ Saved</span>}
         </div>
       </form>
+
+      {/* Admin Snapshot — visible for owner/admin roles */}
+      {(companyRole === "owner" || companyRole === "admin") && (
+        <div className="industrial-card p-6 mt-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold uppercase tracking-wider">Admin: Analytics Snapshot</h2>
+            <button
+              onClick={() => {
+                setSnapshotLoading(true);
+                setSnapshotError("");
+                setSnapshotData(null);
+                api.runSnapshot()
+                  .then(setSnapshotData)
+                  .catch((err: Error) => setSnapshotError(err.message || "Snapshot failed"))
+                  .finally(() => setSnapshotLoading(false));
+              }}
+              disabled={snapshotLoading}
+              className="industrial-btn-primary"
+            >
+              {snapshotLoading ? <Loader2 size={14} className="animate-spin" /> : <Activity size={14} />}
+              <span className="ml-1.5">{snapshotLoading ? "Running…" : "Run Snapshot"}</span>
+            </button>
+          </div>
+
+          {snapshotError && (
+            <div className="rounded-sm border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {snapshotError}
+            </div>
+          )}
+
+          {snapshotData && (
+            <pre className="overflow-auto max-h-80 rounded-sm bg-muted p-4 text-xs font-mono">
+              {JSON.stringify(snapshotData, null, 2)}
+            </pre>
+          )}
+        </div>
+      )}
     </div>
   );
 };
