@@ -1,9 +1,13 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { api } from "@/lib/apiClient";
 import { toast } from "@/hooks/use-toast";
 import { Save, Loader2 } from "lucide-react";
 
-const CompanyInfoSection = () => {
+interface Props {
+  onScrapeComplete?: () => void;
+}
+
+const CompanyInfoSection = ({ onScrapeComplete }: Props) => {
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [businessDescription, setBusinessDescription] = useState("");
   const [additionalNotes, setAdditionalNotes] = useState("");
@@ -11,22 +15,88 @@ const CompanyInfoSection = () => {
   const [saving, setSaving] = useState(false);
   const [scraping, setScraping] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+
+  // Scrape status: null | queued | running | summarizing | done | error
+  const [scrapeStatus, setScrapeStatus] = useState<string | null>(null);
+  const [scrapeError, setScrapeError] = useState<string | null>(null);
+
   const initialRef = useRef({ websiteUrl: "", businessDescription: "", additionalNotes: "" });
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollingStartRef = useRef<number>(0);
+
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
+
+  // Apply fetched company info to state
+  const applyCompanyInfo = useCallback((res: any) => {
+    const w = res.website_url || "";
+    const b = res.business_description || "";
+    const n = res.additional_notes || "";
+    const status = res.scrape_status || null;
+    const error = res.scrape_error || null;
+
+    setWebsiteUrl(w);
+    setBusinessDescription(b);
+    setAdditionalNotes(n);
+    setScrapeStatus(status);
+    setScrapeError(error);
+    initialRef.current = { websiteUrl: w, businessDescription: b, additionalNotes: n };
+    setIsDirty(false);
+
+    return { status };
+  }, []);
+
+  // Start polling GET /api/chatbot/company-info every 2s
+  const startPolling = useCallback(() => {
+    stopPolling();
+    pollingStartRef.current = Date.now();
+
+    pollingRef.current = setInterval(async () => {
+      const elapsed = Date.now() - pollingStartRef.current;
+      if (elapsed > 90_000) {
+        stopPolling();
+        toast({ title: "Still processing", description: "Refresh in a moment." });
+        return;
+      }
+      try {
+        const res = await api.getCompanyInfo();
+        const { status } = applyCompanyInfo(res);
+
+        if (status === "done") {
+          stopPolling();
+          setScraping(false);
+          toast({ title: "Scrape complete", description: "Business description updated." });
+          onScrapeComplete?.();
+        } else if (status === "error") {
+          stopPolling();
+          setScraping(false);
+          toast({ title: "Scrape failed", description: res.scrape_error || "Unknown error", variant: "destructive" });
+        }
+      } catch {
+        // keep polling on transient errors
+      }
+    }, 2000);
+  }, [stopPolling, applyCompanyInfo, onScrapeComplete]);
 
   useEffect(() => {
     api.getCompanyInfo()
       .then((res) => {
-        const w = res.website_url || "";
-        const b = res.business_description || "";
-        const n = res.additional_notes || "";
-        setWebsiteUrl(w);
-        setBusinessDescription(b);
-        setAdditionalNotes(n);
-        initialRef.current = { websiteUrl: w, businessDescription: b, additionalNotes: n };
+        const { status } = applyCompanyInfo(res);
+        // Resume polling if scrape is in progress
+        if (status === "queued" || status === "running" || status === "summarizing") {
+          setScraping(true);
+          startPolling();
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+
+    return () => stopPolling();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const checkDirty = (w: string, b: string, n: string) => {
     const init = initialRef.current;
@@ -60,6 +130,8 @@ const CompanyInfoSection = () => {
       return;
     }
     setScraping(true);
+    setScrapeStatus("queued");
+    setScrapeError(null);
     try {
       if (isDirty) {
         await api.putCompanyInfo({ website_url: websiteUrl, business_description: businessDescription, additional_notes: additionalNotes });
@@ -68,8 +140,11 @@ const CompanyInfoSection = () => {
       }
       await api.scrapeCompanyInfo({ website_url: normalized });
       toast({ title: "Scrape queued", description: "Website content will be processed shortly." });
-    } catch { /* errors handled by apiClient */ }
-    finally { setScraping(false); }
+      startPolling();
+    } catch {
+      setScraping(false);
+      setScrapeStatus(null);
+    }
   };
 
   const isValidUrl = (() => {
@@ -79,6 +154,12 @@ const CompanyInfoSection = () => {
       return true;
     } catch { return false; }
   })();
+
+  const isScrapeInProgress = scrapeStatus === "queued" || scrapeStatus === "running" || scrapeStatus === "summarizing";
+  const hasWebsite = websiteUrl.trim().length > 0;
+
+  // Business description is disabled when: no website, scrape in progress, or scrape errored
+  const descriptionDisabled = !hasWebsite || isScrapeInProgress || scrapeStatus === "error";
 
   if (loading) return <div className="industrial-card p-6 text-muted-foreground text-sm">Loading…</div>;
 
@@ -104,8 +185,26 @@ const CompanyInfoSection = () => {
           value={businessDescription}
           onChange={(e) => { setBusinessDescription(e.target.value); checkDirty(websiteUrl, e.target.value, additionalNotes); }}
           className="industrial-input w-full h-24"
-          placeholder="Describe your business…"
+          placeholder={descriptionDisabled ? "" : "Describe your business…"}
+          disabled={descriptionDisabled}
+          readOnly={descriptionDisabled}
         />
+        {/* Status helpers */}
+        {!hasWebsite && (
+          <p className="mt-1 text-xs text-muted-foreground">Add website URL and run scrape to generate this.</p>
+        )}
+        {isScrapeInProgress && (
+          <p className="mt-1 text-xs text-accent-foreground flex items-center gap-1.5">
+            <Loader2 size={12} className="animate-spin" />
+            Scrape in progress: {scrapeStatus}
+          </p>
+        )}
+        {scrapeStatus === "error" && scrapeError && (
+          <p className="mt-1 text-xs text-destructive">{scrapeError}</p>
+        )}
+        {scrapeStatus === "error" && !scrapeError && (
+          <p className="mt-1 text-xs text-destructive">Scrape failed. Try again.</p>
+        )}
       </div>
 
       <div>
@@ -128,11 +227,11 @@ const CompanyInfoSection = () => {
         </button>
         <button
           onClick={handleScrape}
-          disabled={!isValidUrl || scraping}
+          disabled={!isValidUrl || scraping || isScrapeInProgress}
           className="industrial-btn-primary"
         >
-          {scraping ? <Loader2 size={16} className="animate-spin" /> : null}
-          {scraping ? "Scraping…" : "Request website scrape"}
+          {(scraping || isScrapeInProgress) ? <Loader2 size={16} className="animate-spin" /> : null}
+          {(scraping || isScrapeInProgress) ? "Scraping…" : "Request website scrape"}
         </button>
       </div>
     </div>
