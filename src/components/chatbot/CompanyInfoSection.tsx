@@ -103,7 +103,7 @@ const CompanyInfoSection = ({ onScrapeComplete }: Props) => {
       } catch {
         // keep polling on transient errors
       }
-    }, 4000);
+    }, 3000);
   }, [stopPolling, applyCompanyInfo, onScrapeComplete]);
 
   useEffect(() => {
@@ -259,11 +259,11 @@ const CompanyInfoSection = ({ onScrapeComplete }: Props) => {
         </button>
         <button
           onClick={handleScrape}
-          disabled={!isValidUrl || scraping || isScrapeInProgress}
+          disabled={!isValidUrl || isScrapeInProgress}
           className="industrial-btn-primary"
         >
-          {(scraping || isScrapeInProgress) ? <Loader2 size={16} className="animate-spin" /> : null}
-          {(scraping || isScrapeInProgress) ? "Scraping…" : "Request website scrape"}
+          {isScrapeInProgress ? <Loader2 size={16} className="animate-spin" /> : null}
+          {isScrapeInProgress ? "Scraping…" : scrapeStatus === "error" ? "Retry scrape" : "Request website scrape"}
         </button>
         {statusLabel && (
           <span className={`text-xs font-mono uppercase tracking-wider ${scrapeStatus === "error" ? "text-destructive" : scrapeStatus === "done" ? "text-accent-foreground" : "text-muted-foreground"}`}>
