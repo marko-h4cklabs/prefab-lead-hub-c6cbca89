@@ -50,7 +50,6 @@ async function request<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const token = getAuthToken();
-  const companyId = getCompanyId();
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -59,10 +58,6 @@ async function request<T>(
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
-  }
-
-  if (companyId) {
-    headers["x-company-id"] = companyId;
   }
 
   // x-company-id is no longer sent — tenant is derived from JWT on the backend.
@@ -96,7 +91,6 @@ async function request<T>(
     let message = `API error ${res.status}`;
     try {
       const json = await res.json();
-      // Extract a string message — never pass raw objects
       const raw = json?.error?.message || json?.error || json?.message || json;
       message = typeof raw === "string" ? raw : JSON.stringify(raw);
     } catch {
@@ -118,6 +112,17 @@ async function request<T>(
 export const api = {
   health: () => request<{ status: string }>("/health"),
 
+  // --- Auth ---
+  login: (email: string, password: string) =>
+    request<{ token: string; company_id: string }>("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+
+  me: () =>
+    request<{ user: any; company_id: string }>("/api/auth/me"),
+
+  // --- Company ---
   getCompany: (companyId: string) =>
     request<any>(`/api/companies/${companyId}`),
 
@@ -127,6 +132,7 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  // --- Leads ---
   getLeads: (companyId: string, params: { status?: string; limit?: number; offset?: number }) => {
     const search = new URLSearchParams();
     if (params.status) search.set("status", params.status);
@@ -158,6 +164,7 @@ export const api = {
       method: "POST",
     }),
 
+  // --- Fields ---
   getFields: (companyId: string) =>
     request<any>(`/api/companies/${companyId}/fields`),
 
@@ -176,14 +183,6 @@ export const api = {
   deleteField: (companyId: string, fieldId: string) =>
     request<any>(`/api/companies/${companyId}/fields/${fieldId}`, {
       method: "DELETE",
-    }),
-
-  // --- Auth ---
-  login: (companyId: string, email: string, password: string) =>
-    request<{ token: string; company_id: string }>("/api/auth/login", {
-      method: "POST",
-      headers: { "x-company-id": companyId },
-      body: JSON.stringify({ email, password, companyId }),
     }),
 
   // --- Admin ---
