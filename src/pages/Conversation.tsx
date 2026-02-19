@@ -17,17 +17,30 @@ interface ConversationData {
   current_step: number;
 }
 
-interface FieldDef {
-  id: string;
-  name: string;
-  required?: boolean;
-}
 
-interface InfoItem {
+
+interface HighlightField {
   name: string;
   type?: string;
   units?: string;
   value?: any;
+}
+
+interface HighlightSettings {
+  tone?: string;
+  persona?: string;
+  response_length?: string;
+  emojis_enabled?: boolean;
+}
+
+interface Highlights {
+  settings?: HighlightSettings;
+  fields?: {
+    configured?: HighlightField[];
+    missing_required?: HighlightField[];
+    collected?: HighlightField[];
+  };
+  state?: any;
 }
 
 const Conversation = () => {
@@ -42,14 +55,13 @@ const Conversation = () => {
   }
 
   const [data, setData] = useState<ConversationData | null>(null);
-  const [fields, setFields] = useState<FieldDef[]>([]);
+  
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [aiReplying, setAiReplying] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [requiredInfos, setRequiredInfos] = useState<InfoItem[]>([]);
-  const [collectedInfos, setCollectedInfos] = useState<InfoItem[]>([]);
+  const [highlights, setHighlights] = useState<Highlights>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -58,14 +70,8 @@ const Conversation = () => {
 
   useEffect(() => {
     if (!leadId) return;
-    Promise.all([
-      api.getConversation(companyId, leadId),
-      api.getFields(companyId),
-    ])
-      .then(([convo, fieldsRes]) => {
-        setData(convo);
-        setFields(Array.isArray(fieldsRes) ? fieldsRes : fieldsRes?.data || fieldsRes?.fields || []);
-      })
+    api.getConversation(companyId, leadId)
+      .then((convo) => setData(convo))
       .catch(() => {
         toast({ title: "Error", description: "Failed to load conversation", variant: "destructive" });
       })
@@ -77,17 +83,12 @@ const Conversation = () => {
   }, [data?.messages]);
 
   const applyBackendResponse = (res: any) => {
-    // Handle new contract: { assistant_message, conversation_id, required_infos, collected_infos }
     if (res?.assistant_message !== undefined) {
       if (res.conversation_id) setConversationId(res.conversation_id);
-      if (Array.isArray(res.required_infos)) setRequiredInfos(res.required_infos);
-      if (Array.isArray(res.collected_infos)) setCollectedInfos(res.collected_infos);
+      if (res.highlights) setHighlights(res.highlights);
 
-      // Append user + assistant messages to local state
       setData((prev) => {
         const msgs = prev?.messages || [];
-        // The user message was already optimistically added before send,
-        // but if not, we just append the assistant reply
         return {
           ...prev,
           lead_id: prev?.lead_id || leadId || "",
@@ -97,7 +98,6 @@ const Conversation = () => {
         };
       });
     } else {
-      // Legacy contract: full conversation object
       setData(res);
     }
   };
@@ -167,47 +167,72 @@ const Conversation = () => {
   }
 
   const messages = data?.messages || [];
-  const parsedFields = data?.parsed_fields || {};
   const currentStep = data?.current_step ?? 0;
 
-  const requiredFieldDefs = fields.filter((f) => f.required);
-  const missingFields = requiredFieldDefs.filter((f) => {
-    const val = parsedFields[f.name];
-    return val === undefined || val === null || val === "";
-  });
+  const settings = highlights.settings;
+  const missingRequired = highlights.fields?.missing_required || [];
+  const collected = highlights.fields?.collected || [];
 
-  const InfoPanel = () => (
+  const HighlightsPanel = () => (
     <div className="space-y-4">
-      {/* Required infos (missing) */}
+      {/* Active Settings */}
       <div>
         <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">
-          Required Infos (missing)
+          Active Settings
         </h3>
-        {requiredInfos.length === 0 ? (
-          <p className="text-xs text-muted-foreground">None</p>
+        {settings ? (
+          <dl className="space-y-1">
+            <div className="text-xs font-mono">
+              <dt className="text-muted-foreground inline">Tone: </dt>
+              <dd className="inline text-foreground font-medium">{settings.tone || "—"}</dd>
+            </div>
+            <div className="text-xs font-mono">
+              <dt className="text-muted-foreground inline">Persona: </dt>
+              <dd className="inline text-foreground font-medium">{settings.persona || "—"}</dd>
+            </div>
+            <div className="text-xs font-mono">
+              <dt className="text-muted-foreground inline">Response length: </dt>
+              <dd className="inline text-foreground font-medium">{settings.response_length || "—"}</dd>
+            </div>
+            <div className="text-xs font-mono">
+              <dt className="text-muted-foreground inline">Emojis: </dt>
+              <dd className="inline text-foreground font-medium">{settings.emojis_enabled ? "Yes" : "No"}</dd>
+            </div>
+          </dl>
+        ) : (
+          <p className="text-xs text-muted-foreground">No settings received yet.</p>
+        )}
+      </div>
+
+      {/* Missing Required */}
+      <div>
+        <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">
+          Missing Required
+        </h3>
+        {missingRequired.length === 0 ? (
+          <p className="text-xs text-muted-foreground">All required fields collected.</p>
         ) : (
           <ul className="space-y-1">
-            {requiredInfos.map((item, i) => (
+            {missingRequired.map((item, i) => (
               <li key={i} className="text-xs font-mono">
                 <span className="text-foreground">{item.name}</span>
-                <span className="text-muted-foreground ml-1">({item.type || "text"})</span>
-                {item.units && <span className="text-muted-foreground ml-1">· {item.units}</span>}
+                <span className="text-muted-foreground ml-1">({item.type || "text"}{item.units ? `, ${item.units}` : ""})</span>
               </li>
             ))}
           </ul>
         )}
       </div>
 
-      {/* Collected infos */}
+      {/* Collected */}
       <div>
         <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">
-          Collected Infos
+          Collected
         </h3>
-        {collectedInfos.length === 0 ? (
-          <p className="text-xs text-muted-foreground">None yet</p>
+        {collected.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No fields collected yet.</p>
         ) : (
           <dl className="space-y-1">
-            {collectedInfos.map((item, i) => (
+            {collected.map((item, i) => (
               <div key={i} className="text-xs font-mono">
                 <dt className="text-muted-foreground inline">{item.name}: </dt>
                 <dd className="inline text-foreground font-medium">{String(item.value ?? "—")}</dd>
@@ -217,36 +242,6 @@ const Conversation = () => {
           </dl>
         )}
       </div>
-
-      {/* Legacy captured fields */}
-      {Object.keys(parsedFields).length > 0 && (
-        <div>
-          <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-3">
-            Captured Fields
-          </h3>
-          <dl className="space-y-2">
-            {Object.entries(parsedFields).map(([k, v]) => (
-              <div key={k}>
-                <dt className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">{k}</dt>
-                <dd className="text-sm font-medium">{String(v ?? "—")}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      )}
-
-      {missingFields.length > 0 && (
-        <div>
-          <h3 className="text-xs font-mono uppercase tracking-wider text-destructive mb-2">
-            Missing Required Fields
-          </h3>
-          <ul className="space-y-1">
-            {missingFields.map((f) => (
-              <li key={f.id} className="text-xs font-mono text-destructive/80">• {f.name}</li>
-            ))}
-          </ul>
-        </div>
-      )}
     </div>
   );
 
@@ -336,28 +331,26 @@ const Conversation = () => {
           </div>
         </div>
 
-        {/* Sidebar: Required & Collected Infos */}
+        {/* Sidebar: Highlights */}
         <aside className="hidden md:block w-64 shrink-0 overflow-y-auto">
           <div className="industrial-card p-4">
-            <InfoPanel />
+            <HighlightsPanel />
           </div>
         </aside>
       </div>
 
-      {/* Mobile infos panel */}
+      {/* Mobile highlights panel */}
       <div className="md:hidden mt-3 shrink-0">
-        {(requiredInfos.length > 0 || collectedInfos.length > 0 || Object.keys(parsedFields).length > 0 || missingFields.length > 0) && (
-          <details className="industrial-card p-3">
-            <summary className="text-xs font-mono uppercase tracking-wider text-muted-foreground cursor-pointer">
-              Required & Collected Infos
-              {requiredInfos.length > 0 && ` · ${requiredInfos.length} missing`}
-              {collectedInfos.length > 0 && ` · ${collectedInfos.length} collected`}
-            </summary>
-            <div className="mt-2">
-              <InfoPanel />
-            </div>
-          </details>
-        )}
+        <details className="industrial-card p-3">
+          <summary className="text-xs font-mono uppercase tracking-wider text-muted-foreground cursor-pointer">
+            Highlights
+            {missingRequired.length > 0 && ` · ${missingRequired.length} missing`}
+            {collected.length > 0 && ` · ${collected.length} collected`}
+          </summary>
+          <div className="mt-2">
+            <HighlightsPanel />
+          </div>
+        </details>
       </div>
     </div>
   );
