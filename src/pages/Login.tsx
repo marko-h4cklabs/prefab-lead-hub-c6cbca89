@@ -22,10 +22,14 @@ const Login = () => {
 
     try {
       const res = await api.login(trimmedEmail, password);
-      localStorage.setItem("auth_token", res.token);
-      if (res.company_id) localStorage.setItem("company_id", res.company_id);
+      const token = res.token;
+      if (!token) { setError("Login response missing token"); return; }
+      const companyId = res.company_id || (res as any).companyId;
+      localStorage.setItem("auth_token", token);
+      if (companyId) localStorage.setItem("company_id", companyId);
       if (res.role) localStorage.setItem("user_role", res.role);
-      navigate("/leads");
+      console.log("[auth] stored token key=auth_token tokenLen=" + token.length);
+      navigate("/leads", { replace: true });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Login failed";
       setError(typeof message === "string" ? message : "Login failed");
