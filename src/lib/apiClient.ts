@@ -47,6 +47,7 @@ async function request<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const token = getAuthToken();
+  const companyId = getCompanyId();
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -55,6 +56,10 @@ async function request<T>(
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  if (companyId) {
+    headers["x-company-id"] = companyId;
   }
 
   // x-company-id is no longer sent — tenant is derived from JWT on the backend.
@@ -86,7 +91,9 @@ async function request<T>(
     let message = `API error ${res.status}`;
     try {
       const json = await res.json();
-      message = json.error || json.message || JSON.stringify(json);
+      // Extract a string message — never pass raw objects
+      const raw = json?.error?.message || json?.error || json?.message || json;
+      message = typeof raw === "string" ? raw : JSON.stringify(raw);
     } catch {
       try {
         const text = await res.text();
@@ -95,8 +102,8 @@ async function request<T>(
         // ignore
       }
     }
-    toast({ title: `Error ${res.status}`, description: message, variant: "destructive" });
-    throw new Error(message);
+    toast({ title: `Error ${res.status}`, description: String(message), variant: "destructive" });
+    throw new Error(String(message));
   }
 
   if (res.status === 204) return undefined as T;
@@ -170,7 +177,8 @@ export const api = {
   login: (companyId: string) =>
     request<{ token: string; company_id: string }>("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ company_id: companyId }),
+      headers: { "x-company-id": companyId },
+      body: JSON.stringify({ email: "", password: "", companyId }),
     }),
 
   // --- Admin ---
