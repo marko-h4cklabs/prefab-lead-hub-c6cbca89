@@ -29,10 +29,11 @@ const Login = () => {
       setAuthToken(res.token);
       setCompanyId(res.company_id || trimmed);
       navigate("/leads");
-    } catch (err: any) {
-      // Fallback: if backend doesn't have /auth/login yet, store companyId directly
-      setCompanyId(trimmed);
-      navigate("/leads");
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Login failed";
+      // Only render a string — never an object
+      setError(typeof message === "string" ? message : "Login failed");
     } finally {
       setLoading(false);
     }
