@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { api } from "@/lib/apiClient";
 import { ChevronDown, Loader2 } from "lucide-react";
 import CompanyInfoSection from "@/components/chatbot/CompanyInfoSection";
@@ -29,10 +29,6 @@ const Fields = () => {
       .finally(() => setContextLoading(false));
   };
 
-  const handleScrapeComplete = useCallback(() => {
-    fetchSystemContext();
-  }, []);
-
   const loadSystemContext = () => {
     if (systemContext !== null) {
       setContextOpen(!contextOpen);
@@ -46,7 +42,7 @@ const Fields = () => {
     <div className="max-w-3xl space-y-6">
       <h1 className="text-xl font-bold">Chatbot</h1>
 
-      <CompanyInfoSection onScrapeComplete={handleScrapeComplete} />
+      <CompanyInfoSection />
       <ChatbotBehaviorSection />
       <QuoteFieldsSection />
 
