@@ -200,8 +200,8 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  scrapeCompanyInfo: () =>
-    request<any>("/api/chatbot/company-info/scrape", { method: "POST" }),
+  scrapeCompanyInfo: (data: { website_url: string }) =>
+    request<any>("/api/chatbot/company-info/scrape", { method: "POST", body: JSON.stringify(data) }),
 
   getChatbotBehavior: () =>
     request<any>("/api/chatbot/behavior"),

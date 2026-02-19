@@ -45,12 +45,31 @@ const CompanyInfoSection = () => {
       .finally(() => setSaving(false));
   };
 
-  const handleScrape = () => {
+  const normalizeUrl = (url: string): string | null => {
+    let v = url.trim();
+    if (!v) return null;
+    if (v.startsWith("//")) v = `https:${v}`;
+    else if (!v.startsWith("http://") && !v.startsWith("https://")) v = `https://${v}`;
+    try { new URL(v); return v; } catch { return null; }
+  };
+
+  const handleScrape = async () => {
+    const normalized = normalizeUrl(websiteUrl);
+    if (!normalized) {
+      toast({ title: "Error", description: "Website URL is required and must be valid.", variant: "destructive" });
+      return;
+    }
     setScraping(true);
-    api.scrapeCompanyInfo()
-      .then(() => toast({ title: "Scrape queued", description: "Website content will be processed shortly." }))
-      .catch(() => {})
-      .finally(() => setScraping(false));
+    try {
+      if (isDirty) {
+        await api.putCompanyInfo({ website_url: websiteUrl, business_description: businessDescription, additional_notes: additionalNotes });
+        initialRef.current = { websiteUrl, businessDescription, additionalNotes };
+        setIsDirty(false);
+      }
+      await api.scrapeCompanyInfo({ website_url: normalized });
+      toast({ title: "Scrape queued", description: "Website content will be processed shortly." });
+    } catch { /* errors handled by apiClient */ }
+    finally { setScraping(false); }
   };
 
   const isValidUrl = (() => {
