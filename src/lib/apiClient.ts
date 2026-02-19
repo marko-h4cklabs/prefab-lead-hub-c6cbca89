@@ -113,7 +113,7 @@ export const api = {
 
   // --- Auth ---
   login: (email: string, password: string) =>
-    request<{ token: string; company_id: string }>("/api/auth/login", {
+    request<{ token: string; company_id: string; role?: string }>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
