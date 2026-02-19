@@ -56,7 +56,8 @@ const Leads = () => {
     setCreating(true);
     setCreateError("");
     const normalizedChannel = newChannel.trim().toLowerCase();
-    api.createLead(companyId, { channel: normalizedChannel, external_id: newExternalId.trim() })
+    const normalizedExternalId = newExternalId.trim().toLowerCase();
+    api.createLead(companyId, { channel: normalizedChannel, external_id: normalizedExternalId })
       .then(() => {
         setShowModal(false);
         setNewChannel("");
@@ -115,7 +116,13 @@ const Leads = () => {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">Loading…</td></tr>
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={`skel-${i}`}>
+                  {Array.from({ length: 5 }).map((_, j) => (
+                    <td key={j}><div className="h-4 rounded-sm bg-muted animate-pulse" /></td>
+                  ))}
+                </tr>
+              ))
             ) : leads.length === 0 ? (
               <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">No leads found</td></tr>
             ) : (
