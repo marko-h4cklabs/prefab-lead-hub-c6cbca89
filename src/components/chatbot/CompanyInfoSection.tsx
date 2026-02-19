@@ -16,13 +16,21 @@ const CompanyInfoSection = ({ onScrapeComplete }: Props) => {
   const [scraping, setScraping] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
 
-  // Scrape status: null | queued | running | summarizing | done | error
+  // Scrape status: null | queued | running | summarizing | done/finished | error/failed
   const [scrapeStatus, setScrapeStatus] = useState<string | null>(null);
   const [scrapeError, setScrapeError] = useState<string | null>(null);
 
   const initialRef = useRef({ websiteUrl: "", businessDescription: "", additionalNotes: "" });
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollingStartRef = useRef<number>(0);
+
+  // Normalize backend status to consistent values
+  const normalizeStatus = (s: string | null): string | null => {
+    if (!s) return null;
+    if (s === "finished") return "done";
+    if (s === "failed") return "error";
+    return s;
+  };
 
   const stopPolling = useCallback(() => {
     if (pollingRef.current) {
@@ -31,40 +39,56 @@ const CompanyInfoSection = ({ onScrapeComplete }: Props) => {
     }
   }, []);
 
-  // Apply fetched company info to state
-  const applyCompanyInfo = useCallback((res: any) => {
+  // Apply fetched company info to state — does NOT overwrite businessDescription during polling
+  const applyCompanyInfo = useCallback((res: any, isPolling = false) => {
     const w = res.website_url || "";
     const b = res.business_description || "";
     const n = res.additional_notes || "";
-    const status = res.scrape_status || null;
+    const status = normalizeStatus(res.scrape_status || null);
     const error = res.scrape_error || null;
+    const summary = res.scraped_summary || res.business_description || "";
 
     setWebsiteUrl(w);
-    setBusinessDescription(b);
     setAdditionalNotes(n);
     setScrapeStatus(status);
     setScrapeError(error);
-    initialRef.current = { websiteUrl: w, businessDescription: b, additionalNotes: n };
-    setIsDirty(false);
+
+    if (isPolling) {
+      // During polling: only auto-fill business description when scrape finishes and field is empty
+      if (status === "done" && summary) {
+        setBusinessDescription((prev) => {
+          const val = prev || summary;
+          initialRef.current = { websiteUrl: w, businessDescription: val, additionalNotes: n };
+          return val;
+        });
+      }
+      // Don't update initialRef for other polling states to avoid resetting dirty
+    } else {
+      // Initial load: set everything
+      setBusinessDescription(b);
+      initialRef.current = { websiteUrl: w, businessDescription: b, additionalNotes: n };
+      setIsDirty(false);
+    }
 
     return { status };
   }, []);
 
-  // Start polling GET /api/chatbot/company-info every 2s
+  // Start polling GET /api/chatbot/company-info every 4s
   const startPolling = useCallback(() => {
     stopPolling();
     pollingStartRef.current = Date.now();
 
     pollingRef.current = setInterval(async () => {
       const elapsed = Date.now() - pollingStartRef.current;
-      if (elapsed > 90_000) {
+      if (elapsed > 60_000) {
         stopPolling();
+        setScraping(false);
         toast({ title: "Still processing", description: "Refresh in a moment." });
         return;
       }
       try {
         const res = await api.getCompanyInfo();
-        const { status } = applyCompanyInfo(res);
+        const { status } = applyCompanyInfo(res, true);
 
         if (status === "done") {
           stopPolling();
@@ -79,14 +103,13 @@ const CompanyInfoSection = ({ onScrapeComplete }: Props) => {
       } catch {
         // keep polling on transient errors
       }
-    }, 2000);
+    }, 4000);
   }, [stopPolling, applyCompanyInfo, onScrapeComplete]);
 
   useEffect(() => {
     api.getCompanyInfo()
       .then((res) => {
-        const { status } = applyCompanyInfo(res);
-        // Resume polling if scrape is in progress
+        const { status } = applyCompanyInfo(res, false);
         if (status === "queued" || status === "running" || status === "summarizing") {
           setScraping(true);
           startPolling();
@@ -158,8 +181,18 @@ const CompanyInfoSection = ({ onScrapeComplete }: Props) => {
   const isScrapeInProgress = scrapeStatus === "queued" || scrapeStatus === "running" || scrapeStatus === "summarizing";
   const hasWebsite = websiteUrl.trim().length > 0;
 
-  // Business description is disabled when: no website, scrape in progress, or scrape errored
-  const descriptionDisabled = !hasWebsite || isScrapeInProgress || scrapeStatus === "error";
+  // Business description disabled until: website exists AND scrape is done
+  const descriptionDisabled = !hasWebsite || isScrapeInProgress || scrapeStatus === "error" || (scrapeStatus !== "done" && scrapeStatus !== null);
+
+  // Status label text for near-button indicator
+  const statusLabel = (() => {
+    if (scrapeStatus === "queued") return "queued";
+    if (scrapeStatus === "running") return "running";
+    if (scrapeStatus === "summarizing") return "running";
+    if (scrapeStatus === "done") return "finished";
+    if (scrapeStatus === "error") return "failed";
+    return null;
+  })();
 
   if (loading) return <div className="industrial-card p-6 text-muted-foreground text-sm">Loading…</div>;
 
@@ -189,7 +222,6 @@ const CompanyInfoSection = ({ onScrapeComplete }: Props) => {
           disabled={descriptionDisabled}
           readOnly={descriptionDisabled}
         />
-        {/* Status helpers */}
         {!hasWebsite && (
           <p className="mt-1 text-xs text-muted-foreground">Add website URL and run scrape to generate this.</p>
         )}
@@ -233,6 +265,11 @@ const CompanyInfoSection = ({ onScrapeComplete }: Props) => {
           {(scraping || isScrapeInProgress) ? <Loader2 size={16} className="animate-spin" /> : null}
           {(scraping || isScrapeInProgress) ? "Scraping…" : "Request website scrape"}
         </button>
+        {statusLabel && (
+          <span className={`text-xs font-mono uppercase tracking-wider ${scrapeStatus === "error" ? "text-destructive" : scrapeStatus === "done" ? "text-accent-foreground" : "text-muted-foreground"}`}>
+            {statusLabel}
+          </span>
+        )}
       </div>
     </div>
   );
