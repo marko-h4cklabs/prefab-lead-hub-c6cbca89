@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { api } from "@/lib/apiClient";
 import { toast } from "@/hooks/use-toast";
 import { Save, X } from "lucide-react";
@@ -12,30 +12,36 @@ const ChatbotBehaviorSection = () => {
   const [topicInput, setTopicInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const initialRef = useRef({ tone: "professional", responseLength: "medium", emojisEnabled: false, personaStyle: "busy", forbiddenTopics: [] as string[] });
 
   useEffect(() => {
     api.getChatbotBehavior()
       .then((res) => {
-        setTone(res.tone || "professional");
-        setResponseLength(res.response_length || "medium");
-        setEmojisEnabled(res.emojis_enabled ?? false);
-        setPersonaStyle(res.persona_style || "busy");
-        setForbiddenTopics(Array.isArray(res.forbidden_topics) ? res.forbidden_topics : []);
+        const t = res.tone || "professional";
+        const r = res.response_length || "medium";
+        const e = res.emojis_enabled ?? false;
+        const p = res.persona_style || "busy";
+        const ft = Array.isArray(res.forbidden_topics) ? res.forbidden_topics : [];
+        setTone(t); setResponseLength(r); setEmojisEnabled(e); setPersonaStyle(p); setForbiddenTopics(ft);
+        initialRef.current = { tone: t, responseLength: r, emojisEnabled: e, personaStyle: p, forbiddenTopics: [...ft] };
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
+  const markDirty = () => setIsDirty(true);
+
   const handleSave = () => {
     setSaving(true);
     api.putChatbotBehavior({
-      tone,
-      response_length: responseLength,
-      emojis_enabled: emojisEnabled,
-      persona_style: personaStyle,
-      forbidden_topics: forbiddenTopics,
+      tone, response_length: responseLength, emojis_enabled: emojisEnabled, persona_style: personaStyle, forbidden_topics: forbiddenTopics,
     })
-      .then(() => toast({ title: "Saved", description: "Chatbot behavior updated." }))
+      .then(() => {
+        toast({ title: "Saved", description: "Chatbot behavior updated." });
+        initialRef.current = { tone, responseLength, emojisEnabled, personaStyle, forbiddenTopics: [...forbiddenTopics] };
+        setIsDirty(false);
+      })
       .catch(() => {})
       .finally(() => setSaving(false));
   };
@@ -44,23 +50,20 @@ const ChatbotBehaviorSection = () => {
     const trimmed = value.trim();
     if (trimmed && !forbiddenTopics.includes(trimmed)) {
       setForbiddenTopics([...forbiddenTopics, trimmed]);
+      markDirty();
     }
     setTopicInput("");
   };
 
   const handleTopicKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      addTopic(topicInput);
-    }
+    if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTopic(topicInput); }
   };
 
-  const handleTopicBlur = () => {
-    if (topicInput.trim()) addTopic(topicInput);
-  };
+  const handleTopicBlur = () => { if (topicInput.trim()) addTopic(topicInput); };
 
   const removeTopic = (index: number) => {
     setForbiddenTopics(forbiddenTopics.filter((_, i) => i !== index));
+    markDirty();
   };
 
   if (loading) return <div className="industrial-card p-6 text-muted-foreground text-sm">Loading…</div>;
@@ -72,7 +75,7 @@ const ChatbotBehaviorSection = () => {
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">Tone</label>
-          <select value={tone} onChange={(e) => setTone(e.target.value)} className="industrial-input w-full">
+          <select value={tone} onChange={(e) => { setTone(e.target.value); markDirty(); }} className="industrial-input w-full">
             <option value="professional">Professional</option>
             <option value="friendly">Friendly</option>
           </select>
@@ -80,7 +83,7 @@ const ChatbotBehaviorSection = () => {
 
         <div>
           <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">Response Length</label>
-          <select value={responseLength} onChange={(e) => setResponseLength(e.target.value)} className="industrial-input w-full">
+          <select value={responseLength} onChange={(e) => { setResponseLength(e.target.value); markDirty(); }} className="industrial-input w-full">
             <option value="short">Short</option>
             <option value="medium">Medium</option>
             <option value="long">Long</option>
@@ -89,7 +92,7 @@ const ChatbotBehaviorSection = () => {
 
         <div>
           <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">Persona</label>
-          <select value={personaStyle} onChange={(e) => setPersonaStyle(e.target.value)} className="industrial-input w-full">
+          <select value={personaStyle} onChange={(e) => { setPersonaStyle(e.target.value); markDirty(); }} className="industrial-input w-full">
             <option value="busy">Busy type response</option>
             <option value="explanational">Explanational type response</option>
           </select>
@@ -104,7 +107,7 @@ const ChatbotBehaviorSection = () => {
           <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Emojis</label>
           <button
             type="button"
-            onClick={() => setEmojisEnabled(!emojisEnabled)}
+            onClick={() => { setEmojisEnabled(!emojisEnabled); markDirty(); }}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
               emojisEnabled ? "bg-accent" : "bg-muted"
             }`}
@@ -139,7 +142,11 @@ const ChatbotBehaviorSection = () => {
         />
       </div>
 
-      <button onClick={handleSave} disabled={saving} className="industrial-btn-accent">
+      <button
+        onClick={handleSave}
+        disabled={saving || !isDirty}
+        className={isDirty ? "industrial-btn-accent" : "industrial-btn bg-muted text-muted-foreground"}
+      >
         <Save size={16} /> {saving ? "Saving…" : "Save"}
       </button>
     </div>
