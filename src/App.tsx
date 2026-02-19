@@ -18,9 +18,17 @@ const queryClient = new QueryClient();
 
 const App = () => {
   useEffect(() => {
-    api.health()
-      .then((res) => console.log("[HealthCheck] API OK:", res))
-      .catch((err) => console.warn("[HealthCheck] API unreachable:", err.message));
+    // Session restore: validate existing token on app load
+    const token = localStorage.getItem("plcs_token");
+    if (token) {
+      api.me().then((res) => {
+        if (res.company_id) {
+          localStorage.setItem("plcs_company_id", res.company_id);
+        }
+      }).catch(() => {
+        // 401/403 handled globally in apiClient — token cleared, redirected to /login
+      });
+    }
   }, []);
 
   return (
