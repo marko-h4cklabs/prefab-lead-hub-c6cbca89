@@ -146,7 +146,7 @@ export const api = {
     return request<any>(`/api/companies/${companyId}/leads?${search.toString()}`, { cache: "no-store" });
   },
 
-  createLead: (companyId: string, data: { name: string; external_id: string; channel: string }) =>
+  createLead: (companyId: string, data: { name: string; channel: string }) =>
     request<any>(`/api/companies/${companyId}/leads`, {
       method: "POST",
       body: JSON.stringify(data),

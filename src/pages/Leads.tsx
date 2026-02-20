@@ -146,7 +146,7 @@ const Leads = () => {
     setCreateError("");
     const trimmedName = newExternalId.trim();
     const normalizedChannel = newChannel.trim().toLowerCase();
-    api.createLead(companyId, { name: trimmedName, external_id: trimmedName, channel: normalizedChannel })
+    api.createLead(companyId, { name: trimmedName, channel: normalizedChannel })
       .then(() => {
         setShowModal(false);
         setNewChannel("");
