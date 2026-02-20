@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, requireCompanyId } from "@/lib/apiClient";
-import { ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 function normalizeList(payload: unknown, keys: string[] = []): any[] {
@@ -14,6 +14,13 @@ function normalizeList(payload: unknown, keys: string[] = []): any[] {
   return [];
 }
 
+const CHANNELS = [
+  { value: "messenger", label: "Messenger" },
+  { value: "instagram", label: "Instagram" },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "telegram", label: "Telegram" },
+  { value: "email", label: "Email" },
+];
 
 const PAGE_SIZE = 20;
 const POLL_INTERVAL = 10_000;
@@ -34,7 +41,7 @@ const statusClass = (name: string) => {
   return "status-pending";
 };
 
-const Leads = () => {
+const Simulation = () => {
   const companyId = requireCompanyId();
   const navigate = useNavigate();
   const [leads, setLeads] = useState<any[]>([]);
@@ -42,6 +49,11 @@ const Leads = () => {
   const [offset, setOffset] = useState(0);
   const [statusFilter, setStatusFilter] = useState<string>("__pending__");
   const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [newChannel, setNewChannel] = useState("");
+  const [newExternalId, setNewExternalId] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
   const [fetchError, setFetchError] = useState("");
   const [statuses, setStatuses] = useState<LeadStatus[]>([]);
   const [savingStatusFor, setSavingStatusFor] = useState<string | null>(null);
@@ -50,7 +62,6 @@ const Leads = () => {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Load statuses, sort by position, default to "New"
   useEffect(() => {
     api.getLeadStatuses()
       .then((res) => {
@@ -78,7 +89,7 @@ const Leads = () => {
     if (statusFilter === "__pending__") return;
     setLoading(true);
     setFetchError("");
-    const params: { statusId?: string; limit: number; offset: number; query?: string; source: string } = { limit: PAGE_SIZE, offset, source: "real" };
+    const params: { statusId?: string; limit: number; offset: number; query?: string; source: string } = { limit: PAGE_SIZE, offset, source: "simulation" };
     if (statusFilter && statusFilter !== "__ALL__") params.statusId = statusFilter;
     if (searchQuery) params.query = searchQuery;
     api.getLeads(companyId, params)
@@ -86,9 +97,6 @@ const Leads = () => {
         const list = normalizeList(res, ["data", "leads", "items"]);
         setLeads(list);
         setTotal((res as any)?.total ?? (res as any)?.count ?? list.length);
-        if (list.length === 0 && res && typeof res === "object" && (res as any).error) {
-          toast({ title: "Error", description: String((res as any).error.message || (res as any).error), variant: "destructive" });
-        }
       })
       .catch((err: Error) => {
         setFetchError(err.message || "Failed to load leads");
@@ -97,10 +105,9 @@ const Leads = () => {
       .finally(() => setLoading(false));
   }, [companyId, statusFilter, offset, searchQuery]);
 
-  // Silent poll (no loading state reset)
   const pollLeads = useCallback(() => {
     if (statusFilter === "__pending__") return;
-    const params2: { statusId?: string; limit: number; offset: number; query?: string; source: string } = { limit: PAGE_SIZE, offset, source: "real" };
+    const params2: { statusId?: string; limit: number; offset: number; query?: string; source: string } = { limit: PAGE_SIZE, offset, source: "simulation" };
     if (statusFilter && statusFilter !== "__ALL__") params2.statusId = statusFilter;
     if (searchQuery) params2.query = searchQuery;
     api.getLeads(companyId, params2)
@@ -114,7 +121,6 @@ const Leads = () => {
 
   useEffect(() => { fetchLeads(); }, [fetchLeads]);
 
-  // Polling every 10s
   useEffect(() => {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(pollLeads, POLL_INTERVAL);
@@ -148,6 +154,32 @@ const Leads = () => {
     }
   };
 
+  const handleCreate = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreating(true);
+    setCreateError("");
+    const trimmedName = newExternalId.trim();
+    if (trimmedName.length < 2) {
+      setCreateError("Name must be at least 2 characters.");
+      setCreating(false);
+      return;
+    }
+    const normalizedChannel = newChannel.trim().toLowerCase();
+    api.createLead(companyId, { name: trimmedName, channel: normalizedChannel })
+      .then(() => {
+        setShowModal(false);
+        setNewChannel("");
+        setNewExternalId("");
+        setCreateError("");
+        fetchLeads();
+        toast({ title: "Lead created successfully" });
+      })
+      .catch((err: Error) => {
+        setCreateError(err.message || "Failed to create lead");
+      })
+      .finally(() => setCreating(false));
+  };
+
   const getStatusId = (lead: any) => lead.status_id || "";
   const getStatusName = (lead: any) => lead.status_name || "New";
   const getLeadName = (lead: any) => lead.name || lead.external_id || "—";
@@ -155,10 +187,12 @@ const Leads = () => {
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-bold">Inbox</h1>
+        <h1 className="text-xl font-bold">Simulation</h1>
+        <button onClick={() => setShowModal(true)} className="industrial-btn-accent">
+          <Plus size={16} /> New Lead
+        </button>
       </div>
 
-      {/* Filter + Search */}
       <div className="mb-4 flex items-center gap-3">
         <select
           value={statusFilter === "__pending__" ? "" : statusFilter}
@@ -187,7 +221,6 @@ const Leads = () => {
         </div>
       )}
 
-      {/* Table */}
       <div className="industrial-card overflow-hidden">
         <table className="industrial-table">
           <thead>
@@ -208,7 +241,7 @@ const Leads = () => {
                 </tr>
               ))
             ) : leads.length === 0 ? (
-              <tr><td colSpan={4} className="text-center py-8 text-muted-foreground">No real leads yet. Integrations will populate this.</td></tr>
+              <tr><td colSpan={4} className="text-center py-8 text-muted-foreground">No simulation leads found</td></tr>
             ) : (
               leads.map((lead) => (
                 <tr
@@ -253,7 +286,6 @@ const Leads = () => {
         </table>
       </div>
 
-      {/* Pagination */}
       <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
         <span className="font-mono text-xs">
           {offset + 1}–{Math.min(offset + PAGE_SIZE, total || leads.length)} of {total || leads.length}
@@ -275,8 +307,42 @@ const Leads = () => {
           </button>
         </div>
       </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40">
+          <div className="industrial-card w-full max-w-md p-6">
+            <h2 className="text-lg font-bold mb-4">Create Lead</h2>
+            <form onSubmit={handleCreate} className="space-y-4">
+              {createError && (
+                <div className="rounded-sm border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {createError}
+                </div>
+              )}
+              <div>
+                <label className="mb-1 block text-xs font-mono uppercase tracking-wider text-muted-foreground">Channel</label>
+                <select value={newChannel} onChange={(e) => setNewChannel(e.target.value)} className="industrial-input w-full" required>
+                  <option value="" disabled>Select channel…</option>
+                  {CHANNELS.map((ch) => (
+                    <option key={ch.value} value={ch.value}>{ch.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-mono uppercase tracking-wider text-muted-foreground">Name</label>
+                <input value={newExternalId} onChange={(e) => setNewExternalId(e.target.value)} className="industrial-input w-full" required />
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button type="button" onClick={() => setShowModal(false)} className="industrial-btn-ghost">Cancel</button>
+                <button type="submit" disabled={creating} className="industrial-btn-accent">
+                  {creating ? "Creating…" : "Create"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default Leads;
+export default Simulation;
