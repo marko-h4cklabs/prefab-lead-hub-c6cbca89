@@ -143,7 +143,7 @@ export const api = {
     if (params.statusId) search.set("statusId", params.statusId);
     if (params.limit !== undefined) search.set("limit", String(params.limit));
     if (params.offset !== undefined) search.set("offset", String(params.offset));
-    return request<any>(`/api/companies/${companyId}/leads?${search.toString()}`);
+    return request<any>(`/api/companies/${companyId}/leads?${search.toString()}`, { cache: "no-store" });
   },
 
   createLead: (companyId: string, data: { channel: string; external_id: string }) =>
@@ -170,7 +170,7 @@ export const api = {
     }),
 
   getLeadStatuses: () =>
-    request<{ id: string; name: string; sort_order: number; is_default: boolean }[]>("/api/leads/statuses"),
+    request<{ id: string; name: string; sort_order: number; is_default: boolean }[]>("/api/leads/statuses", { cache: "no-store" }),
 
   updateLeadStatus: (leadId: string, statusId: string) =>
     request<any>(`/api/leads/${leadId}/status`, {
