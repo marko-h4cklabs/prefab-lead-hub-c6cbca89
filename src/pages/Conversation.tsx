@@ -19,29 +19,16 @@ interface ConversationData {
 
 
 
-interface HighlightField {
+interface LookingForItem {
   name: string;
   type?: string;
   units?: string;
+}
+
+interface CollectedItem {
+  name: string;
   value?: any;
-}
-
-interface HighlightSettings {
-  tone?: string;
-  persona?: string;
-  response_length?: string;
-  emojis_enabled?: boolean;
-  forbidden_topics?: string[];
-}
-
-interface Highlights {
-  settings?: HighlightSettings;
-  fields?: {
-    configured?: HighlightField[];
-    missing_required?: HighlightField[];
-    collected?: HighlightField[];
-  };
-  state?: any;
+  units?: string;
 }
 
 const Conversation = () => {
@@ -62,7 +49,8 @@ const Conversation = () => {
   const [sending, setSending] = useState(false);
   const [aiReplying, setAiReplying] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [highlights, setHighlights] = useState<Highlights>({});
+  const [lookingFor, setLookingFor] = useState<LookingForItem[]>([]);
+  const [collected, setCollected] = useState<CollectedItem[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -72,7 +60,11 @@ const Conversation = () => {
   useEffect(() => {
     if (!leadId) return;
     api.getConversation(companyId, leadId)
-      .then((convo) => setData(convo))
+      .then((convo) => {
+        setData(convo);
+        if (Array.isArray(convo?.looking_for)) setLookingFor(convo.looking_for);
+        if (Array.isArray(convo?.collected)) setCollected(convo.collected);
+      })
       .catch(() => {
         toast({ title: "Error", description: "Failed to load conversation", variant: "destructive" });
       })
@@ -87,26 +79,8 @@ const Conversation = () => {
     if (res?.assistant_message !== undefined) {
       if (res.conversation_id) setConversationId(res.conversation_id);
 
-      // Support multiple response shapes for highlights
-      const h: Highlights = res.highlights || {};
-      const activeSettings = res.active_settings || h.settings;
-      const missingReq = res.missing_required_infos || res.required_infos || res.required || h.fields?.missing_required || [];
-      const coll = res.collected_infos || res.collected || h.fields?.collected || [];
-
-      setHighlights({
-        settings: activeSettings ? {
-          tone: activeSettings.tone,
-          persona: activeSettings.persona_style || activeSettings.persona,
-          response_length: activeSettings.response_length,
-          emojis_enabled: activeSettings.emojis_enabled,
-          forbidden_topics: activeSettings.forbidden_topics,
-        } : h.settings,
-        fields: {
-          configured: h.fields?.configured,
-          missing_required: missingReq,
-          collected: coll,
-        },
-      });
+      if (Array.isArray(res.looking_for)) setLookingFor(res.looking_for);
+      if (Array.isArray(res.collected)) setCollected(res.collected);
 
       setData((prev) => {
         const msgs = prev?.messages || [];
@@ -120,6 +94,8 @@ const Conversation = () => {
       });
     } else {
       setData(res);
+      if (Array.isArray(res?.looking_for)) setLookingFor(res.looking_for);
+      if (Array.isArray(res?.collected)) setCollected(res.collected);
     }
   };
 
@@ -190,60 +166,25 @@ const Conversation = () => {
   const messages = data?.messages || [];
   const currentStep = data?.current_step ?? 0;
 
-  const settings = highlights.settings;
-  const missingRequired = highlights.fields?.missing_required || [];
-  const collected = highlights.fields?.collected || [];
-
   const HighlightsPanel = () => (
     <div className="space-y-4">
-      {/* Active Settings */}
+      {/* Looking for */}
       <div>
         <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">
-          Active Settings
+          Looking for
         </h3>
-        {settings ? (
-          <dl className="space-y-1">
-            <div className="text-xs font-mono">
-              <dt className="text-muted-foreground inline">Tone: </dt>
-              <dd className="inline text-foreground font-medium">{settings.tone || "—"}</dd>
-            </div>
-            <div className="text-xs font-mono">
-              <dt className="text-muted-foreground inline">Persona: </dt>
-              <dd className="inline text-foreground font-medium">{settings.persona || "—"}</dd>
-            </div>
-            <div className="text-xs font-mono">
-              <dt className="text-muted-foreground inline">Response length: </dt>
-              <dd className="inline text-foreground font-medium">{settings.response_length || "—"}</dd>
-            </div>
-            <div className="text-xs font-mono">
-              <dt className="text-muted-foreground inline">Emojis: </dt>
-              <dd className="inline text-foreground font-medium">{settings.emojis_enabled ? "Yes" : "No"}</dd>
-            </div>
-            <div className="text-xs font-mono">
-              <dt className="text-muted-foreground inline">Forbidden topics: </dt>
-              <dd className="inline text-foreground font-medium">
-                {settings.forbidden_topics?.length ? settings.forbidden_topics.join(", ") : "—"}
-              </dd>
-            </div>
-          </dl>
-        ) : (
-          <p className="text-xs text-muted-foreground">No settings received yet.</p>
-        )}
-      </div>
-
-      {/* Missing Required */}
-      <div>
-        <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">
-          Missing Required
-        </h3>
-        {missingRequired.length === 0 ? (
-          <p className="text-xs text-muted-foreground">All required fields collected.</p>
+        {lookingFor.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No required fields defined.</p>
         ) : (
           <ul className="space-y-1">
-            {missingRequired.map((item, i) => (
+            {lookingFor.map((item, i) => (
               <li key={i} className="text-xs font-mono">
                 <span className="text-foreground">{item.name}</span>
-                <span className="text-muted-foreground ml-1">({item.type || "text"}{item.units ? `, ${item.units}` : ""})</span>
+                {(item.type || item.units) && (
+                  <span className="text-muted-foreground ml-1">
+                    ({[item.type, item.units].filter(Boolean).join(", ")})
+                  </span>
+                )}
               </li>
             ))}
           </ul>
@@ -256,7 +197,7 @@ const Conversation = () => {
           Collected
         </h3>
         {collected.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No fields collected yet.</p>
+          <p className="text-xs text-muted-foreground">None yet</p>
         ) : (
           <dl className="space-y-1">
             {collected.map((item, i) => (
@@ -371,7 +312,7 @@ const Conversation = () => {
         <details className="industrial-card p-3">
           <summary className="text-xs font-mono uppercase tracking-wider text-muted-foreground cursor-pointer">
             Highlights
-            {missingRequired.length > 0 && ` · ${missingRequired.length} missing`}
+            {lookingFor.length > 0 && ` · ${lookingFor.length} looking for`}
             {collected.length > 0 && ` · ${collected.length} collected`}
           </summary>
           <div className="mt-2">

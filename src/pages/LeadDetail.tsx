@@ -136,8 +136,7 @@ const LeadDetail = () => {
   const leadName = lead.name || lead.external_id || "—";
   const statusId = lead.status_id || "";
   const statusName = lead.status_name || "New";
-  const collectedInfos: any[] = Array.isArray(lead.collected_infos) ? lead.collected_infos : [];
-  const missingInfos: string[] = Array.isArray(lead.required_infos_missing) ? lead.required_infos_missing : [];
+  const collectedInfos: any[] = Array.isArray(lead.collected_infos) ? lead.collected_infos : (Array.isArray(lead.collected) ? lead.collected : []);
 
   return (
     <div>
@@ -234,40 +233,28 @@ const LeadDetail = () => {
       </div>
 
       {/* Collected info section */}
-      {(collectedInfos.length > 0 || missingInfos.length > 0) && (
-        <div className="industrial-card p-6 mt-6">
-          <h2 className="text-sm font-bold font-mono uppercase tracking-wider text-muted-foreground mb-4">
-            Collected info:
-          </h2>
-
-          {collectedInfos.length > 0 && (
-            <dl className="space-y-2 mb-4">
-              {collectedInfos.map((info: any, i: number) => (
-                <div key={i} className="flex gap-2 text-sm">
-                  <dt className="font-mono text-muted-foreground min-w-[140px]">
-                    {info.field_name || info.name || `Field ${i + 1}`}:
-                  </dt>
-                  <dd className="font-medium">
-                    {info.value ?? "—"}
-                    {info.units ? ` (${info.units})` : ""}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          )}
-
-          {missingInfos.length > 0 && (
-            <div>
-              <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">Missing:</h3>
-              <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                {missingInfos.map((name, i) => (
-                  <li key={i}>{typeof name === "string" ? name : (name as any)?.field_name || (name as any)?.name || JSON.stringify(name)}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
+      <div className="industrial-card p-6 mt-6">
+        <h2 className="text-sm font-bold font-mono uppercase tracking-wider text-muted-foreground mb-4">
+          Collected info
+        </h2>
+        {collectedInfos.length > 0 ? (
+          <dl className="space-y-2">
+            {collectedInfos.map((info: any, i: number) => (
+              <div key={i} className="flex gap-2 text-sm">
+                <dt className="font-mono text-muted-foreground min-w-[140px]">
+                  {info.field_name || info.name || `Field ${i + 1}`}:
+                </dt>
+                <dd className="font-medium">
+                  {info.value ?? "—"}
+                  {info.units ? ` (${info.units})` : ""}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p className="text-sm text-muted-foreground">None yet</p>
+        )}
+      </div>
     </div>
   );
 };
