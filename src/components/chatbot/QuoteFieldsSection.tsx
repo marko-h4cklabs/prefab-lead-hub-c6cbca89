@@ -98,19 +98,9 @@ const QuoteFieldsSection = () => {
   useEffect(() => {
     api.getQuoteFields()
       .then((res) => {
-        const data = res?.presets || res?.fields || res;
-        if (data && typeof data === "object" && !Array.isArray(data)) {
-          const merged = { ...buildDefault() };
-          for (const key of Object.keys(merged)) {
-            if (data[key]) merged[key] = { ...merged[key], ...data[key] };
-          }
-          setPresets(merged);
-          initialRef.current = JSON.stringify(merged);
-        } else {
-          const def = buildDefault();
-          setPresets(def);
-          initialRef.current = JSON.stringify(def);
-        }
+        const next = applyFetched(res);
+        setPresets(next);
+        initialRef.current = JSON.stringify(next);
       })
       .catch(() => {
         const def = buildDefault();
@@ -128,12 +118,45 @@ const QuoteFieldsSection = () => {
     });
   };
 
+  const toPayload = (state: AllPresetsState) =>
+    PRESETS.map((p) => {
+      const s = state[p.id];
+      const config: Record<string, any> = {};
+      if (p.configType === "currency") config.defaultUnit = s.currency || "EUR";
+      if (p.configType === "options") config.allowed_options = s.allowed_options || [];
+      if (p.configType === "dimensions") {
+        config.enabledParts = s.dimension_axes || [];
+        config.unit = s.dimension_unit || "m";
+      }
+      return { name: p.id, is_enabled: s.enabled, config };
+    });
+
+  const applyFetched = (data: any) => {
+    const list: any[] = Array.isArray(data) ? data : data?.presets || data?.fields || [];
+    const merged = buildDefault();
+    list.forEach((item: any) => {
+      if (!item?.name || !merged[item.name]) return;
+      merged[item.name].enabled = !!item.is_enabled;
+      const c = item.config || {};
+      if (c.defaultUnit) merged[item.name].currency = c.defaultUnit;
+      if (c.allowed_options) merged[item.name].allowed_options = c.allowed_options;
+      if (c.enabledParts) merged[item.name].dimension_axes = c.enabledParts;
+      if (c.unit) merged[item.name].dimension_unit = c.unit;
+    });
+    return merged;
+  };
+
   const handleSave = () => {
     setSaving(true);
-    api.putQuoteFields({ fields: presets as any })
+    api.putQuoteFields({ presets: toPayload(presets) })
       .then(() => {
         toast({ title: "Saved", description: "Quote fields updated." });
-        initialRef.current = JSON.stringify(presets);
+        return api.getQuoteFields();
+      })
+      .then((res) => {
+        const next = applyFetched(res);
+        setPresets(next);
+        initialRef.current = JSON.stringify(next);
         setIsDirty(false);
       })
       .catch(() => {})
