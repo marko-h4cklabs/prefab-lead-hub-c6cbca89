@@ -4,7 +4,7 @@ import { api, requireCompanyId, clearAuth } from "@/lib/apiClient";
 import { LayoutList, Bot, Settings, LogOut } from "lucide-react";
 
 const navItems = [
-  { to: "/leads", label: "Leads", icon: LayoutList },
+  { to: "/leads", label: "Inbox", icon: LayoutList },
   { to: "/fields", label: "Chatbot", icon: Bot },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
