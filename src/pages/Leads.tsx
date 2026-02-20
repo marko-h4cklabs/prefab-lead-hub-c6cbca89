@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, requireCompanyId } from "@/lib/apiClient";
-import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 const CHANNELS = [
@@ -14,8 +14,15 @@ const CHANNELS = [
 
 const PAGE_SIZE = 20;
 
-const statusClass = (status: string) => {
-  const s = status?.toLowerCase();
+interface LeadStatus {
+  id: string;
+  name: string;
+  sort_order: number;
+  is_default: boolean;
+}
+
+const statusClass = (name: string) => {
+  const s = name?.toLowerCase();
   if (s === "new") return "status-new";
   if (s === "qualified") return "status-qualified";
   if (s === "disqualified") return "status-disqualified";
@@ -36,6 +43,12 @@ const Leads = () => {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const [fetchError, setFetchError] = useState("");
+  const [statuses, setStatuses] = useState<LeadStatus[]>([]);
+  const [savingStatusFor, setSavingStatusFor] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.getLeadStatuses().then(setStatuses).catch(() => {});
+  }, []);
 
   const fetchLeads = () => {
     setLoading(true);
@@ -50,6 +63,34 @@ const Leads = () => {
   };
 
   useEffect(() => { fetchLeads(); }, [offset, statusFilter]);
+
+  const handleStatusChange = async (leadId: string, newStatusId: string) => {
+    const leadIndex = leads.findIndex((l) => l.id === leadId);
+    if (leadIndex === -1) return;
+    const prevStatus = leads[leadIndex].status;
+    const newStatusObj = statuses.find((s) => s.id === newStatusId);
+    if (!newStatusObj) return;
+
+    // Optimistic update
+    setLeads((prev) =>
+      prev.map((l) =>
+        l.id === leadId ? { ...l, status: { id: newStatusObj.id, name: newStatusObj.name } } : l
+      )
+    );
+    setSavingStatusFor(leadId);
+
+    try {
+      await api.updateLeadStatus(leadId, newStatusId);
+    } catch {
+      // Revert
+      setLeads((prev) =>
+        prev.map((l) => (l.id === leadId ? { ...l, status: prevStatus } : l))
+      );
+      toast({ title: "Failed to update status", variant: "destructive" });
+    } finally {
+      setSavingStatusFor(null);
+    }
+  };
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,10 +113,13 @@ const Leads = () => {
       .finally(() => setCreating(false));
   };
 
+  const getStatusId = (lead: any) => lead.status?.id || "";
+  const getStatusName = (lead: any) => lead.status?.name || "New";
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-bold">Leads</h1>
+        <h1 className="text-xl font-bold">Inbox</h1>
         <button onClick={() => setShowModal(true)} className="industrial-btn-accent">
           <Plus size={16} /> New Lead
         </button>
@@ -89,10 +133,17 @@ const Leads = () => {
           className="industrial-input"
         >
           <option value="">All Statuses</option>
-          <option value="new">New</option>
-          <option value="qualified">Qualified</option>
-          <option value="disqualified">Disqualified</option>
-          <option value="pending_review">Pending Review</option>
+          {statuses.length > 0
+            ? statuses.map((s) => (
+                <option key={s.id} value={s.name.toLowerCase()}>{s.name}</option>
+              ))
+            : <>
+                <option value="new">New</option>
+                <option value="qualified">Qualified</option>
+                <option value="disqualified">Disqualified</option>
+                <option value="pending_review">Pending Review</option>
+              </>
+          }
         </select>
       </div>
 
@@ -109,7 +160,6 @@ const Leads = () => {
             <tr>
               <th>Channel</th>
               <th>External ID</th>
-              <th>Score</th>
               <th>Status</th>
               <th>Created</th>
             </tr>
@@ -118,13 +168,13 @@ const Leads = () => {
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={`skel-${i}`}>
-                  {Array.from({ length: 5 }).map((_, j) => (
+                  {Array.from({ length: 4 }).map((_, j) => (
                     <td key={j}><div className="h-4 rounded-sm bg-muted animate-pulse" /></td>
                   ))}
                 </tr>
               ))
             ) : leads.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">No leads found</td></tr>
+              <tr><td colSpan={4} className="text-center py-8 text-muted-foreground">No leads found</td></tr>
             ) : (
               leads.map((lead) => (
                 <tr
@@ -134,8 +184,31 @@ const Leads = () => {
                 >
                   <td className="font-mono text-sm">{lead.channel}</td>
                   <td className="font-mono text-sm truncate max-w-[200px]">{lead.external_id ?? "—"}</td>
-                  <td className="font-mono">{lead.score ?? "—"}</td>
-                  <td><span className={statusClass(lead.status)}>{lead.status}</span></td>
+                  <td>
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        value={getStatusId(lead)}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          handleStatusChange(lead.id, e.target.value);
+                        }}
+                        disabled={savingStatusFor === lead.id}
+                        className={`industrial-input py-1 px-2 text-xs font-mono w-auto min-w-[100px] ${statusClass(getStatusName(lead))}`}
+                      >
+                        {statuses.length > 0 ? (
+                          statuses.map((s) => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))
+                        ) : (
+                          <option value="">{getStatusName(lead)}</option>
+                        )}
+                      </select>
+                      {savingStatusFor === lead.id && (
+                        <Loader2 size={12} className="animate-spin text-muted-foreground" />
+                      )}
+                    </div>
+                  </td>
                   <td className="text-muted-foreground text-xs font-mono">
                     {lead.created_at ? new Date(lead.created_at).toLocaleDateString() : "—"}
                   </td>

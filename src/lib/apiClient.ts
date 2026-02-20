@@ -169,6 +169,15 @@ export const api = {
       method: "POST",
     }),
 
+  getLeadStatuses: () =>
+    request<{ id: string; name: string; sort_order: number; is_default: boolean }[]>("/api/leads/statuses"),
+
+  updateLeadStatus: (leadId: string, statusId: string) =>
+    request<any>(`/api/leads/${leadId}/status`, {
+      method: "PUT",
+      body: JSON.stringify({ status_id: statusId }),
+    }),
+
   // --- Fields ---
   getFields: (companyId: string) =>
     request<any>(`/api/companies/${companyId}/fields`),
