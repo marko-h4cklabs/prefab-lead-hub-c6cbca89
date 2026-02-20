@@ -219,7 +219,7 @@ const LeadDetail = () => {
           <div>
             <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-0.5">Created at</dt>
             <dd className="text-sm font-medium font-mono">
-              {lead.created_at ? new Date(lead.created_at).toLocaleString() : "—"}
+              {(lead.created_at || lead.createdAt) ? new Date(lead.created_at || lead.createdAt).toLocaleString() : "—"}
             </dd>
           </div>
 
@@ -227,7 +227,7 @@ const LeadDetail = () => {
           <div>
             <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-0.5">Updated at</dt>
             <dd className="text-sm font-medium font-mono">
-              {lead.updated_at ? new Date(lead.updated_at).toLocaleString() : "—"}
+              {(lead.updated_at || lead.updatedAt) ? new Date(lead.updated_at || lead.updatedAt).toLocaleString() : "—"}
             </dd>
           </div>
         </dl>

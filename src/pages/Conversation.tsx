@@ -31,6 +31,7 @@ interface HighlightSettings {
   persona?: string;
   response_length?: string;
   emojis_enabled?: boolean;
+  forbidden_topics?: string[];
 }
 
 interface Highlights {
@@ -95,9 +96,10 @@ const Conversation = () => {
       setHighlights({
         settings: activeSettings ? {
           tone: activeSettings.tone,
-          persona: activeSettings.persona || activeSettings.persona_style,
+          persona: activeSettings.persona_style || activeSettings.persona,
           response_length: activeSettings.response_length,
           emojis_enabled: activeSettings.emojis_enabled,
+          forbidden_topics: activeSettings.forbidden_topics,
         } : h.settings,
         fields: {
           configured: h.fields?.configured,
@@ -216,6 +218,12 @@ const Conversation = () => {
             <div className="text-xs font-mono">
               <dt className="text-muted-foreground inline">Emojis: </dt>
               <dd className="inline text-foreground font-medium">{settings.emojis_enabled ? "Yes" : "No"}</dd>
+            </div>
+            <div className="text-xs font-mono">
+              <dt className="text-muted-foreground inline">Forbidden topics: </dt>
+              <dd className="inline text-foreground font-medium">
+                {settings.forbidden_topics?.length ? settings.forbidden_topics.join(", ") : "—"}
+              </dd>
             </div>
           </dl>
         ) : (
