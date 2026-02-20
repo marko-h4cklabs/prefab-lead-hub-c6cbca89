@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, requireCompanyId } from "@/lib/apiClient";
 import { Plus, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
@@ -23,6 +23,7 @@ const CHANNELS = [
 ];
 
 const PAGE_SIZE = 20;
+const POLL_INTERVAL = 10_000;
 
 interface LeadStatus {
   id: string;
@@ -45,7 +46,7 @@ const Leads = () => {
   const [leads, setLeads] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("__pending__");
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [newChannel, setNewChannel] = useState("");
@@ -55,14 +56,24 @@ const Leads = () => {
   const [fetchError, setFetchError] = useState("");
   const [statuses, setStatuses] = useState<LeadStatus[]>([]);
   const [savingStatusFor, setSavingStatusFor] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Load statuses, then set default filter to "New" if it exists
   useEffect(() => {
     api.getLeadStatuses()
-      .then((res) => setStatuses(normalizeList(res, ["statuses", "items", "data"])))
-      .catch(() => {});
+      .then((res) => {
+        const list = normalizeList(res, ["statuses", "items", "data"]);
+        setStatuses(list);
+        const newStatus = list.find((s: LeadStatus) => s.name.toLowerCase() === "new");
+        setStatusFilter(newStatus ? newStatus.id : "");
+      })
+      .catch(() => {
+        setStatusFilter("");
+      });
   }, []);
 
-  const fetchLeads = () => {
+  const fetchLeads = useCallback(() => {
+    if (statusFilter === "__pending__") return;
     setLoading(true);
     setFetchError("");
     api.getLeads(companyId, { statusId: statusFilter || undefined, limit: PAGE_SIZE, offset })
@@ -79,9 +90,28 @@ const Leads = () => {
         toast({ title: "Failed to load leads", description: err.message, variant: "destructive" });
       })
       .finally(() => setLoading(false));
-  };
+  }, [companyId, statusFilter, offset]);
 
-  useEffect(() => { fetchLeads(); }, [offset, statusFilter]);
+  // Silent poll (no loading state reset)
+  const pollLeads = useCallback(() => {
+    if (statusFilter === "__pending__") return;
+    api.getLeads(companyId, { statusId: statusFilter || undefined, limit: PAGE_SIZE, offset })
+      .then((res) => {
+        const list = normalizeList(res, ["data", "leads", "items"]);
+        setLeads(list);
+        setTotal((res as any)?.total ?? (res as any)?.count ?? list.length);
+      })
+      .catch(() => {});
+  }, [companyId, statusFilter, offset]);
+
+  useEffect(() => { fetchLeads(); }, [fetchLeads]);
+
+  // Polling every 10s
+  useEffect(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(pollLeads, POLL_INTERVAL);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [pollLeads]);
 
   const handleStatusChange = async (leadId: string, newStatusId: string) => {
     const leadIndex = leads.findIndex((l) => l.id === leadId);
@@ -91,7 +121,6 @@ const Leads = () => {
     const newStatusObj = statuses.find((s) => s.id === newStatusId);
     if (!newStatusObj) return;
 
-    // Optimistic update
     setLeads((prev) =>
       prev.map((l) =>
         l.id === leadId ? { ...l, status_id: newStatusObj.id, status_name: newStatusObj.name } : l
@@ -102,7 +131,6 @@ const Leads = () => {
     try {
       await api.updateLeadStatus(leadId, newStatusId);
     } catch {
-      // Revert
       setLeads((prev) =>
         prev.map((l) => (l.id === leadId ? { ...l, status_id: prevStatusId, status_name: prevStatusName } : l))
       );
@@ -135,6 +163,7 @@ const Leads = () => {
 
   const getStatusId = (lead: any) => lead.status_id || "";
   const getStatusName = (lead: any) => lead.status_name || "New";
+  const getLeadName = (lead: any) => lead.name || lead.external_id || "—";
 
   return (
     <div>
@@ -148,14 +177,14 @@ const Leads = () => {
       {/* Filter */}
       <div className="mb-4">
         <select
-          value={statusFilter}
+          value={statusFilter === "__pending__" ? "" : statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setOffset(0); }}
           className="industrial-input"
         >
-          <option value="">All Statuses</option>
           {statuses.map((s) => (
             <option key={s.id} value={s.id}>{s.name}</option>
           ))}
+          <option value="">All Statuses</option>
         </select>
       </div>
 
@@ -171,7 +200,7 @@ const Leads = () => {
           <thead>
             <tr>
               <th>Channel</th>
-              <th>External ID</th>
+              <th>Name</th>
               <th>Status</th>
               <th>Created</th>
             </tr>
@@ -195,7 +224,7 @@ const Leads = () => {
                   onClick={() => navigate(`/leads/${lead.id}`)}
                 >
                   <td className="font-mono text-sm">{lead.channel}</td>
-                  <td className="font-mono text-sm truncate max-w-[200px]">{lead.external_id ?? "—"}</td>
+                  <td className="text-sm truncate max-w-[200px]">{getLeadName(lead)}</td>
                   <td>
                     <div className="flex items-center gap-1.5">
                       <select
