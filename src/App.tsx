@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import AppLayout from "./components/AppLayout";
 import Leads from "./pages/Leads";
+import Simulation from "./pages/Simulation";
 import LeadDetail from "./pages/LeadDetail";
 import Conversation from "./pages/Conversation";
 import Fields from "./pages/Fields";
@@ -44,6 +45,7 @@ const App = () => {
           <Route path="/" element={<Navigate to="/leads" replace />} />
           <Route element={<AppLayout />}>
             <Route path="/leads" element={<Leads />} />
+            <Route path="/simulation" element={<Simulation />} />
             <Route path="/leads/:leadId" element={<LeadDetail />} />
             <Route path="/leads/:leadId/conversation" element={<Conversation />} />
             <Route path="/fields" element={<Fields />} />

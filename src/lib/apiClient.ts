@@ -133,12 +133,13 @@ export const api = {
     }),
 
   // --- Leads ---
-  getLeads: (companyId: string, params: { statusId?: string; limit?: number; offset?: number; query?: string }) => {
+  getLeads: (companyId: string, params: { statusId?: string; limit?: number; offset?: number; query?: string; source?: string }) => {
     const search = new URLSearchParams();
     if (params.statusId) search.set("status_id", params.statusId);
     if (params.limit !== undefined) search.set("limit", String(params.limit));
     if (params.offset !== undefined) search.set("offset", String(params.offset));
     if (params.query) search.set("query", params.query);
+    if (params.source) search.set("source", params.source);
     return request<any>(`/api/companies/${companyId}/leads?${search.toString()}`, { cache: "no-store" });
   },
 

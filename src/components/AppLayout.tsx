@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { api, requireCompanyId, clearAuth } from "@/lib/apiClient";
-import { LayoutList, Bot, Settings, LogOut } from "lucide-react";
+import { LayoutList, FlaskConical, Bot, Settings, LogOut } from "lucide-react";
 
 const navItems = [
   { to: "/leads", label: "Inbox", icon: LayoutList },
+  { to: "/simulation", label: "Simulation", icon: FlaskConical },
   { to: "/fields", label: "Chatbot", icon: Bot },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
