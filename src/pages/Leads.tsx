@@ -35,7 +35,7 @@ const Leads = () => {
   const [leads, setLeads] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [newChannel, setNewChannel] = useState("");
@@ -53,12 +53,15 @@ const Leads = () => {
   const fetchLeads = () => {
     setLoading(true);
     setFetchError("");
-    api.getLeads(companyId, { status: statusFilter || undefined, limit: PAGE_SIZE, offset })
+    api.getLeads(companyId, { statusId: statusFilter || undefined, limit: PAGE_SIZE, offset })
       .then((res) => {
         setLeads(res.data || res.leads || res || []);
         setTotal(res.total ?? res.count ?? (res.data?.length || 0));
       })
-      .catch((err: Error) => setFetchError(err.message || "Failed to load leads"))
+      .catch((err: Error) => {
+        setFetchError(err.message || "Failed to load leads");
+        toast({ title: "Failed to load leads", description: err.message, variant: "destructive" });
+      })
       .finally(() => setLoading(false));
   };
 
@@ -67,14 +70,15 @@ const Leads = () => {
   const handleStatusChange = async (leadId: string, newStatusId: string) => {
     const leadIndex = leads.findIndex((l) => l.id === leadId);
     if (leadIndex === -1) return;
-    const prevStatus = leads[leadIndex].status;
+    const prevStatusId = leads[leadIndex].status_id;
+    const prevStatusName = leads[leadIndex].status_name;
     const newStatusObj = statuses.find((s) => s.id === newStatusId);
     if (!newStatusObj) return;
 
     // Optimistic update
     setLeads((prev) =>
       prev.map((l) =>
-        l.id === leadId ? { ...l, status: { id: newStatusObj.id, name: newStatusObj.name } } : l
+        l.id === leadId ? { ...l, status_id: newStatusObj.id, status_name: newStatusObj.name } : l
       )
     );
     setSavingStatusFor(leadId);
@@ -84,7 +88,7 @@ const Leads = () => {
     } catch {
       // Revert
       setLeads((prev) =>
-        prev.map((l) => (l.id === leadId ? { ...l, status: prevStatus } : l))
+        prev.map((l) => (l.id === leadId ? { ...l, status_id: prevStatusId, status_name: prevStatusName } : l))
       );
       toast({ title: "Failed to update status", variant: "destructive" });
     } finally {
@@ -113,8 +117,8 @@ const Leads = () => {
       .finally(() => setCreating(false));
   };
 
-  const getStatusId = (lead: any) => lead.status?.id || "";
-  const getStatusName = (lead: any) => lead.status?.name || "New";
+  const getStatusId = (lead: any) => lead.status_id || "";
+  const getStatusName = (lead: any) => lead.status_name || "New";
 
   return (
     <div>
@@ -133,17 +137,9 @@ const Leads = () => {
           className="industrial-input"
         >
           <option value="">All Statuses</option>
-          {statuses.length > 0
-            ? statuses.map((s) => (
-                <option key={s.id} value={s.name.toLowerCase()}>{s.name}</option>
-              ))
-            : <>
-                <option value="new">New</option>
-                <option value="qualified">Qualified</option>
-                <option value="disqualified">Disqualified</option>
-                <option value="pending_review">Pending Review</option>
-              </>
-          }
+          {statuses.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
         </select>
       </div>
 

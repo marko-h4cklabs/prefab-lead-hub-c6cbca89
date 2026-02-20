@@ -138,9 +138,9 @@ export const api = {
     }),
 
   // --- Leads ---
-  getLeads: (companyId: string, params: { status?: string; limit?: number; offset?: number }) => {
+  getLeads: (companyId: string, params: { statusId?: string; limit?: number; offset?: number }) => {
     const search = new URLSearchParams();
-    if (params.status) search.set("status", params.status);
+    if (params.statusId) search.set("statusId", params.statusId);
     if (params.limit !== undefined) search.set("limit", String(params.limit));
     if (params.offset !== undefined) search.set("offset", String(params.offset));
     return request<any>(`/api/companies/${companyId}/leads?${search.toString()}`);
@@ -175,7 +175,7 @@ export const api = {
   updateLeadStatus: (leadId: string, statusId: string) =>
     request<any>(`/api/leads/${leadId}/status`, {
       method: "PUT",
-      body: JSON.stringify({ status_id: statusId }),
+      body: JSON.stringify({ statusId }),
     }),
 
   // --- Fields ---
