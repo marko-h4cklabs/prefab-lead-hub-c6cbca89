@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, requireCompanyId } from "@/lib/apiClient";
-import { Plus, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 function normalizeList(payload: unknown, keys: string[] = []): any[] {
@@ -57,6 +57,9 @@ const Leads = () => {
   const [fetchError, setFetchError] = useState("");
   const [statuses, setStatuses] = useState<LeadStatus[]>([]);
   const [savingStatusFor, setSavingStatusFor] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Load statuses, sort by position, default to "New"
@@ -74,12 +77,22 @@ const Leads = () => {
       });
   }, []);
 
+  const handleSearchInput = (value: string) => {
+    setSearchInput(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setSearchQuery(value.trim());
+      setOffset(0);
+    }, 300);
+  };
+
   const fetchLeads = useCallback(() => {
     if (statusFilter === "__pending__") return;
     setLoading(true);
     setFetchError("");
-    const params: { statusId?: string; limit: number; offset: number } = { limit: PAGE_SIZE, offset };
+    const params: { statusId?: string; limit: number; offset: number; query?: string } = { limit: PAGE_SIZE, offset };
     if (statusFilter && statusFilter !== "__ALL__") params.statusId = statusFilter;
+    if (searchQuery) params.query = searchQuery;
     api.getLeads(companyId, params)
       .then((res) => {
         const list = normalizeList(res, ["data", "leads", "items"]);
@@ -94,13 +107,14 @@ const Leads = () => {
         toast({ title: "Failed to load leads", description: err.message, variant: "destructive" });
       })
       .finally(() => setLoading(false));
-  }, [companyId, statusFilter, offset]);
+  }, [companyId, statusFilter, offset, searchQuery]);
 
   // Silent poll (no loading state reset)
   const pollLeads = useCallback(() => {
     if (statusFilter === "__pending__") return;
-    const params2: { statusId?: string; limit: number; offset: number } = { limit: PAGE_SIZE, offset };
+    const params2: { statusId?: string; limit: number; offset: number; query?: string } = { limit: PAGE_SIZE, offset };
     if (statusFilter && statusFilter !== "__ALL__") params2.statusId = statusFilter;
+    if (searchQuery) params2.query = searchQuery;
     api.getLeads(companyId, params2)
       .then((res) => {
         const list = normalizeList(res, ["data", "leads", "items"]);
@@ -108,7 +122,7 @@ const Leads = () => {
         setTotal((res as any)?.total ?? (res as any)?.count ?? list.length);
       })
       .catch(() => {});
-  }, [companyId, statusFilter, offset]);
+  }, [companyId, statusFilter, offset, searchQuery]);
 
   useEffect(() => { fetchLeads(); }, [fetchLeads]);
 
@@ -185,8 +199,8 @@ const Leads = () => {
         </button>
       </div>
 
-      {/* Filter */}
-      <div className="mb-4">
+      {/* Filter + Search */}
+      <div className="mb-4 flex items-center gap-3">
         <select
           value={statusFilter === "__pending__" ? "" : statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setOffset(0); }}
@@ -197,6 +211,15 @@ const Leads = () => {
           ))}
           <option value="__ALL__">All Statuses</option>
         </select>
+        <div className="relative flex-1 max-w-xs">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={searchInput}
+            onChange={(e) => handleSearchInput(e.target.value)}
+            placeholder="Search leads..."
+            className="industrial-input w-full pl-8"
+          />
+        </div>
       </div>
 
       {fetchError && (
