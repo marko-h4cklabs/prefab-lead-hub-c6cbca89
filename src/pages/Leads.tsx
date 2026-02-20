@@ -144,9 +144,9 @@ const Leads = () => {
     e.preventDefault();
     setCreating(true);
     setCreateError("");
+    const trimmedName = newExternalId.trim();
     const normalizedChannel = newChannel.trim().toLowerCase();
-    const normalizedExternalId = newExternalId.trim().toLowerCase();
-    api.createLead(companyId, { channel: normalizedChannel, external_id: normalizedExternalId })
+    api.createLead(companyId, { name: trimmedName, external_id: trimmedName, channel: normalizedChannel })
       .then(() => {
         setShowModal(false);
         setNewChannel("");
@@ -305,7 +305,7 @@ const Leads = () => {
                 <p className="mt-1 text-xs text-muted-foreground">Channel is case-insensitive; values are normalized automatically.</p>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-mono uppercase tracking-wider text-muted-foreground">External ID</label>
+                <label className="mb-1 block text-xs font-mono uppercase tracking-wider text-muted-foreground">Name</label>
                 <input value={newExternalId} onChange={(e) => setNewExternalId(e.target.value)} className="industrial-input w-full" required />
               </div>
               <div className="flex gap-3 justify-end">

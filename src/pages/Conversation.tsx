@@ -85,7 +85,26 @@ const Conversation = () => {
   const applyBackendResponse = (res: any) => {
     if (res?.assistant_message !== undefined) {
       if (res.conversation_id) setConversationId(res.conversation_id);
-      if (res.highlights) setHighlights(res.highlights);
+
+      // Support multiple response shapes for highlights
+      const h: Highlights = res.highlights || {};
+      const activeSettings = res.active_settings || h.settings;
+      const missingReq = res.missing_required_infos || res.required || h.fields?.missing_required || [];
+      const coll = res.collected_infos || res.collected || h.fields?.collected || [];
+
+      setHighlights({
+        settings: activeSettings ? {
+          tone: activeSettings.tone,
+          persona: activeSettings.persona || activeSettings.persona_style,
+          response_length: activeSettings.response_length,
+          emojis_enabled: activeSettings.emojis_enabled,
+        } : h.settings,
+        fields: {
+          configured: h.fields?.configured,
+          missing_required: missingReq,
+          collected: coll,
+        },
+      });
 
       setData((prev) => {
         const msgs = prev?.messages || [];
