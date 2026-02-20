@@ -165,7 +165,7 @@ const Simulation = () => {
       return;
     }
     const normalizedChannel = newChannel.trim().toLowerCase();
-    api.createLead(companyId, { name: trimmedName, channel: normalizedChannel })
+    api.createLead(companyId, { name: trimmedName, channel: normalizedChannel, source: "simulation" })
       .then(() => {
         setShowModal(false);
         setNewChannel("");
