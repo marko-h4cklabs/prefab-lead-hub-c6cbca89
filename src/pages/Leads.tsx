@@ -145,6 +145,11 @@ const Leads = () => {
     setCreating(true);
     setCreateError("");
     const trimmedName = newExternalId.trim();
+    if (trimmedName.length < 2) {
+      setCreateError("Name must be at least 2 characters.");
+      setCreating(false);
+      return;
+    }
     const normalizedChannel = newChannel.trim().toLowerCase();
     api.createLead(companyId, { name: trimmedName, channel: normalizedChannel })
       .then(() => {
