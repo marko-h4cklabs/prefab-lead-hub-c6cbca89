@@ -89,7 +89,7 @@ const Conversation = () => {
       // Support multiple response shapes for highlights
       const h: Highlights = res.highlights || {};
       const activeSettings = res.active_settings || h.settings;
-      const missingReq = res.missing_required_infos || res.required || h.fields?.missing_required || [];
+      const missingReq = res.missing_required_infos || res.required_infos || res.required || h.fields?.missing_required || [];
       const coll = res.collected_infos || res.collected || h.fields?.collected || [];
 
       setHighlights({
