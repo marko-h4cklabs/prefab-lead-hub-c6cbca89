@@ -1,7 +1,41 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, requireCompanyId } from "@/lib/apiClient";
-import { ArrowLeft, MessageSquare } from "lucide-react";
+import { ArrowLeft, MessageSquare, Loader2 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+
+function normalizeList(payload: unknown, keys: string[] = []): any[] {
+  if (Array.isArray(payload)) return payload;
+  if (payload && typeof payload === "object") {
+    for (const k of keys) {
+      if (Array.isArray((payload as any)[k])) return (payload as any)[k];
+    }
+  }
+  return [];
+}
+
+interface LeadStatus {
+  id: string;
+  name: string;
+  sort_order: number;
+  is_default: boolean;
+}
+
+const HIDDEN_FIELDS = new Set([
+  "id", "__v", "company_id", "score", "status_id", "status_obj",
+  "status_name", "assigned_sales", "name", "external_id", "channel",
+  "created_at", "updated_at", "collected_infos", "required_infos_missing",
+]);
+
+const POLL_INTERVAL = 7_000;
+
+const statusClass = (name: string) => {
+  const s = name?.toLowerCase();
+  if (s === "new") return "status-new";
+  if (s === "qualified") return "status-qualified";
+  if (s === "disqualified") return "status-disqualified";
+  return "status-pending";
+};
 
 const LeadDetail = () => {
   const { leadId } = useParams();
@@ -9,24 +43,106 @@ const LeadDetail = () => {
   const navigate = useNavigate();
   const [lead, setLead] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [statuses, setStatuses] = useState<LeadStatus[]>([]);
+  const [savingStatus, setSavingStatus] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState("");
+  const [savingName, setSavingName] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchLead = useCallback(() => {
+    if (!leadId) return Promise.resolve();
+    return api.getLead(companyId, leadId)
+      .then((data) => {
+        setLead(data);
+        setNameValue(data?.name || data?.external_id || "");
+      })
+      .catch(() => {});
+  }, [companyId, leadId]);
 
   useEffect(() => {
+    fetchLead().finally(() => setLoading(false));
+  }, [fetchLead]);
+
+  // Load statuses
+  useEffect(() => {
+    api.getLeadStatuses()
+      .then((res) => setStatuses(normalizeList(res, ["statuses", "items", "data"])))
+      .catch(() => {});
+  }, []);
+
+  // Polling
+  useEffect(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(() => {
+      if (!leadId) return;
+      api.getLead(companyId, leadId)
+        .then((data) => {
+          setLead(data);
+          if (!editingName) setNameValue(data?.name || data?.external_id || "");
+        })
+        .catch(() => {});
+    }, POLL_INTERVAL);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [companyId, leadId, editingName]);
+
+  const handleStatusChange = async (newStatusId: string) => {
     if (!leadId) return;
-    api.getLead(companyId, leadId)
-      .then(setLead)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [leadId]);
+    const prev = { status_id: lead.status_id, status_name: lead.status_name };
+    const newObj = statuses.find((s) => s.id === newStatusId);
+    if (!newObj) return;
+
+    setLead((l: any) => ({ ...l, status_id: newObj.id, status_name: newObj.name, updated_at: new Date().toISOString() }));
+    setSavingStatus(true);
+
+    try {
+      await api.updateLeadStatus(leadId, newStatusId);
+    } catch {
+      setLead((l: any) => ({ ...l, ...prev }));
+      toast({ title: "Failed to update status", variant: "destructive" });
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
+  const handleNameSave = async () => {
+    if (!leadId) return;
+    const trimmed = nameValue.trim();
+    if (!trimmed) {
+      setNameValue(lead?.name || lead?.external_id || "");
+      setEditingName(false);
+      return;
+    }
+    // Allow only letters, spaces, unicode
+    if (!/^[\p{L}\s]+$/u.test(trimmed)) {
+      toast({ title: "Invalid name", description: "Name can only contain letters and spaces.", variant: "destructive" });
+      return;
+    }
+    setSavingName(true);
+    try {
+      await api.updateLeadName(leadId, trimmed);
+      setLead((l: any) => ({ ...l, name: trimmed, updated_at: new Date().toISOString() }));
+      setEditingName(false);
+    } catch (err: any) {
+      toast({ title: "Failed to update name", description: err?.message, variant: "destructive" });
+    } finally {
+      setSavingName(false);
+    }
+  };
 
   if (loading) return <div className="text-muted-foreground">Loading…</div>;
   if (!lead) return <div className="text-destructive">Lead not found</div>;
 
-  const fields = Object.entries(lead).filter(([k]) => !["id", "__v"].includes(k));
+  const leadName = lead.name || lead.external_id || "—";
+  const statusId = lead.status_id || "";
+  const statusName = lead.status_name || "New";
+  const collectedInfos: any[] = Array.isArray(lead.collected_infos) ? lead.collected_infos : [];
+  const missingInfos: string[] = Array.isArray(lead.required_infos_missing) ? lead.required_infos_missing : [];
 
   return (
     <div>
       <button onClick={() => navigate("/leads")} className="industrial-btn-ghost mb-4">
-        <ArrowLeft size={16} /> Back to Leads
+        <ArrowLeft size={16} /> Back to Inbox
       </button>
 
       <div className="flex items-center justify-between mb-6">
@@ -41,22 +157,117 @@ const LeadDetail = () => {
 
       <div className="industrial-card p-6">
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
-          {fields.map(([key, value]) => (
-            <div key={key}>
-              <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-0.5">{key}</dt>
-              <dd className="text-sm font-medium">
-                {typeof value === "object" ? (
-                  <pre className="text-xs font-mono bg-muted p-2 rounded-sm overflow-auto max-h-40">
-                    {JSON.stringify(value, null, 2)}
-                  </pre>
-                ) : (
-                  String(value ?? "—")
-                )}
-              </dd>
-            </div>
-          ))}
+          {/* Channel */}
+          <div>
+            <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-0.5">Channel</dt>
+            <dd className="text-sm font-medium">{lead.channel || "—"}</dd>
+          </div>
+
+          {/* Name (editable) */}
+          <div>
+            <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-0.5">Name</dt>
+            <dd className="text-sm font-medium">
+              {editingName ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    className="industrial-input py-1 px-2 text-sm w-full max-w-[200px]"
+                    value={nameValue}
+                    onChange={(e) => setNameValue(e.target.value)}
+                    onBlur={handleNameSave}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleNameSave(); }}
+                    disabled={savingName}
+                    autoFocus
+                  />
+                  {savingName && <Loader2 size={14} className="animate-spin text-muted-foreground" />}
+                </div>
+              ) : (
+                <span
+                  className="cursor-pointer hover:underline"
+                  onClick={() => { setEditingName(true); setNameValue(leadName); }}
+                >
+                  {leadName}
+                </span>
+              )}
+            </dd>
+          </div>
+
+          {/* Status (dropdown) */}
+          <div>
+            <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-0.5">Status</dt>
+            <dd className="text-sm font-medium">
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={statusId}
+                  onChange={(e) => handleStatusChange(e.target.value)}
+                  disabled={savingStatus}
+                  className={`industrial-input py-1 px-2 text-xs font-mono w-auto min-w-[100px] ${statusClass(statusName)}`}
+                >
+                  {statuses.length > 0 ? (
+                    statuses.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))
+                  ) : (
+                    <option value="">{statusName}</option>
+                  )}
+                </select>
+                {savingStatus && <Loader2 size={12} className="animate-spin text-muted-foreground" />}
+              </div>
+            </dd>
+          </div>
+
+          {/* Created at */}
+          <div>
+            <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-0.5">Created at</dt>
+            <dd className="text-sm font-medium font-mono">
+              {lead.created_at ? new Date(lead.created_at).toLocaleString() : "—"}
+            </dd>
+          </div>
+
+          {/* Updated at */}
+          <div>
+            <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-0.5">Updated at</dt>
+            <dd className="text-sm font-medium font-mono">
+              {lead.updated_at ? new Date(lead.updated_at).toLocaleString() : "—"}
+            </dd>
+          </div>
         </dl>
       </div>
+
+      {/* Collected info section */}
+      {(collectedInfos.length > 0 || missingInfos.length > 0) && (
+        <div className="industrial-card p-6 mt-6">
+          <h2 className="text-sm font-bold font-mono uppercase tracking-wider text-muted-foreground mb-4">
+            Collected info:
+          </h2>
+
+          {collectedInfos.length > 0 && (
+            <dl className="space-y-2 mb-4">
+              {collectedInfos.map((info: any, i: number) => (
+                <div key={i} className="flex gap-2 text-sm">
+                  <dt className="font-mono text-muted-foreground min-w-[140px]">
+                    {info.field_name || info.name || `Field ${i + 1}`}:
+                  </dt>
+                  <dd className="font-medium">
+                    {info.value ?? "—"}
+                    {info.units ? ` (${info.units})` : ""}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+
+          {missingInfos.length > 0 && (
+            <div>
+              <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">Missing:</h3>
+              <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                {missingInfos.map((name, i) => (
+                  <li key={i}>{typeof name === "string" ? name : (name as any)?.field_name || (name as any)?.name || JSON.stringify(name)}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

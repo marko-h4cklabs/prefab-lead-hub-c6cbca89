@@ -140,7 +140,7 @@ export const api = {
   // --- Leads ---
   getLeads: (companyId: string, params: { statusId?: string; limit?: number; offset?: number }) => {
     const search = new URLSearchParams();
-    if (params.statusId) search.set("statusId", params.statusId);
+    if (params.statusId) search.set("status_id", params.statusId);
     if (params.limit !== undefined) search.set("limit", String(params.limit));
     if (params.offset !== undefined) search.set("offset", String(params.offset));
     return request<any>(`/api/companies/${companyId}/leads?${search.toString()}`, { cache: "no-store" });
@@ -174,8 +174,14 @@ export const api = {
 
   updateLeadStatus: (leadId: string, statusId: string) =>
     request<any>(`/api/leads/${leadId}/status`, {
-      method: "PUT",
-      body: JSON.stringify({ statusId }),
+      method: "PATCH",
+      body: JSON.stringify({ status_id: statusId }),
+    }),
+
+  updateLeadName: (leadId: string, name: string) =>
+    request<any>(`/api/leads/${leadId}/name`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
     }),
 
   // --- Fields ---
