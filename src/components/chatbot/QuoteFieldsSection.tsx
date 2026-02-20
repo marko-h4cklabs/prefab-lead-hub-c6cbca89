@@ -1,18 +1,95 @@
 import { useEffect, useState, useRef } from "react";
 import { api } from "@/lib/apiClient";
 import { toast } from "@/hooks/use-toast";
-import { Save, Plus, Trash2 } from "lucide-react";
+import { Save, X } from "lucide-react";
 
-interface QuoteField {
-  name: string;
-  type: string;
-  units: string;
-  priority: number;
-  required: boolean;
+// --- Preset definitions ---
+
+interface PresetConfig {
+  id: string;
+  label: string;
+  description: string;
+  configType?: "currency" | "options" | "dimensions";
 }
 
+const PRESETS: PresetConfig[] = [
+  { id: "budget", label: "Budget", description: "Requested budget or price range", configType: "currency" },
+  { id: "location", label: "Location", description: "Project or delivery location", configType: "options" },
+  { id: "email_address", label: "Email Address", description: "Contact email" },
+  { id: "phone_number", label: "Phone Number", description: "Contact phone number" },
+  { id: "full_name", label: "Full Name", description: "Contact full name" },
+  { id: "additional_notes", label: "Additional Notes", description: "Any extra information from the lead" },
+  { id: "doors", label: "Doors", description: "Door specifications", configType: "options" },
+  { id: "windows", label: "Windows", description: "Window specifications", configType: "options" },
+  { id: "colors", label: "Colors", description: "Color preferences", configType: "options" },
+  { id: "dimensions", label: "Dimensions", description: "Size measurements", configType: "dimensions" },
+  { id: "roof", label: "Roof", description: "Roof type or specifications", configType: "options" },
+];
+
+interface PresetState {
+  enabled: boolean;
+  currency?: string;
+  allowed_options?: string[];
+  dimension_axes?: string[];
+  dimension_unit?: string;
+}
+
+type AllPresetsState = Record<string, PresetState>;
+
+function buildDefault(): AllPresetsState {
+  const state: AllPresetsState = {};
+  PRESETS.forEach((p) => {
+    const s: PresetState = { enabled: false };
+    if (p.configType === "currency") s.currency = "EUR";
+    if (p.configType === "options") s.allowed_options = [];
+    if (p.configType === "dimensions") {
+      s.dimension_axes = ["length", "width"];
+      s.dimension_unit = "m";
+    }
+    state[p.id] = s;
+  });
+  return state;
+}
+
+// --- Tag input component ---
+
+const TagInput = ({ tags, onChange }: { tags: string[]; onChange: (t: string[]) => void }) => {
+  const [draft, setDraft] = useState("");
+
+  const add = () => {
+    const v = draft.trim();
+    if (v && !tags.includes(v)) {
+      onChange([...tags, v]);
+    }
+    setDraft("");
+  };
+
+  return (
+    <div className="flex flex-wrap gap-1.5 items-center">
+      {tags.map((t) => (
+        <span key={t} className="inline-flex items-center gap-1 bg-muted px-2 py-0.5 rounded-sm text-xs font-mono">
+          {t}
+          <button type="button" onClick={() => onChange(tags.filter((x) => x !== t))} className="text-muted-foreground hover:text-destructive">
+            <X size={10} />
+          </button>
+        </span>
+      ))}
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
+        onBlur={add}
+        placeholder="Add option…"
+        className="industrial-input py-0.5 px-2 text-xs w-28"
+      />
+    </div>
+  );
+};
+
+// --- Main component ---
+
 const QuoteFieldsSection = () => {
-  const [fields, setFields] = useState<QuoteField[]>([]);
+  const [presets, setPresets] = useState<AllPresetsState>(buildDefault);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -21,145 +98,150 @@ const QuoteFieldsSection = () => {
   useEffect(() => {
     api.getQuoteFields()
       .then((res) => {
-        const data = res.fields || res.data || res || [];
-        const parsed: QuoteField[] = Array.isArray(data)
-          ? data.map((f: any, idx: number) => ({
-              name: f.name || f.field_name || "",
-              type: f.type === "number" || f.field_type === "number" ? "number" : "text",
-              units: f.units || "",
-              priority: f.priority ?? f.display_order ?? (idx + 1) * 10,
-              required: f.required ?? true,
-            }))
-          : [];
-        setFields(parsed);
-        initialRef.current = JSON.stringify(parsed);
+        const data = res?.presets || res?.fields || res;
+        if (data && typeof data === "object" && !Array.isArray(data)) {
+          const merged = { ...buildDefault() };
+          for (const key of Object.keys(merged)) {
+            if (data[key]) merged[key] = { ...merged[key], ...data[key] };
+          }
+          setPresets(merged);
+          initialRef.current = JSON.stringify(merged);
+        } else {
+          const def = buildDefault();
+          setPresets(def);
+          initialRef.current = JSON.stringify(def);
+        }
       })
-      .catch(() => {})
+      .catch(() => {
+        const def = buildDefault();
+        setPresets(def);
+        initialRef.current = JSON.stringify(def);
+      })
       .finally(() => setLoading(false));
   }, []);
 
-  const setFieldsAndDirty = (next: QuoteField[]) => {
-    setFields(next);
-    setIsDirty(JSON.stringify(next) !== initialRef.current);
+  const update = (id: string, patch: Partial<PresetState>) => {
+    setPresets((prev) => {
+      const next = { ...prev, [id]: { ...prev[id], ...patch } };
+      setIsDirty(JSON.stringify(next) !== initialRef.current);
+      return next;
+    });
   };
 
   const handleSave = () => {
     setSaving(true);
-    const sorted = [...fields].sort((a, b) => a.priority - b.priority);
-    api.putQuoteFields({ fields: sorted })
+    api.putQuoteFields({ fields: presets as any })
       .then(() => {
         toast({ title: "Saved", description: "Quote fields updated." });
-        initialRef.current = JSON.stringify(fields);
+        initialRef.current = JSON.stringify(presets);
         setIsDirty(false);
       })
       .catch(() => {})
       .finally(() => setSaving(false));
   };
 
-  const addField = () => {
-    const maxPriority = fields.reduce((max, f) => Math.max(max, f.priority), 0);
-    const nextPriority = maxPriority > 0 ? maxPriority + 10 : 10;
-    setFieldsAndDirty([...fields, { name: "", type: "text", units: "", priority: nextPriority, required: true }]);
-  };
-
-  const removeField = (index: number) => {
-    setFieldsAndDirty(fields.filter((_, i) => i !== index));
-  };
-
-  const updateField = (index: number, patch: Partial<QuoteField>) => {
-    setFieldsAndDirty(fields.map((f, i) => (i === index ? { ...f, ...patch } : f)));
-  };
-
   if (loading) return <div className="industrial-card p-6 text-muted-foreground text-sm">Loading…</div>;
 
   return (
     <div className="industrial-card p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold uppercase tracking-wider">Quote Requirements</h2>
-        <button onClick={addField} className="industrial-btn-primary text-xs">
-          <Plus size={14} /> Add Field
-        </button>
-      </div>
+      <h2 className="text-sm font-bold uppercase tracking-wider">Quote Requirements</h2>
 
-      <div className="overflow-hidden">
-        <table className="industrial-table">
-          <thead>
-            <tr>
-              <th>Field Name</th>
-              <th>Type</th>
-              <th>Units</th>
-              <th>Priority</th>
-              <th>Required</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {fields.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="text-center py-8 text-muted-foreground">
-                  No quote fields configured. Click "Add Field" to start.
-                </td>
-              </tr>
-            ) : (
-              fields.map((f, i) => (
-                <tr key={i}>
-                  <td>
-                    <input
-                      value={f.name}
-                      onChange={(e) => updateField(i, { name: e.target.value })}
-                      className="industrial-input w-full"
-                      placeholder="Field name"
-                    />
-                  </td>
-                  <td>
-                    <select
-                      value={f.type}
-                      onChange={(e) => updateField(i, { type: e.target.value })}
-                      className="industrial-input w-full"
-                    >
-                      <option value="text">Text</option>
-                      <option value="number">Number</option>
-                    </select>
-                  </td>
-                  <td>
-                    <input
-                      value={f.units}
-                      onChange={(e) => updateField(i, { units: e.target.value })}
-                      className="industrial-input w-full"
-                      placeholder="e.g. kg, m²"
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="number"
-                      value={f.priority}
-                      onChange={(e) => updateField(i, { priority: Number(e.target.value) })}
-                      className="industrial-input w-16"
-                    />
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      onClick={() => updateField(i, { required: !f.required })}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        f.required ? "bg-accent" : "bg-muted"
-                      }`}
-                    >
-                      <span className={`inline-block h-4 w-4 rounded-full bg-card transition-transform ${
-                        f.required ? "translate-x-6" : "translate-x-1"
-                      }`} />
-                    </button>
-                  </td>
-                  <td>
-                    <button onClick={() => removeField(i)} className="industrial-btn-ghost p-1.5 text-destructive">
-                      <Trash2 size={14} />
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      <div className="space-y-1">
+        {PRESETS.map((preset) => {
+          const state = presets[preset.id];
+          const enabled = state?.enabled ?? false;
+
+          return (
+            <div key={preset.id} className="border border-border rounded-sm">
+              {/* Row header */}
+              <div className="flex items-center gap-3 px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => update(preset.id, { enabled: !enabled })}
+                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                    enabled ? "bg-accent" : "bg-muted"
+                  }`}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-card transition-transform ${
+                    enabled ? "translate-x-[18px]" : "translate-x-[3px]"
+                  }`} />
+                </button>
+                <div className="min-w-0">
+                  <span className="text-sm font-semibold">{preset.label}</span>
+                  <span className="text-xs text-muted-foreground ml-2">{preset.description}</span>
+                </div>
+              </div>
+
+              {/* Config panel */}
+              {enabled && preset.configType && (
+                <div className="px-4 pb-3 pt-0 border-t border-border">
+                  <div className="pt-3">
+                    {preset.configType === "currency" && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono text-muted-foreground">Units:</span>
+                        <select
+                          value={state.currency || "EUR"}
+                          onChange={(e) => update(preset.id, { currency: e.target.value })}
+                          className="industrial-input py-0.5 px-2 text-xs w-24"
+                        >
+                          <option value="EUR">EUR</option>
+                          <option value="USD">USD</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {preset.configType === "options" && (
+                      <div className="space-y-1">
+                        <span className="text-xs font-mono text-muted-foreground">Allowed options:</span>
+                        <TagInput
+                          tags={state.allowed_options || []}
+                          onChange={(t) => update(preset.id, { allowed_options: t })}
+                        />
+                      </div>
+                    )}
+
+                    {preset.configType === "dimensions" && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-mono text-muted-foreground">Axes:</span>
+                          {(["length", "width", "height"] as const).map((axis) => {
+                            const axes = state.dimension_axes || [];
+                            const checked = axes.includes(axis);
+                            return (
+                              <label key={axis} className="flex items-center gap-1 text-xs font-mono">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => {
+                                    const next = checked ? axes.filter((a) => a !== axis) : [...axes, axis];
+                                    update(preset.id, { dimension_axes: next });
+                                  }}
+                                  className="accent-accent"
+                                />
+                                {axis}
+                              </label>
+                            );
+                          })}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono text-muted-foreground">Unit:</span>
+                          <select
+                            value={state.dimension_unit || "m"}
+                            onChange={(e) => update(preset.id, { dimension_unit: e.target.value })}
+                            className="industrial-input py-0.5 px-2 text-xs w-20"
+                          >
+                            <option value="m">m</option>
+                            <option value="cm">cm</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <button
