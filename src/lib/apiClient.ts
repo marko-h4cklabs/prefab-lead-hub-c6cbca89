@@ -245,6 +245,22 @@ export const api = {
   getSystemContext: () =>
     request<any>("/api/chatbot/system-context"),
 
+  // --- Account ---
+  getMe: () =>
+    request<any>("/api/me"),
+
+  updateEmail: (email: string) =>
+    request<any>("/api/me/email", {
+      method: "PUT",
+      body: JSON.stringify({ email }),
+    }),
+
+  updatePassword: (currentPassword: string, newPassword: string) =>
+    request<any>("/api/me/password", {
+      method: "PUT",
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    }),
+
   // --- Admin ---
   runSnapshot: () =>
     request<any>("/api/admin/snapshot", { method: "POST" }),
