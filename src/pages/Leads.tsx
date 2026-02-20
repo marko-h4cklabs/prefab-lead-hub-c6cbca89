@@ -4,6 +4,16 @@ import { api, requireCompanyId } from "@/lib/apiClient";
 import { Plus, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
+function normalizeList(payload: unknown, keys: string[] = []): any[] {
+  if (Array.isArray(payload)) return payload;
+  if (payload && typeof payload === "object") {
+    for (const k of keys) {
+      if (Array.isArray((payload as any)[k])) return (payload as any)[k];
+    }
+  }
+  return [];
+}
+
 const CHANNELS = [
   { value: "messenger", label: "Messenger" },
   { value: "instagram", label: "Instagram" },
@@ -47,7 +57,9 @@ const Leads = () => {
   const [savingStatusFor, setSavingStatusFor] = useState<string | null>(null);
 
   useEffect(() => {
-    api.getLeadStatuses().then(setStatuses).catch(() => {});
+    api.getLeadStatuses()
+      .then((res) => setStatuses(normalizeList(res, ["statuses", "items", "data"])))
+      .catch(() => {});
   }, []);
 
   const fetchLeads = () => {
@@ -55,8 +67,12 @@ const Leads = () => {
     setFetchError("");
     api.getLeads(companyId, { statusId: statusFilter || undefined, limit: PAGE_SIZE, offset })
       .then((res) => {
-        setLeads(res.data || res.leads || res || []);
-        setTotal(res.total ?? res.count ?? (res.data?.length || 0));
+        const list = normalizeList(res, ["data", "leads", "items"]);
+        setLeads(list);
+        setTotal((res as any)?.total ?? (res as any)?.count ?? list.length);
+        if (list.length === 0 && res && typeof res === "object" && (res as any).error) {
+          toast({ title: "Error", description: String((res as any).error.message || (res as any).error), variant: "destructive" });
+        }
       })
       .catch((err: Error) => {
         setFetchError(err.message || "Failed to load leads");
