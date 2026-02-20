@@ -241,7 +241,7 @@ const Simulation = () => {
                 </tr>
               ))
             ) : leads.length === 0 ? (
-              <tr><td colSpan={4} className="text-center py-8 text-muted-foreground">No simulation leads found</td></tr>
+<tr><td colSpan={4} className="text-center py-8 text-muted-foreground">No simulation leads found</td></tr>
             ) : (
               leads.map((lead) => (
                 <tr

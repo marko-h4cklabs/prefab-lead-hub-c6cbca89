@@ -78,7 +78,7 @@ const Leads = () => {
     if (statusFilter === "__pending__") return;
     setLoading(true);
     setFetchError("");
-    const params: { statusId?: string; limit: number; offset: number; query?: string; source: string } = { limit: PAGE_SIZE, offset, source: "real" };
+    const params: { statusId?: string; limit: number; offset: number; query?: string; source: string } = { limit: PAGE_SIZE, offset, source: "inbox" };
     if (statusFilter && statusFilter !== "__ALL__") params.statusId = statusFilter;
     if (searchQuery) params.query = searchQuery;
     api.getLeads(companyId, params)
@@ -100,7 +100,7 @@ const Leads = () => {
   // Silent poll (no loading state reset)
   const pollLeads = useCallback(() => {
     if (statusFilter === "__pending__") return;
-    const params2: { statusId?: string; limit: number; offset: number; query?: string; source: string } = { limit: PAGE_SIZE, offset, source: "real" };
+    const params2: { statusId?: string; limit: number; offset: number; query?: string; source: string } = { limit: PAGE_SIZE, offset, source: "inbox" };
     if (statusFilter && statusFilter !== "__ALL__") params2.statusId = statusFilter;
     if (searchQuery) params2.query = searchQuery;
     api.getLeads(companyId, params2)
@@ -208,7 +208,7 @@ const Leads = () => {
                 </tr>
               ))
             ) : leads.length === 0 ? (
-              <tr><td colSpan={4} className="text-center py-8 text-muted-foreground">No real leads yet. Integrations will populate this.</td></tr>
+              <tr><td colSpan={4} className="text-center py-8 text-muted-foreground">No leads found</td></tr>
             ) : (
               leads.map((lead) => (
                 <tr
