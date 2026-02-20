@@ -24,7 +24,7 @@ const Login = () => {
       const res = await api.login(trimmedEmail, password);
       const token = res.token;
       if (!token) { setError("Login response missing token"); return; }
-      const companyId = res.company_id || (res as any).companyId;
+      const companyId = res.user?.companyId || res.company_id || (res as any).companyId;
       localStorage.setItem("auth_token", token);
       if (companyId) localStorage.setItem("company_id", companyId);
       if (res.role) localStorage.setItem("user_role", res.role);

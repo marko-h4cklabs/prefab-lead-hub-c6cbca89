@@ -50,7 +50,6 @@ async function request<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const token = getAuthToken();
-  const companyId = getCompanyId();
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -59,10 +58,6 @@ async function request<T>(
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
-  }
-
-  if (companyId) {
-    headers["x-company-id"] = companyId;
   }
 
   const res = await fetch(`${API_BASE}${path}`, {
@@ -113,7 +108,7 @@ export const api = {
 
   // --- Auth ---
   login: (email: string, password: string) =>
-    request<{ token: string; company_id: string; role?: string }>("/api/auth/login", {
+    request<{ token: string; company_id?: string; user?: { companyId: string }; role?: string }>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
