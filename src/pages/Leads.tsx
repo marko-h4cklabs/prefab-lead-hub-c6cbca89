@@ -28,8 +28,9 @@ const POLL_INTERVAL = 10_000;
 interface LeadStatus {
   id: string;
   name: string;
-  sort_order: number;
-  is_default: boolean;
+  position?: number;
+  sort_order?: number;
+  is_default?: boolean;
 }
 
 const statusClass = (name: string) => {
@@ -58,14 +59,15 @@ const Leads = () => {
   const [savingStatusFor, setSavingStatusFor] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Load statuses, then set default filter to "New" if it exists
+  // Load statuses, sort by position, default to "New"
   useEffect(() => {
     api.getLeadStatuses()
       .then((res) => {
         const list = normalizeList(res, ["statuses", "items", "data"]);
-        setStatuses(list);
-        const newStatus = list.find((s: LeadStatus) => s.name.toLowerCase() === "new");
-        setStatusFilter(newStatus ? newStatus.id : "");
+        const sorted = [...list].sort((a, b) => (a.position ?? a.sort_order ?? 0) - (b.position ?? b.sort_order ?? 0));
+        setStatuses(sorted);
+        const newStatus = sorted.find((s: LeadStatus) => s.name.toLowerCase() === "new");
+        setStatusFilter(newStatus ? newStatus.id : (sorted[0]?.id || ""));
       })
       .catch(() => {
         setStatusFilter("");
@@ -76,7 +78,9 @@ const Leads = () => {
     if (statusFilter === "__pending__") return;
     setLoading(true);
     setFetchError("");
-    api.getLeads(companyId, { statusId: statusFilter || undefined, limit: PAGE_SIZE, offset })
+    const params: { statusId?: string; limit: number; offset: number } = { limit: PAGE_SIZE, offset };
+    if (statusFilter && statusFilter !== "__ALL__") params.statusId = statusFilter;
+    api.getLeads(companyId, params)
       .then((res) => {
         const list = normalizeList(res, ["data", "leads", "items"]);
         setLeads(list);
@@ -95,7 +99,9 @@ const Leads = () => {
   // Silent poll (no loading state reset)
   const pollLeads = useCallback(() => {
     if (statusFilter === "__pending__") return;
-    api.getLeads(companyId, { statusId: statusFilter || undefined, limit: PAGE_SIZE, offset })
+    const params2: { statusId?: string; limit: number; offset: number } = { limit: PAGE_SIZE, offset };
+    if (statusFilter && statusFilter !== "__ALL__") params2.statusId = statusFilter;
+    api.getLeads(companyId, params2)
       .then((res) => {
         const list = normalizeList(res, ["data", "leads", "items"]);
         setLeads(list);
@@ -189,7 +195,7 @@ const Leads = () => {
           {statuses.map((s) => (
             <option key={s.id} value={s.id}>{s.name}</option>
           ))}
-          <option value="">All Statuses</option>
+          <option value="__ALL__">All Statuses</option>
         </select>
       </div>
 

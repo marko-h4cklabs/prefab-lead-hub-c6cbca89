@@ -1,7 +1,7 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, requireCompanyId } from "@/lib/apiClient";
-import { ArrowLeft, Send, Loader2, Bot } from "lucide-react";
+import { ArrowLeft, Send, Loader2, Bot, Timer } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface Message {
@@ -17,18 +17,17 @@ interface ConversationData {
   current_step: number;
 }
 
-
-
-interface LookingForItem {
+interface RequiredInfo {
   name: string;
   type?: string;
   units?: string;
 }
 
-interface CollectedItem {
+interface CollectedInfo {
   name: string;
   value?: any;
   units?: string;
+  field_name?: string;
 }
 
 const Conversation = () => {
@@ -43,18 +42,41 @@ const Conversation = () => {
   }
 
   const [data, setData] = useState<ConversationData | null>(null);
-  
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [aiReplying, setAiReplying] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [lookingFor, setLookingFor] = useState<LookingForItem[]>([]);
-  const [collected, setCollected] = useState<CollectedItem[]>([]);
+  const [requiredInfos, setRequiredInfos] = useState<RequiredInfo[]>([]);
+  const [collectedInfos, setCollectedInfos] = useState<CollectedInfo[]>([]);
+
+  // Testing mode state
+  const [testingMode, setTestingMode] = useState<"manual" | "automated">("manual");
+  const [smartDelay, setSmartDelay] = useState(8);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const delayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const clearTimers = useCallback(() => {
+    if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
+    if (delayTimerRef.current) { clearTimeout(delayTimerRef.current); delayTimerRef.current = null; }
+    setCountdown(null);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => () => clearTimers(), [clearTimers]);
+
+  const applyResponseFields = (res: any) => {
+    if (Array.isArray(res?.required_infos)) setRequiredInfos(res.required_infos);
+    else if (Array.isArray(res?.looking_for)) setRequiredInfos(res.looking_for);
+    if (Array.isArray(res?.collected_infos)) setCollectedInfos(res.collected_infos);
+    else if (Array.isArray(res?.collected)) setCollectedInfos(res.collected);
   };
 
   useEffect(() => {
@@ -62,8 +84,7 @@ const Conversation = () => {
     api.getConversation(companyId, leadId)
       .then((convo) => {
         setData(convo);
-        if (Array.isArray(convo?.looking_for)) setLookingFor(convo.looking_for);
-        if (Array.isArray(convo?.collected)) setCollected(convo.collected);
+        applyResponseFields(convo);
       })
       .catch(() => {
         toast({ title: "Error", description: "Failed to load conversation", variant: "destructive" });
@@ -71,17 +92,12 @@ const Conversation = () => {
       .finally(() => setLoading(false));
   }, [leadId]);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [data?.messages]);
+  useEffect(() => { scrollToBottom(); }, [data?.messages]);
 
   const applyBackendResponse = (res: any) => {
+    applyResponseFields(res);
     if (res?.assistant_message !== undefined) {
       if (res.conversation_id) setConversationId(res.conversation_id);
-
-      if (Array.isArray(res.looking_for)) setLookingFor(res.looking_for);
-      if (Array.isArray(res.collected)) setCollected(res.collected);
-
       setData((prev) => {
         const msgs = prev?.messages || [];
         return {
@@ -94,16 +110,45 @@ const Conversation = () => {
       });
     } else {
       setData(res);
-      if (Array.isArray(res?.looking_for)) setLookingFor(res.looking_for);
-      if (Array.isArray(res?.collected)) setCollected(res.collected);
     }
   };
+
+  const triggerAiReply = useCallback(async () => {
+    if (!leadId || aiReplying) return;
+    setAiReplying(true);
+    try {
+      const res = await api.aiReply(companyId, leadId);
+      applyBackendResponse(res);
+    } catch {
+      toast({ title: "Error", description: "Failed to get AI reply", variant: "destructive" });
+    } finally {
+      setAiReplying(false);
+    }
+  }, [leadId, companyId, aiReplying]);
+
+  const startAutoCountdown = useCallback(() => {
+    clearTimers();
+    setCountdown(smartDelay);
+    countdownRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev === null || prev <= 1) return null;
+        return prev - 1;
+      });
+    }, 1000);
+    delayTimerRef.current = setTimeout(() => {
+      clearTimers();
+      triggerAiReply();
+    }, smartDelay * 1000);
+  }, [smartDelay, clearTimers, triggerAiReply]);
 
   const handleSend = async () => {
     if (!draft.trim() || !leadId || sending) return;
     const content = draft.trim();
     setSending(true);
     setDraft("");
+
+    // Reset countdown on each new message
+    clearTimers();
 
     // Optimistically add user message
     setData((prev) => ({
@@ -119,9 +164,13 @@ const Conversation = () => {
       if (conversationId) body.conversation_id = conversationId;
       const res = await api.sendMessage(companyId, leadId, body);
       applyBackendResponse(res);
+
+      // If automated, start countdown for AI reply
+      if (testingMode === "automated") {
+        startAutoCountdown();
+      }
     } catch {
       toast({ title: "Error", description: "Failed to send message", variant: "destructive" });
-      // Remove optimistic user message and restore draft
       setData((prev) => ({
         ...prev,
         lead_id: prev?.lead_id || leadId || "",
@@ -132,19 +181,6 @@ const Conversation = () => {
       setDraft(content);
     } finally {
       setSending(false);
-    }
-  };
-
-  const handleAiReply = async () => {
-    if (!leadId || aiReplying) return;
-    setAiReplying(true);
-    try {
-      const res = await api.aiReply(companyId, leadId);
-      applyBackendResponse(res);
-    } catch {
-      toast({ title: "Error", description: "Failed to get AI reply", variant: "destructive" });
-    } finally {
-      setAiReplying(false);
     }
   };
 
@@ -168,16 +204,16 @@ const Conversation = () => {
 
   const HighlightsPanel = () => (
     <div className="space-y-4">
-      {/* Looking for */}
+      {/* Looking for (required_infos) */}
       <div>
         <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">
           Looking for
         </h3>
-        {lookingFor.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No required fields defined.</p>
+        {requiredInfos.length === 0 ? (
+          <p className="text-xs text-muted-foreground">All required fields collected.</p>
         ) : (
           <ul className="space-y-1">
-            {lookingFor.map((item, i) => (
+            {requiredInfos.map((item, i) => (
               <li key={i} className="text-xs font-mono">
                 <span className="text-foreground">{item.name}</span>
                 {(item.type || item.units) && (
@@ -191,18 +227,18 @@ const Conversation = () => {
         )}
       </div>
 
-      {/* Collected */}
+      {/* Collected (collected_infos) */}
       <div>
         <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">
           Collected
         </h3>
-        {collected.length === 0 ? (
+        {collectedInfos.length === 0 ? (
           <p className="text-xs text-muted-foreground">None yet</p>
         ) : (
           <dl className="space-y-1">
-            {collected.map((item, i) => (
+            {collectedInfos.map((item, i) => (
               <div key={i} className="text-xs font-mono">
-                <dt className="text-muted-foreground inline">{item.name}: </dt>
+                <dt className="text-muted-foreground inline">{item.field_name || item.name}: </dt>
                 <dd className="inline text-foreground font-medium">{String(item.value ?? "—")}</dd>
                 {item.units && <span className="text-muted-foreground ml-1">({item.units})</span>}
               </div>
@@ -223,7 +259,41 @@ const Conversation = () => {
           </button>
           <h1 className="text-lg font-bold">Conversation</h1>
         </div>
-        <span className="text-xs font-mono text-muted-foreground">Step {currentStep}</span>
+        <div className="flex items-center gap-3">
+          {/* Testing mode toggle */}
+          <div className="flex items-center gap-2 text-xs font-mono">
+            <button
+              onClick={() => { setTestingMode("manual"); clearTimers(); }}
+              className={`px-2 py-1 rounded-sm border ${testingMode === "manual" ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+            >
+              Manual
+            </button>
+            <button
+              onClick={() => setTestingMode("automated")}
+              className={`px-2 py-1 rounded-sm border ${testingMode === "automated" ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+            >
+              Automated
+            </button>
+          </div>
+          {testingMode === "automated" && (
+            <div className="flex items-center gap-1 text-xs font-mono text-muted-foreground">
+              <Timer size={12} />
+              <input
+                type="number"
+                min={1}
+                max={120}
+                value={smartDelay}
+                onChange={(e) => setSmartDelay(Math.max(1, Math.min(120, Number(e.target.value) || 8)))}
+                className="industrial-input w-14 py-0.5 px-1 text-xs text-center"
+              />
+              <span>s</span>
+            </div>
+          )}
+          {countdown !== null && (
+            <span className="text-xs font-mono text-accent animate-pulse">AI in {countdown}s</span>
+          )}
+          <span className="text-xs font-mono text-muted-foreground">Step {currentStep}</span>
+        </div>
       </div>
 
       {/* Body */}
@@ -287,7 +357,7 @@ const Conversation = () => {
                   {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                 </button>
                 <button
-                  onClick={handleAiReply}
+                  onClick={() => { clearTimers(); triggerAiReply(); }}
                   disabled={aiReplying}
                   className="industrial-btn-accent h-[25px] px-4"
                 >
@@ -312,8 +382,8 @@ const Conversation = () => {
         <details className="industrial-card p-3">
           <summary className="text-xs font-mono uppercase tracking-wider text-muted-foreground cursor-pointer">
             Highlights
-            {lookingFor.length > 0 && ` · ${lookingFor.length} looking for`}
-            {collected.length > 0 && ` · ${collected.length} collected`}
+            {requiredInfos.length > 0 && ` · ${requiredInfos.length} looking for`}
+            {collectedInfos.length > 0 && ` · ${collectedInfos.length} collected`}
           </summary>
           <div className="mt-2">
             <HighlightsPanel />
