@@ -5,6 +5,7 @@ import { ArrowLeft, MessageSquare, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { toDisplayText, safeArray, getErrorMessage } from "@/lib/errorUtils";
 import PicturesThumbnails from "@/components/PicturesThumbnails";
+import CrmSection from "@/components/crm/CrmSection";
 
 function normalizeList(payload: unknown, keys: string[] = []): any[] {
   if (Array.isArray(payload)) return payload;
@@ -286,6 +287,9 @@ const LeadDetail = () => {
           <p className="text-sm text-muted-foreground">None yet</p>
         )}
       </div>
+
+      {/* CRM Section */}
+      {leadId && <CrmSection leadId={leadId} />}
     </div>
   );
 };
