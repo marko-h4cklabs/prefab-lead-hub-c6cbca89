@@ -5,6 +5,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { api } from "@/lib/apiClient";
+import { toast } from "@/hooks/use-toast";
+import { getErrorMessage } from "@/lib/errorUtils";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import AppLayout from "./components/AppLayout";
@@ -31,6 +33,17 @@ const App = () => {
         // 401/403 handled globally in apiClient — token cleared, redirected to /login
       });
     }
+  }, []);
+
+  // Global safety net: catch unhandled promise rejections to prevent blank-page crashes
+  useEffect(() => {
+    const handler = (event: PromiseRejectionEvent) => {
+      console.error("Unhandled rejection:", event.reason);
+      toast({ title: "Error", description: getErrorMessage(event.reason), variant: "destructive" });
+      event.preventDefault();
+    };
+    window.addEventListener("unhandledrejection", handler);
+    return () => window.removeEventListener("unhandledrejection", handler);
   }, []);
 
   return (
