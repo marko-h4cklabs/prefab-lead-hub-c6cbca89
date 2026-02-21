@@ -1,12 +1,13 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, requireCompanyId } from "@/lib/apiClient";
-import { ArrowLeft, MessageSquare, Loader2 } from "lucide-react";
+import { ArrowLeft, MessageSquare, Loader2, CalendarPlus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { toDisplayText, safeArray, getErrorMessage } from "@/lib/errorUtils";
 import PicturesThumbnails from "@/components/PicturesThumbnails";
 import CrmSection from "@/components/crm/CrmSection";
 import LeadAppointments from "@/components/appointments/LeadAppointments";
+import AppointmentModal, { AppointmentFormData } from "@/components/appointments/AppointmentModal";
 
 function normalizeList(payload: unknown, keys: string[] = []): any[] {
   if (Array.isArray(payload)) return payload;
@@ -52,6 +53,8 @@ const LeadDetail = () => {
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
   const [savingName, setSavingName] = useState(false);
+  const [apptModalOpen, setApptModalOpen] = useState(false);
+  const [apptRefreshKey, setApptRefreshKey] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchLead = useCallback(() => {
@@ -142,6 +145,15 @@ const LeadDetail = () => {
   const statusName = lead.status_name || "New";
   const collectedInfos: any[] = safeArray(lead.collected_infos ?? lead.collected, "collectedInfos");
 
+  const apptPrefill: Partial<AppointmentFormData> = {
+    lead_id: leadId!,
+    lead_name: leadName,
+    title: `Call with ${leadName !== "—" ? leadName : "Lead"}`,
+    notes: collectedInfos.length > 0
+      ? collectedInfos.map((i: any) => `${i.field_name || i.name}: ${i.value}`).join("\n")
+      : "",
+  };
+
   return (
     <div>
       <button onClick={() => navigate("/leads")} className="industrial-btn-ghost mb-4">
@@ -150,12 +162,20 @@ const LeadDetail = () => {
 
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold">Lead Detail</h1>
-        <button
-          onClick={() => navigate(`/leads/${leadId}/conversation`)}
-          className="industrial-btn-primary"
-        >
-          <MessageSquare size={16} /> View Conversation
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setApptModalOpen(true)}
+            className="industrial-btn-accent"
+          >
+            <CalendarPlus size={16} /> Add to Calendar
+          </button>
+          <button
+            onClick={() => navigate(`/leads/${leadId}/conversation`)}
+            className="industrial-btn-primary"
+          >
+            <MessageSquare size={16} /> View Conversation
+          </button>
+        </div>
       </div>
 
       <div className="industrial-card p-6">
@@ -292,6 +312,7 @@ const LeadDetail = () => {
       {/* Appointments Section */}
       {leadId && (
         <LeadAppointments
+          key={apptRefreshKey}
           leadId={leadId}
           leadName={leadName}
           collectedSummary={collectedInfos.map((i: any) => `${i.field_name || i.name}: ${i.value}`).join(", ")}
@@ -300,6 +321,15 @@ const LeadDetail = () => {
 
       {/* CRM Section */}
       {leadId && <CrmSection leadId={leadId} />}
+
+      {/* Appointment Modal from header button */}
+      <AppointmentModal
+        open={apptModalOpen}
+        onClose={() => setApptModalOpen(false)}
+        onSaved={() => setApptRefreshKey((k) => k + 1)}
+        prefill={apptPrefill}
+        lockLead
+      />
     </div>
   );
 };

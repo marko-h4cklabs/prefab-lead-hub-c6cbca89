@@ -400,6 +400,25 @@ export const api = {
   cancelAppointment: (id: string) =>
     request<any>(`/api/appointments/${id}/cancel`, { method: "POST" }),
 
+  // --- Availability ---
+  getAvailableSlots: (params: { type?: string; from?: string; to?: string }) => {
+    const search = new URLSearchParams();
+    if (params.type) search.set("type", params.type);
+    if (params.from) search.set("from", params.from);
+    if (params.to) search.set("to", params.to);
+    return request<any>(`/api/appointments/availability?${search.toString()}`);
+  },
+
+  // --- Scheduling Settings ---
+  getSchedulingSettings: () =>
+    request<any>("/api/settings/scheduling"),
+
+  updateSchedulingSettings: (data: any) =>
+    request<any>("/api/settings/scheduling", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
   // --- Admin ---
   runSnapshot: () =>
     request<any>("/api/admin/snapshot", { method: "POST" }),

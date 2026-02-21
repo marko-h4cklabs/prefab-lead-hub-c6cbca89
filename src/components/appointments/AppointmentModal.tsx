@@ -13,6 +13,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { api, requireCompanyId } from "@/lib/apiClient";
+import AvailabilitySlots from "./AvailabilitySlots";
 
 const TYPES = ["call", "site_visit", "meeting", "follow_up"] as const;
 const TYPE_LABELS: Record<string, string> = {
@@ -307,6 +308,25 @@ export default function AppointmentModal({ open, onClose, onSaved, prefill, exis
               <Input type="time" className="mt-1" value={form.start_time} onChange={(e) => set("start_time", e.target.value)} />
             </div>
           </div>
+
+          {/* Availability Slots */}
+          <AvailabilitySlots
+            appointmentType={form.type}
+            selectedDate={form.date}
+            onSelectSlot={({ date, startTime, endTime }) => {
+              setForm((f) => ({
+                ...f,
+                date,
+                start_time: startTime,
+                // Compute duration from endTime - startTime
+                duration_minutes: (() => {
+                  const [sh, sm] = startTime.split(":").map(Number);
+                  const [eh, em] = endTime.split(":").map(Number);
+                  return Math.max((eh * 60 + em) - (sh * 60 + sm), 15);
+                })(),
+              }));
+            }}
+          />
 
           {/* Duration + End */}
           <div className="grid grid-cols-2 gap-3">
