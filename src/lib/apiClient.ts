@@ -234,10 +234,10 @@ export const api = {
     }),
 
   getQuoteFields: () =>
-    request<any>("/api/chatbot/quote-presets"),
+    request<any>("/api/chatbot/quote-fields"),
 
   putQuoteFields: (data: { presets: any[] }) =>
-    request<any>("/api/chatbot/quote-presets", {
+    request<any>("/api/chatbot/quote-fields", {
       method: "PUT",
       body: JSON.stringify(data),
     }),
