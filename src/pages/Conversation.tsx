@@ -291,7 +291,8 @@ const Conversation = () => {
             {safeArray<CollectedInfo>(collectedInfos, "collectedInfos").map((item, i) => {
               const fieldName = (item.field_name || item.name || "").toLowerCase();
               if (fieldName === "pictures") {
-                const picUrls: string[] = Array.isArray(item.value) ? item.value.filter((v: any) => typeof v === "string") : [];
+                const rawValue = item.value;
+                const picUrls: string[] = Array.isArray(rawValue) ? rawValue.filter((v: any) => typeof v === "string") : [];
                 const picLinks: { label: string; url: string }[] =
                   Array.isArray((item as any).links)
                     ? (item as any).links

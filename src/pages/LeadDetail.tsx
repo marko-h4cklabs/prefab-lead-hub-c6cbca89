@@ -244,7 +244,9 @@ const LeadDetail = () => {
             {collectedInfos.map((info: any, i: number) => {
               const fieldName = (info.field_name || info.name || "").toLowerCase();
               if (fieldName === "pictures") {
-                const picUrls: string[] = Array.isArray(info.value) ? info.value.filter((v: any) => typeof v === "string") : [];
+                const rawValue = info.value;
+                // Never treat pictures as boolean – only accept string URL arrays
+                const picUrls: string[] = Array.isArray(rawValue) ? rawValue.filter((v: any) => typeof v === "string") : [];
                 const picLinks: { label: string; url: string }[] =
                   Array.isArray((info as any).links)
                     ? (info as any).links
