@@ -286,6 +286,20 @@ export const api = {
     });
   },
 
+  // --- Notifications ---
+  getNotifications: (params: { limit?: number; offset?: number }) => {
+    const search = new URLSearchParams();
+    if (params.limit !== undefined) search.set("limit", String(params.limit));
+    if (params.offset !== undefined) search.set("offset", String(params.offset));
+    return request<any>(`/api/notifications?${search.toString()}`);
+  },
+
+  markNotificationRead: (id: string) =>
+    request<any>(`/api/notifications/${id}/read`, { method: "POST" }),
+
+  markAllNotificationsRead: () =>
+    request<any>("/api/notifications/read-all", { method: "POST" }),
+
   // --- Admin ---
   runSnapshot: () =>
     request<any>("/api/admin/snapshot", { method: "POST" }),
