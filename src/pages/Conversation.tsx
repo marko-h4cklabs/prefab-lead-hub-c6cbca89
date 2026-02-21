@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, requireCompanyId } from "@/lib/apiClient";
-import { toDisplayText, safeArray } from "@/lib/errorUtils";
-import { ArrowLeft, Send, Loader2, Bot, Timer } from "lucide-react";
+import { toDisplayText, safeArray, getErrorMessage } from "@/lib/errorUtils";
+import { ArrowLeft, Send, Loader2, Bot, Timer, ImagePlus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import PicturesThumbnails from "@/components/PicturesThumbnails";
 
 interface Message {
   role: string;
@@ -50,6 +51,8 @@ const Conversation = () => {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [requiredInfos, setRequiredInfos] = useState<RequiredInfo[]>([]);
   const [collectedInfos, setCollectedInfos] = useState<CollectedInfo[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Testing mode state
   const [testingMode, setTestingMode] = useState<"manual" | "automated">("manual");
@@ -192,6 +195,54 @@ const Conversation = () => {
     }
   };
 
+  const picturesRequired = requiredInfos.some(
+    (r) => r.name?.toLowerCase() === "pictures"
+  );
+
+  const picturesCollected: string[] = (() => {
+    const entry = collectedInfos.find(
+      (c) => (c.field_name || c.name || "").toLowerCase() === "pictures"
+    );
+    if (!entry) return [];
+    if (Array.isArray(entry.value)) return entry.value.filter((v: any) => typeof v === "string");
+    return [];
+  })();
+
+  const handleImageUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !leadId) return;
+    setUploading(true);
+    let successCount = 0;
+    for (const file of Array.from(files)) {
+      try {
+        await api.uploadAttachment(leadId, file);
+        successCount++;
+      } catch (err: unknown) {
+        toast({
+          title: "Upload failed",
+          description: getErrorMessage(err),
+          variant: "destructive",
+        });
+      }
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (successCount > 0) {
+      // Send an informational message and refresh state
+      try {
+        const body: any = { role: "user", content: `Uploaded ${successCount} picture${successCount > 1 ? "s" : ""}.` };
+        if (conversationId) body.conversation_id = conversationId;
+        const res = await api.sendMessage(companyId, leadId, body);
+        applyBackendResponse(res);
+      } catch { /* best-effort */ }
+      // Refresh conversation to get updated collected_infos
+      try {
+        const convo = await api.getConversation(companyId, leadId);
+        setData(convo);
+        applyResponseFields(convo);
+      } catch { /* ignore */ }
+    }
+    setUploading(false);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-muted-foreground p-8">
@@ -237,13 +288,24 @@ const Conversation = () => {
           <p className="text-xs text-muted-foreground">None yet</p>
         ) : (
           <dl className="space-y-1">
-            {safeArray<CollectedInfo>(collectedInfos, "collectedInfos").map((item, i) => (
-              <div key={i} className="text-xs font-mono">
-                <dt className="text-muted-foreground inline">{toDisplayText(item.field_name || item.name)}: </dt>
-                <dd className="inline text-foreground font-medium">{toDisplayText(item.value)}</dd>
-                {item.units && <span className="text-muted-foreground ml-1">({toDisplayText(item.units)})</span>}
-              </div>
-            ))}
+            {safeArray<CollectedInfo>(collectedInfos, "collectedInfos").map((item, i) => {
+              const fieldName = (item.field_name || item.name || "").toLowerCase();
+              if (fieldName === "pictures") {
+                return (
+                  <div key={i} className="text-xs font-mono">
+                    <dt className="text-muted-foreground">{toDisplayText(item.field_name || item.name)}:</dt>
+                    <PicturesThumbnails urls={Array.isArray(item.value) ? item.value.filter((v: any) => typeof v === "string") : []} />
+                  </div>
+                );
+              }
+              return (
+                <div key={i} className="text-xs font-mono">
+                  <dt className="text-muted-foreground inline">{toDisplayText(item.field_name || item.name)}: </dt>
+                  <dd className="inline text-foreground font-medium">{toDisplayText(item.value)}</dd>
+                  {item.units && <span className="text-muted-foreground ml-1">({toDisplayText(item.units)})</span>}
+                </div>
+              );
+            })}
           </dl>
         )}
       </div>
@@ -365,6 +427,26 @@ const Conversation = () => {
                   {aiReplying ? <Loader2 size={14} className="animate-spin" /> : <Bot size={14} />}
                   <span className="text-xs ml-1">AI Reply</span>
                 </button>
+                {picturesRequired && (
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => handleImageUpload(e.target.files)}
+                    />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      className="industrial-btn-ghost h-[25px] px-4 border border-border"
+                    >
+                      {uploading ? <Loader2 size={14} className="animate-spin" /> : <ImagePlus size={14} />}
+                      <span className="text-xs ml-1">{uploading ? "Uploading…" : "Pictures"}</span>
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
