@@ -4,6 +4,7 @@ import { api, requireCompanyId } from "@/lib/apiClient";
 import { ArrowLeft, MessageSquare, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { toDisplayText, safeArray, getErrorMessage } from "@/lib/errorUtils";
+import PicturesThumbnails from "@/components/PicturesThumbnails";
 
 function normalizeList(payload: unknown, keys: string[] = []): any[] {
   if (Array.isArray(payload)) return payload;
@@ -240,17 +241,30 @@ const LeadDetail = () => {
         </h2>
         {collectedInfos.length > 0 ? (
           <dl className="space-y-2">
-            {collectedInfos.map((info: any, i: number) => (
-              <div key={i} className="flex gap-2 text-sm">
-                <dt className="font-mono text-muted-foreground min-w-[140px]">
-                  {info.field_name || info.name || `Field ${i + 1}`}:
-                </dt>
-                 <dd className="font-medium">
-                   {toDisplayText(info.value)}
-                   {info.units ? ` (${toDisplayText(info.units)})` : ""}
-                </dd>
-              </div>
-            ))}
+            {collectedInfos.map((info: any, i: number) => {
+              const fieldName = (info.field_name || info.name || "").toLowerCase();
+              if (fieldName === "pictures") {
+                return (
+                  <div key={i} className="flex flex-col gap-1 text-sm">
+                    <dt className="font-mono text-muted-foreground">pictures:</dt>
+                    <dd>
+                      <PicturesThumbnails urls={Array.isArray(info.value) ? info.value.filter((v: any) => typeof v === "string") : []} />
+                    </dd>
+                  </div>
+                );
+              }
+              return (
+                <div key={i} className="flex gap-2 text-sm">
+                  <dt className="font-mono text-muted-foreground min-w-[140px]">
+                    {info.field_name || info.name || `Field ${i + 1}`}:
+                  </dt>
+                  <dd className="font-medium">
+                    {toDisplayText(info.value)}
+                    {info.units ? ` (${toDisplayText(info.units)})` : ""}
+                  </dd>
+                </div>
+              );
+            })}
           </dl>
         ) : (
           <p className="text-sm text-muted-foreground">None yet</p>

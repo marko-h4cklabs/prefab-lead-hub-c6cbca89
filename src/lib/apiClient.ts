@@ -261,6 +261,31 @@ export const api = {
       body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
     }),
 
+  // --- Attachments ---
+  uploadAttachment: (leadId: string, file: File) => {
+    const token = getAuthToken();
+    const formData = new FormData();
+    formData.append("file", file);
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    return fetch(`${API_BASE}/api/leads/${leadId}/attachments`, {
+      method: "POST",
+      headers,
+      body: formData,
+    }).then(async (res) => {
+      if (!res.ok) {
+        let message = `Upload failed (${res.status})`;
+        try {
+          const json = await res.json();
+          message = json?.error || json?.message || message;
+        } catch { /* ignore */ }
+        throw new Error(typeof message === "string" ? message : JSON.stringify(message));
+      }
+      if (res.status === 204) return undefined;
+      return res.json();
+    });
+  },
+
   // --- Admin ---
   runSnapshot: () =>
     request<any>("/api/admin/snapshot", { method: "POST" }),
