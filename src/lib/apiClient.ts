@@ -373,6 +373,33 @@ export const api = {
     return request<any>(`/api/analytics/dashboard?${search.toString()}`);
   },
 
+  // --- Appointments ---
+  getAppointments: (params?: { from?: string; to?: string; status?: string; type?: string; source?: string; lead_id?: string }) => {
+    const search = new URLSearchParams();
+    if (params?.from) search.set("from", params.from);
+    if (params?.to) search.set("to", params.to);
+    if (params?.status && params.status !== "all") search.set("status", params.status);
+    if (params?.type && params.type !== "all") search.set("type", params.type);
+    if (params?.source && params.source !== "all") search.set("source", params.source);
+    if (params?.lead_id) search.set("lead_id", params.lead_id);
+    return request<any>(`/api/appointments?${search.toString()}`);
+  },
+
+  getAppointment: (id: string) =>
+    request<any>(`/api/appointments/${id}`),
+
+  getUpcomingAppointments: () =>
+    request<any>("/api/appointments/upcoming"),
+
+  createAppointment: (data: any) =>
+    request<any>("/api/appointments", { method: "POST", body: JSON.stringify(data) }),
+
+  updateAppointment: (id: string, data: any) =>
+    request<any>(`/api/appointments/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+
+  cancelAppointment: (id: string) =>
+    request<any>(`/api/appointments/${id}/cancel`, { method: "POST" }),
+
   // --- Admin ---
   runSnapshot: () =>
     request<any>("/api/admin/snapshot", { method: "POST" }),

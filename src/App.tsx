@@ -13,6 +13,7 @@ import Signup from "./pages/Signup";
 import AppLayout from "./components/AppLayout";
 import Leads from "./pages/Leads";
 import Simulation from "./pages/Simulation";
+import Calendar from "./pages/Calendar";
 import LeadDetail from "./pages/LeadDetail";
 import Conversation from "./pages/Conversation";
 import Fields from "./pages/Fields";
@@ -66,6 +67,7 @@ const App = () => {
             <Route path="/leads/:leadId/conversation" element={<Conversation />} />
             <Route path="/fields" element={<Fields />} />
             <Route path="/analytics" element={<Analytics />} />
+            <Route path="/calendar" element={<Calendar />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
           <Route path="*" element={<NotFound />} />

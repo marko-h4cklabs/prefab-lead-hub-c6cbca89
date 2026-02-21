@@ -6,6 +6,7 @@ import { toast } from "@/hooks/use-toast";
 import { toDisplayText, safeArray, getErrorMessage } from "@/lib/errorUtils";
 import PicturesThumbnails from "@/components/PicturesThumbnails";
 import CrmSection from "@/components/crm/CrmSection";
+import LeadAppointments from "@/components/appointments/LeadAppointments";
 
 function normalizeList(payload: unknown, keys: string[] = []): any[] {
   if (Array.isArray(payload)) return payload;
@@ -287,6 +288,15 @@ const LeadDetail = () => {
           <p className="text-sm text-muted-foreground">None yet</p>
         )}
       </div>
+
+      {/* Appointments Section */}
+      {leadId && (
+        <LeadAppointments
+          leadId={leadId}
+          leadName={leadName}
+          collectedSummary={collectedInfos.map((i: any) => `${i.field_name || i.name}: ${i.value}`).join(", ")}
+        />
+      )}
 
       {/* CRM Section */}
       {leadId && <CrmSection leadId={leadId} />}
