@@ -24,11 +24,11 @@ const TYPE_LABELS: Record<string, string> = {
 
 const DURATIONS = [15, 30, 45, 60, 90, 120];
 const REMINDERS = [
-  { value: "", label: "None" },
-  { value: "15m", label: "15 min before" },
-  { value: "30m", label: "30 min before" },
-  { value: "1h", label: "1 hour before" },
-  { value: "24h", label: "24 hours before" },
+  { value: "", label: "None", minutes: null as number | null },
+  { value: "15m", label: "15 min before", minutes: 15 },
+  { value: "30m", label: "30 min before", minutes: 30 },
+  { value: "1h", label: "1 hour before", minutes: 60 },
+  { value: "24h", label: "24 hours before", minutes: 1440 },
 ];
 
 const STATUSES = ["scheduled", "completed", "cancelled", "no_show"] as const;
@@ -137,23 +137,42 @@ export default function AppointmentModal({ open, onClose, onSaved, prefill, exis
     );
   }, [form, existing, isEdit]);
 
+  const buildPayload = () => {
+    const [h, m] = form.start_time.split(":").map(Number);
+    const startDate = new Date(`${form.date}T${form.start_time}:00`);
+    const endDate = new Date(startDate.getTime() + form.duration_minutes * 60_000);
+    const reminderEntry = REMINDERS.find((r) => r.value === form.reminder);
+
+    return {
+      leadId: form.lead_id,
+      title: form.title.trim(),
+      appointmentType: form.type,
+      startAt: startDate.toISOString(),
+      endAt: endDate.toISOString(),
+      timezone: form.timezone,
+      notes: form.notes.trim() || null,
+      source: "manual",
+      reminderMinutesBefore: reminderEntry?.minutes ?? null,
+    };
+  };
+
+  const extractValidationMessage = (err: any): string => {
+    try {
+      const details = err?.response?.data?.details || err?.details;
+      if (Array.isArray(details) && details.length > 0) {
+        return details[0].message || details[0].msg || JSON.stringify(details[0]);
+      }
+    } catch {}
+    return getErrorMessage(err);
+  };
+
   const handleSave = async () => {
     if (!isValid || saving) return;
     setSaving(true);
     try {
-      const payload = {
-        lead_id: form.lead_id,
-        title: form.title.trim(),
-        type: form.type,
-        date: form.date,
-        start_time: form.start_time,
-        end_time: endTime,
-        duration_minutes: form.duration_minutes,
-        timezone: form.timezone,
-        reminder: form.reminder || null,
-        notes: form.notes.trim() || null,
-        status: form.status,
-      };
+      const payload = buildPayload();
+      console.log("appointment submit payload", payload);
+
       if (isEdit && existing?.id) {
         await api.updateAppointment(existing.id, payload);
         toast({ title: "Appointment updated" });
@@ -163,8 +182,8 @@ export default function AppointmentModal({ open, onClose, onSaved, prefill, exis
       }
       onSaved();
       onClose();
-    } catch (err) {
-      toast({ title: "Failed to save appointment", description: getErrorMessage(err), variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Failed to save appointment", description: extractValidationMessage(err), variant: "destructive" });
     } finally {
       setSaving(false);
     }
