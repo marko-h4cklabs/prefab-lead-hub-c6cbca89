@@ -4,8 +4,9 @@ import { Activity, Loader2, Save } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import NotificationSettings from "@/components/settings/NotificationSettings";
+import SchedulingSettings from "@/components/settings/SchedulingSettings";
 
-const TABS = ["General", "Notifications"] as const;
+const TABS = ["General", "Scheduling", "Notifications"] as const;
 type SettingsTab = (typeof TABS)[number];
 
 const Settings = () => {
@@ -118,6 +119,8 @@ const Settings = () => {
 
       {activeTab === "Notifications" ? (
         <NotificationSettings />
+      ) : activeTab === "Scheduling" ? (
+        <SchedulingSettings />
       ) : (
         <>
           {/* Company Info */}
