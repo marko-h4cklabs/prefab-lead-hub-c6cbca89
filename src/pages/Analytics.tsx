@@ -73,13 +73,36 @@ const Analytics = () => {
     setLoading(true);
     setError("");
     try {
-      const res = await api.getAnalyticsDashboard(f);
+      const params = {
+        range: f.range,
+        source: f.source.toLowerCase(),
+        channel: f.channel.toLowerCase(),
+      };
+      console.log("[Analytics] fetch params:", params);
+      const raw = await api.getAnalyticsDashboard(params);
+
+      // Normalize: backend may wrap payload in { data: {...} } or return flat
+      const res: DashboardData = raw?.data && typeof raw.data === "object" && !Array.isArray(raw.data) ? raw.data : raw;
+
+      console.log("[Analytics] payload summary:", {
+        keys: res ? Object.keys(res) : [],
+        total_leads: res?.summary?.total_leads,
+        leads_over_time: (res?.leads_over_time ?? []).length,
+        channel_breakdown: (res?.channel_breakdown ?? []).length,
+        status_breakdown: (res?.status_breakdown ?? []).length,
+        field_completion: (res?.field_completion ?? []).length,
+        top_signals: (res?.top_signals ?? []).length,
+        available_channels: res?.available_channels,
+      });
+
       setData(res);
-      // Update available channels from backend
-      if (res?.available_channels) {
-        setAvailableChannels(res.available_channels);
-        // Reset channel filter if selected channel no longer exists
-        if (f.channel !== "all" && !res.available_channels.includes(f.channel)) {
+
+      // Build channel options from available_channels OR channel_breakdown
+      const channels = res?.available_channels
+        ?? (res?.channel_breakdown ?? []).map((c: any) => c.channel).filter(Boolean);
+      if (channels.length > 0) {
+        setAvailableChannels(channels);
+        if (f.channel !== "all" && !channels.includes(f.channel)) {
           setFilters((p) => ({ ...p, channel: "all" }));
         }
       }
@@ -88,6 +111,7 @@ const Analytics = () => {
     } catch (err: unknown) {
       const msg = getErrorMessage(err);
       setError(msg);
+      // Keep last successful data visible
       toast({ title: "Failed to load analytics", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);
@@ -326,7 +350,7 @@ function ChartStatusBreakdown({ data, emptyMsg }: { data: DashboardData["status_
   return (
     <ResponsiveContainer width="100%" height={240}>
       <PieChart>
-        <Pie data={data} dataKey="count" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false} fontSize={11}>
+        <Pie data={data.map(d => ({ ...d, label: d.name || d.status || "Unknown" }))} dataKey="count" nameKey="label" cx="50%" cy="50%" outerRadius={90} label={({ label, percent }) => `${label} ${(percent * 100).toFixed(0)}%`} labelLine={false} fontSize={11}>
           {data.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
         </Pie>
         <Tooltip contentStyle={{ fontSize: 12, borderRadius: 4, border: "1px solid hsl(220,13%,86%)" }} />
