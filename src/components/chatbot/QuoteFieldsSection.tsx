@@ -1,8 +1,8 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { api } from "@/lib/apiClient";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
-import { Save, X } from "lucide-react";
+import { Save, X, ChevronUp, ChevronDown } from "lucide-react";
 
 // --- Preset definitions ---
 
@@ -99,6 +99,25 @@ const TagInput = ({ tags, onChange }: { tags: string[]; onChange: (t: string[]) 
   );
 };
 
+// --- Helpers for global ordering ---
+
+/** Get enabled preset IDs sorted by their current priority */
+function getEnabledOrder(presets: AllPresetsState): string[] {
+  return PRESETS
+    .filter((p) => presets[p.id]?.enabled)
+    .sort((a, b) => (presets[a.id].priority ?? 999) - (presets[b.id].priority ?? 999))
+    .map((p) => p.id);
+}
+
+/** Reassign priorities as consecutive 1..N based on ordered list */
+function reassignPriorities(presets: AllPresetsState, orderedIds: string[]): AllPresetsState {
+  const next = { ...presets };
+  orderedIds.forEach((id, i) => {
+    next[id] = { ...next[id], priority: i + 1 };
+  });
+  return next;
+}
+
 // --- Main component ---
 
 const QuoteFieldsSection = () => {
@@ -107,6 +126,9 @@ const QuoteFieldsSection = () => {
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const initialRef = useRef<string>("");
+
+  // Global ordered list of enabled preset IDs
+  const enabledOrder = useMemo(() => getEnabledOrder(presets), [presets]);
 
   useEffect(() => {
     api.getQuoteFields()
@@ -123,10 +145,39 @@ const QuoteFieldsSection = () => {
       .finally(() => setLoading(false));
   }, []);
 
+  const markDirty = (next: AllPresetsState) => {
+    setIsDirty(JSON.stringify(next) !== initialRef.current);
+  };
+
   const update = (id: string, patch: Partial<PresetState>) => {
     setPresets((prev) => {
-      const next = { ...prev, [id]: { ...prev[id], ...patch } };
-      setIsDirty(JSON.stringify(next) !== initialRef.current);
+      let next = { ...prev, [id]: { ...prev[id], ...patch } };
+      // When toggling on, assign priority after last enabled
+      if (patch.enabled === true && !prev[id].enabled) {
+        const currentEnabled = getEnabledOrder(prev);
+        next[id] = { ...next[id], priority: currentEnabled.length + 1 };
+      }
+      // When toggling off, reassign remaining enabled priorities
+      if (patch.enabled === false && prev[id].enabled) {
+        const remaining = getEnabledOrder(prev).filter((x) => x !== id);
+        next = reassignPriorities(next, remaining);
+      }
+      markDirty(next);
+      return next;
+    });
+  };
+
+  const moveOrder = (id: string, direction: "up" | "down") => {
+    setPresets((prev) => {
+      const order = getEnabledOrder(prev);
+      const idx = order.indexOf(id);
+      if (idx < 0) return prev;
+      const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= order.length) return prev;
+      const newOrder = [...order];
+      [newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]];
+      const next = reassignPriorities({ ...prev }, newOrder);
+      markDirty(next);
       return next;
     });
   };
@@ -191,6 +242,10 @@ const QuoteFieldsSection = () => {
   const renderPreset = (preset: PresetConfig) => {
     const state = presets[preset.id];
     const enabled = state?.enabled ?? false;
+    const globalIdx = enabledOrder.indexOf(preset.id);
+    const orderNum = globalIdx >= 0 ? globalIdx + 1 : -1;
+    const isFirst = orderNum === 1;
+    const isLast = orderNum === enabledOrder.length;
 
     return (
       <div key={preset.id} className="border border-border rounded-sm">
@@ -210,19 +265,30 @@ const QuoteFieldsSection = () => {
             <span className="text-sm font-semibold">{preset.label}</span>
             <span className="text-xs text-muted-foreground ml-2">{preset.description}</span>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-[10px] font-mono text-muted-foreground uppercase">Order</span>
-            <input
-              type="number"
-              min={1}
-              step={1}
-              value={state.priority}
-              onChange={(e) => {
-                const v = parseInt(e.target.value, 10);
-                if (!isNaN(v) && v > 0) update(preset.id, { priority: v });
-              }}
-              className="industrial-input w-14 py-0.5 px-2 text-xs text-center"
-            />
+          <div className="flex items-center gap-1 shrink-0">
+            {enabled ? (
+              <>
+                <span className="text-xs font-mono text-muted-foreground w-6 text-center">{orderNum}</span>
+                <button
+                  type="button"
+                  disabled={isFirst}
+                  onClick={() => moveOrder(preset.id, "up")}
+                  className="p-0.5 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed text-muted-foreground hover:text-foreground"
+                >
+                  <ChevronUp size={14} />
+                </button>
+                <button
+                  type="button"
+                  disabled={isLast}
+                  onClick={() => moveOrder(preset.id, "down")}
+                  className="p-0.5 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed text-muted-foreground hover:text-foreground"
+                >
+                  <ChevronDown size={14} />
+                </button>
+              </>
+            ) : (
+              <span className="text-xs text-muted-foreground w-6 text-center">—</span>
+            )}
           </div>
         </div>
 
@@ -326,16 +392,16 @@ const QuoteFieldsSection = () => {
     <div className="industrial-card p-6 space-y-6">
       <h2 className="text-sm font-bold uppercase tracking-wider">Quote Requirements</h2>
 
-      <div className="space-y-4">
-        <div className="space-y-1">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Basic Options</h3>
+      <div className="space-y-5">
+        <div className="space-y-2">
+          <h3 className="text-sm font-extrabold uppercase tracking-wider text-foreground">Basic Options</h3>
           <div className="space-y-1">
             {basicPresets.map(renderPreset)}
           </div>
         </div>
 
-        <div className="space-y-1">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Detailed Options</h3>
+        <div className="space-y-2">
+          <h3 className="text-sm font-extrabold uppercase tracking-wider text-foreground">Detailed Options</h3>
           <div className="space-y-1">
             {detailedPresets.map(renderPreset)}
           </div>
