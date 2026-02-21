@@ -1,40 +1,41 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { api } from "@/lib/apiClient";
-import { CalendarPlus, Loader2, Search } from "lucide-react";
+import { CalendarPlus, Loader2, Search, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import AppointmentModal, { AppointmentFormData } from "@/components/appointments/AppointmentModal";
+import AppointmentDetailDrawer from "@/components/appointments/AppointmentDetailDrawer";
+import UpcomingPanel from "@/components/appointments/UpcomingPanel";
+import {
+  normalizeAppointmentList,
+  NormalizedAppointment,
+  appointmentToFormData,
+  TYPE_LABELS,
+  STATUS_CLASSES,
+  STATUS_LABELS,
+  SOURCE_LABELS,
+  formatAppointmentTime,
+  extractDate,
+} from "@/lib/appointmentUtils";
 import { addDays, format, startOfDay } from "date-fns";
-
-const TYPE_LABELS: Record<string, string> = {
-  call: "Call",
-  site_visit: "Site Visit",
-  meeting: "Meeting",
-  follow_up: "Follow-up",
-};
-
-const STATUS_CLASSES: Record<string, string> = {
-  scheduled: "status-new",
-  completed: "status-qualified",
-  cancelled: "status-disqualified",
-  no_show: "status-pending",
-};
 
 const RANGE_OPTIONS = [
   { label: "Today", days: 0 },
   { label: "7 days", days: 7 },
   { label: "30 days", days: 30 },
+  { label: "90 days", days: 90 },
 ];
 
-const SOURCE_OPTIONS = ["all", "manual", "chatbot"];
+const SOURCE_OPTIONS = ["all", "manual", "chatbot", "inbox", "simulation"];
 const STATUS_OPTIONS = ["all", "scheduled", "completed", "cancelled", "no_show"];
 const TYPE_OPTIONS = ["all", "call", "site_visit", "meeting", "follow_up"];
 
 const Calendar = () => {
-  const [appointments, setAppointments] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<NormalizedAppointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [rangeDays, setRangeDays] = useState(30);
   const [source, setSource] = useState("all");
   const [status, setStatus] = useState("all");
@@ -42,18 +43,21 @@ const Calendar = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAppt, setEditingAppt] = useState<AppointmentFormData | null>(null);
+  const [detailAppt, setDetailAppt] = useState<NormalizedAppointment | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const fetchAppointments = useCallback(() => {
     setLoading(true);
+    setError(null);
     const from = format(startOfDay(new Date()), "yyyy-MM-dd");
     const to = rangeDays > 0 ? format(addDays(new Date(), rangeDays), "yyyy-MM-dd") : from;
 
     api.getAppointments({ from, to, status, type, source })
       .then((res) => {
-        const list = Array.isArray(res) ? res : (res?.data || res?.appointments || res?.items || []);
-        setAppointments(list);
+        setAppointments(normalizeAppointmentList(res));
       })
       .catch((err) => {
+        setError(getErrorMessage(err));
         toast({ title: "Failed to load appointments", description: getErrorMessage(err), variant: "destructive" });
       })
       .finally(() => setLoading(false));
@@ -65,38 +69,51 @@ const Calendar = () => {
     if (!searchQuery.trim()) return appointments;
     const q = searchQuery.toLowerCase();
     return appointments.filter((a) =>
-      (a.title || "").toLowerCase().includes(q) ||
-      (a.lead?.name || "").toLowerCase().includes(q)
+      a.title.toLowerCase().includes(q) ||
+      (a.lead?.name || "").toLowerCase().includes(q) ||
+      (a.lead?.channel || "").toLowerCase().includes(q)
     );
   }, [appointments, searchQuery]);
 
   // Group by date
   const grouped = useMemo(() => {
-    const groups: Record<string, any[]> = {};
-    filteredAppointments.forEach((a) => {
-      const day = a.date ? a.date.slice(0, 10) : "Unknown";
+    const sorted = [...filteredAppointments].sort(
+      (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
+    );
+    const groups: Record<string, NormalizedAppointment[]> = {};
+    sorted.forEach((a) => {
+      const day = extractDate(a.startAt) || "Unknown";
       if (!groups[day]) groups[day] = [];
       groups[day].push(a);
     });
     return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
   }, [filteredAppointments]);
 
-  const handleEdit = (appt: any) => {
-    setEditingAppt({
-      id: appt.id,
-      lead_id: appt.lead_id || "",
-      lead_name: appt.lead?.name || appt.lead_name || "",
-      title: appt.title || "",
-      type: appt.type || "call",
-      date: appt.date ? appt.date.slice(0, 10) : "",
-      start_time: appt.start_time || "",
-      duration_minutes: appt.duration_minutes || 30,
-      timezone: appt.timezone || "Europe/Zagreb",
-      reminder: appt.reminder || "",
-      notes: appt.notes || "",
-      status: appt.status || "scheduled",
-    });
+  const handleEdit = (appt: NormalizedAppointment) => {
+    setEditingAppt(appointmentToFormData(appt));
+    setDetailOpen(false);
     setModalOpen(true);
+  };
+
+  const handleQuickAction = async (action: "complete" | "cancel", id: string) => {
+    try {
+      if (action === "complete") {
+        await api.updateAppointment(id, { status: "completed" });
+        toast({ title: "Appointment completed" });
+      } else {
+        await api.cancelAppointment(id);
+        toast({ title: "Appointment cancelled" });
+      }
+      setDetailOpen(false);
+      fetchAppointments();
+    } catch (err) {
+      toast({ title: "Action failed", description: getErrorMessage(err), variant: "destructive" });
+    }
+  };
+
+  const handleRowClick = (appt: NormalizedAppointment) => {
+    setDetailAppt(appt);
+    setDetailOpen(true);
   };
 
   return (
@@ -107,7 +124,10 @@ const Calendar = () => {
           <h1 className="text-xl font-bold">Calendar</h1>
           <p className="text-sm text-muted-foreground">Manage appointments and scheduled activities</p>
         </div>
-        <Button className="gap-1.5 bg-accent text-accent-foreground hover:bg-accent/90" onClick={() => { setEditingAppt(null); setModalOpen(true); }}>
+        <Button
+          className="gap-1.5 bg-accent text-accent-foreground hover:bg-accent/90"
+          onClick={() => { setEditingAppt(null); setModalOpen(true); }}
+        >
           <CalendarPlus size={16} />
           New Appointment
         </Button>
@@ -129,15 +149,21 @@ const Calendar = () => {
         </div>
 
         <select className="industrial-input py-1.5 text-xs" value={source} onChange={(e) => setSource(e.target.value)}>
-          {SOURCE_OPTIONS.map((s) => <option key={s} value={s}>{s === "all" ? "All Sources" : s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+          {SOURCE_OPTIONS.map((s) => (
+            <option key={s} value={s}>{s === "all" ? "All Sources" : SOURCE_LABELS[s] || s}</option>
+          ))}
         </select>
 
         <select className="industrial-input py-1.5 text-xs" value={status} onChange={(e) => setStatus(e.target.value)}>
-          {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s === "all" ? "All Statuses" : s.replace("_", " ").replace(/^\w/, (c) => c.toUpperCase())}</option>)}
+          {STATUS_OPTIONS.map((s) => (
+            <option key={s} value={s}>{s === "all" ? "All Statuses" : STATUS_LABELS[s] || s}</option>
+          ))}
         </select>
 
         <select className="industrial-input py-1.5 text-xs" value={type} onChange={(e) => setType(e.target.value)}>
-          {TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t === "all" ? "All Types" : TYPE_LABELS[t] || t}</option>)}
+          {TYPE_OPTIONS.map((t) => (
+            <option key={t} value={t}>{t === "all" ? "All Types" : TYPE_LABELS[t] || t}</option>
+          ))}
         </select>
 
         <div className="relative">
@@ -151,6 +177,25 @@ const Calendar = () => {
         </div>
       </div>
 
+      {/* Error state */}
+      {error && !loading && (
+        <div className="industrial-card p-6 flex items-center gap-3 mb-4 border-destructive/30">
+          <AlertCircle size={18} className="text-destructive shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-destructive">Failed to load appointments</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{error}</p>
+          </div>
+          <Button variant="outline" size="sm" className="ml-auto text-xs" onClick={fetchAppointments}>
+            Retry
+          </Button>
+        </div>
+      )}
+
+      {/* Upcoming panel */}
+      {!loading && !error && (
+        <UpcomingPanel appointments={appointments} onSelect={handleRowClick} />
+      )}
+
       {/* Content */}
       {loading ? (
         <div className="space-y-3">
@@ -161,49 +206,65 @@ const Calendar = () => {
             </div>
           ))}
         </div>
-      ) : filteredAppointments.length === 0 ? (
+      ) : !error && filteredAppointments.length === 0 ? (
         <div className="industrial-card p-12 text-center">
           <p className="text-muted-foreground text-sm">No appointments in this range</p>
-          <Button variant="outline" className="mt-4 gap-1.5" onClick={() => { setEditingAppt(null); setModalOpen(true); }}>
+          <Button
+            variant="outline"
+            className="mt-4 gap-1.5"
+            onClick={() => { setEditingAppt(null); setModalOpen(true); }}
+          >
             <CalendarPlus size={14} /> Create your first appointment
           </Button>
         </div>
-      ) : (
+      ) : !error && (
         <div className="space-y-4">
           {grouped.map(([day, appts]) => (
             <div key={day}>
               <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                {day !== "Unknown" ? format(new Date(day + "T00:00:00"), "EEEE, MMM d, yyyy") : "Unscheduled"}
+                {day !== "Unknown"
+                  ? format(new Date(day + "T00:00:00"), "EEEE, MMM d, yyyy")
+                  : "Unscheduled"}
               </h3>
               <div className="space-y-1.5">
-                {appts.map((appt: any) => (
+                {appts.map((appt) => (
                   <button
                     key={appt.id}
-                    onClick={() => handleEdit(appt)}
+                    onClick={() => handleRowClick(appt)}
                     className="w-full text-left industrial-card p-4 hover:bg-muted/30 transition-colors"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className="text-xs font-mono text-muted-foreground w-12 shrink-0">
-                          {appt.start_time || "—"}
+                        <span className="text-xs font-mono text-muted-foreground w-24 shrink-0">
+                          {formatAppointmentTime(appt)}
                         </span>
                         <span className="text-sm font-medium truncate">{appt.title}</span>
                         {appt.lead?.name && (
-                          <span className="text-xs text-muted-foreground truncate">• {appt.lead.name}</span>
+                          <span className="text-xs text-muted-foreground truncate hidden sm:inline">• {appt.lead.name}</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {appt.lead?.channel && (
-                          <span className="status-badge bg-muted text-muted-foreground">{appt.lead.channel}</span>
+                          <span className="status-badge bg-muted text-muted-foreground text-[10px] hidden md:inline-flex">{appt.lead.channel}</span>
                         )}
-                        <span className="text-xs text-muted-foreground">{TYPE_LABELS[appt.type] || appt.type}</span>
+                        <span className="status-badge bg-muted text-muted-foreground text-[10px]">
+                          {TYPE_LABELS[appt.appointmentType] || appt.appointmentType}
+                        </span>
+                        {appt.source !== "manual" && (
+                          <span className="status-badge bg-muted text-muted-foreground text-[10px] hidden lg:inline-flex">
+                            {SOURCE_LABELS[appt.source] || appt.source}
+                          </span>
+                        )}
+                        {appt.reminderMinutesBefore && (
+                          <span className="text-muted-foreground text-[10px] hidden lg:inline" title="Reminder set">🔔</span>
+                        )}
                         <span className={`text-xs ${STATUS_CLASSES[appt.status] || "status-pending"}`}>
-                          {appt.status?.replace("_", " ")}
+                          {STATUS_LABELS[appt.status] || appt.status}
                         </span>
                       </div>
                     </div>
                     {appt.notes && (
-                      <p className="text-xs text-muted-foreground mt-1.5 ml-[60px] truncate">{appt.notes}</p>
+                      <p className="text-xs text-muted-foreground mt-1.5 ml-[108px] truncate hidden sm:block">{appt.notes}</p>
                     )}
                   </button>
                 ))}
@@ -218,6 +279,15 @@ const Calendar = () => {
         onClose={() => { setModalOpen(false); setEditingAppt(null); }}
         onSaved={fetchAppointments}
         existing={editingAppt}
+      />
+
+      <AppointmentDetailDrawer
+        appointment={detailAppt}
+        open={detailOpen}
+        onClose={() => { setDetailOpen(false); setDetailAppt(null); }}
+        onEdit={handleEdit}
+        onMarkCompleted={(id) => handleQuickAction("complete", id)}
+        onCancel={(id) => handleQuickAction("cancel", id)}
       />
     </div>
   );
