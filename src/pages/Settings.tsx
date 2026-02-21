@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, requireCompanyId } from "@/lib/apiClient";
 import { Activity, Loader2, Save } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { getErrorMessage } from "@/lib/errorUtils";
 
 const Settings = () => {
   const companyId = requireCompanyId();
@@ -49,8 +50,8 @@ const Settings = () => {
       await api.updateEmail(trimmed);
       setUserEmail(trimmed);
       toast({ title: "Email updated successfully" });
-    } catch (err: any) {
-      toast({ title: "Failed to update email", description: err?.message, variant: "destructive" });
+    } catch (err: unknown) {
+      toast({ title: "Failed to update email", description: getErrorMessage(err), variant: "destructive" });
     } finally {
       setSavingEmail(false);
     }
@@ -74,8 +75,8 @@ const Settings = () => {
       setNewPassword("");
       setConfirmPassword("");
       toast({ title: "Password updated successfully" });
-    } catch (err: any) {
-      toast({ title: "Failed to update password", description: err?.message, variant: "destructive" });
+    } catch (err: unknown) {
+      toast({ title: "Failed to update password", description: getErrorMessage(err), variant: "destructive" });
     } finally {
       setSavingPassword(false);
     }

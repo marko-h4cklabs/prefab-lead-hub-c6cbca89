@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { api, requireCompanyId } from "@/lib/apiClient";
 import { ArrowLeft, MessageSquare, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { toDisplayText, safeArray, getErrorMessage } from "@/lib/errorUtils";
 
 function normalizeList(payload: unknown, keys: string[] = []): any[] {
   if (Array.isArray(payload)) return payload;
@@ -123,8 +124,8 @@ const LeadDetail = () => {
       await api.updateLeadName(leadId, trimmed);
       setLead((l: any) => ({ ...l, name: trimmed, updated_at: new Date().toISOString() }));
       setEditingName(false);
-    } catch (err: any) {
-      toast({ title: "Failed to update name", description: err?.message, variant: "destructive" });
+    } catch (err: unknown) {
+      toast({ title: "Failed to update name", description: getErrorMessage(err), variant: "destructive" });
     } finally {
       setSavingName(false);
     }
@@ -136,7 +137,7 @@ const LeadDetail = () => {
   const leadName = lead.name || lead.external_id || "—";
   const statusId = lead.status_id || "";
   const statusName = lead.status_name || "New";
-  const collectedInfos: any[] = Array.isArray(lead.collected_infos) ? lead.collected_infos : (Array.isArray(lead.collected) ? lead.collected : []);
+  const collectedInfos: any[] = safeArray(lead.collected_infos ?? lead.collected, "collectedInfos");
 
   return (
     <div>
@@ -244,9 +245,9 @@ const LeadDetail = () => {
                 <dt className="font-mono text-muted-foreground min-w-[140px]">
                   {info.field_name || info.name || `Field ${i + 1}`}:
                 </dt>
-                <dd className="font-medium">
-                  {info.value ?? "—"}
-                  {info.units ? ` (${info.units})` : ""}
+                 <dd className="font-medium">
+                   {toDisplayText(info.value)}
+                   {info.units ? ` (${toDisplayText(info.units)})` : ""}
                 </dd>
               </div>
             ))}
