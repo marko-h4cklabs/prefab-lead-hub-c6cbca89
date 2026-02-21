@@ -300,6 +300,21 @@ export const api = {
   markAllNotificationsRead: () =>
     request<any>("/api/notifications/read-all", { method: "POST" }),
 
+  // --- Notification Settings ---
+  getNotificationSettings: () =>
+    request<any>("/api/settings/notifications"),
+
+  updateNotificationSettings: (data: {
+    email_enabled: boolean;
+    email_recipients: string[];
+    notify_new_inquiry_inbox: boolean;
+    notify_new_inquiry_simulation: boolean;
+  }) =>
+    request<any>("/api/settings/notifications", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
   // --- Admin ---
   runSnapshot: () =>
     request<any>("/api/admin/snapshot", { method: "POST" }),
