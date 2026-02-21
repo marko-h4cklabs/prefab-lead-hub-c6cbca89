@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api, requireCompanyId } from "@/lib/apiClient";
 import { Plus, ChevronLeft, ChevronRight, Loader2, Search } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { getErrorMessage, getFieldErrors, normalizeLeadName, validateLeadName } from "@/lib/errorUtils";
 
 function normalizeList(payload: unknown, keys: string[] = []): any[] {
   if (Array.isArray(payload)) return payload;
@@ -54,6 +55,7 @@ const Simulation = () => {
   const [newExternalId, setNewExternalId] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
+  const [nameError, setNameError] = useState("");
   const [fetchError, setFetchError] = useState("");
   const [statuses, setStatuses] = useState<LeadStatus[]>([]);
   const [savingStatusFor, setSavingStatusFor] = useState<string | null>(null);
@@ -154,30 +156,44 @@ const Simulation = () => {
     }
   };
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleNameInput = (raw: string) => {
+    const normalized = normalizeLeadName(raw);
+    setNewExternalId(normalized);
+    const err = validateLeadName(normalized);
+    setNameError(err || "");
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreating(true);
     setCreateError("");
+    setNameError("");
     const trimmedName = newExternalId.trim();
-    if (trimmedName.length < 2) {
-      setCreateError("Name must be at least 2 characters.");
+    const validationErr = validateLeadName(trimmedName);
+    if (validationErr) {
+      setNameError(validationErr);
       setCreating(false);
       return;
     }
     const normalizedChannel = newChannel.trim().toLowerCase();
-    api.createLead(companyId, { name: trimmedName, channel: normalizedChannel, source: "simulation" })
-      .then(() => {
-        setShowModal(false);
-        setNewChannel("");
-        setNewExternalId("");
-        setCreateError("");
-        fetchLeads();
-        toast({ title: "Lead created successfully" });
-      })
-      .catch((err: Error) => {
-        setCreateError(err.message || "Failed to create lead");
-      })
-      .finally(() => setCreating(false));
+    try {
+      await api.createLead(companyId, { name: trimmedName, channel: normalizedChannel, source: "simulation" });
+      setShowModal(false);
+      setNewChannel("");
+      setNewExternalId("");
+      setCreateError("");
+      setNameError("");
+      fetchLeads();
+      toast({ title: "Lead created successfully" });
+    } catch (err: any) {
+      const fieldErrs = getFieldErrors(err);
+      if (fieldErrs.name) {
+        setNameError(fieldErrs.name);
+      }
+      setCreateError(getErrorMessage(err));
+    } finally {
+      setCreating(false);
+    }
   };
 
   const getStatusId = (lead: any) => lead.status_id || "";
@@ -329,7 +345,8 @@ const Simulation = () => {
               </div>
               <div>
                 <label className="mb-1 block text-xs font-mono uppercase tracking-wider text-muted-foreground">Name</label>
-                <input value={newExternalId} onChange={(e) => setNewExternalId(e.target.value)} className="industrial-input w-full" required />
+                <input value={newExternalId} onChange={(e) => handleNameInput(e.target.value)} className={`industrial-input w-full ${nameError ? "border-destructive" : ""}`} required />
+                {nameError && <p className="mt-1 text-xs text-destructive">{nameError}</p>}
               </div>
               <div className="flex gap-3 justify-end">
                 <button type="button" onClick={() => setShowModal(false)} className="industrial-btn-ghost">Cancel</button>

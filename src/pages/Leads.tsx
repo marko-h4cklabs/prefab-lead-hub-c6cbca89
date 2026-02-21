@@ -86,13 +86,11 @@ const Leads = () => {
         const list = normalizeList(res, ["data", "leads", "items"]);
         setLeads(list);
         setTotal((res as any)?.total ?? (res as any)?.count ?? list.length);
-        if (list.length === 0 && res && typeof res === "object" && (res as any).error) {
-          toast({ title: "Error", description: String((res as any).error.message || (res as any).error), variant: "destructive" });
-        }
       })
-      .catch((err: Error) => {
-        setFetchError(err.message || "Failed to load leads");
-        toast({ title: "Failed to load leads", description: err.message, variant: "destructive" });
+      .catch((err: any) => {
+        const msg = typeof err?.message === "string" ? err.message : "Failed to load leads";
+        setFetchError(msg);
+        toast({ title: "Failed to load leads", description: msg, variant: "destructive" });
       })
       .finally(() => setLoading(false));
   }, [companyId, statusFilter, offset, searchQuery]);

@@ -44,6 +44,7 @@ export function clearCompanyId() {
 // --- HTTP wrapper ---
 
 import { toast } from "@/hooks/use-toast";
+import { getErrorMessage } from "@/lib/errorUtils";
 
 async function request<T>(
   path: string,
@@ -85,8 +86,10 @@ async function request<T>(
 
   if (!res.ok) {
     let message = `API error ${res.status}`;
+    let details: any = undefined;
     try {
       const json = await res.json();
+      details = json?.details;
       const raw = json?.error?.message || json?.error || json?.message || json;
       message = typeof raw === "string" ? raw : JSON.stringify(raw);
     } catch {
@@ -95,8 +98,8 @@ async function request<T>(
         if (text) message = text;
       } catch { /* ignore */ }
     }
-    toast({ title: `Error ${res.status}`, description: String(message), variant: "destructive" });
-    throw new Error(String(message));
+    toast({ title: `Error ${res.status}`, description: message, variant: "destructive" });
+    throw Object.assign(new Error(message), details ? { details } : {});
   }
 
   if (res.status === 204) return undefined as T;
