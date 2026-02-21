@@ -39,6 +39,35 @@ export function getFieldErrors(error: unknown): Record<string, string> {
   return result;
 }
 
+/**
+ * Safely convert any value to a displayable string for React rendering.
+ * Prevents React error #31 by never returning an object.
+ */
+export function toDisplayText(value: unknown): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "—";
+    if (value.every((v) => typeof v === "string" || typeof v === "number" || typeof v === "boolean")) {
+      return value.join(", ");
+    }
+    return `${value.length} items: ${JSON.stringify(value)}`;
+  }
+  return JSON.stringify(value);
+}
+
+/**
+ * Safely ensure a value is an array. If not, log a warning and return [].
+ */
+export function safeArray<T = any>(value: unknown, label = "data"): T[] {
+  if (Array.isArray(value)) return value;
+  if (value !== null && value !== undefined) {
+    console.warn(`Expected array for ${label}, got ${typeof value}`);
+  }
+  return [];
+}
+
 /** Name normalization: replace underscores with spaces, collapse whitespace, trim. */
 export function normalizeLeadName(raw: string): string {
   return raw.replace(/_/g, " ").replace(/\s+/g, " ").trimStart();

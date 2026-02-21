@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, requireCompanyId } from "@/lib/apiClient";
+import { toDisplayText, safeArray } from "@/lib/errorUtils";
 import { ArrowLeft, Send, Loader2, Bot, Timer } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -213,12 +214,12 @@ const Conversation = () => {
           <p className="text-xs text-muted-foreground">All required fields collected.</p>
         ) : (
           <ul className="space-y-1">
-            {requiredInfos.map((item, i) => (
+            {safeArray<RequiredInfo>(requiredInfos, "requiredInfos").map((item, i) => (
               <li key={i} className="text-xs font-mono">
-                <span className="text-foreground">{item.name}</span>
+                <span className="text-foreground">{toDisplayText(item.name)}</span>
                 {(item.type || item.units) && (
                   <span className="text-muted-foreground ml-1">
-                    ({[item.type, item.units].filter(Boolean).join(", ")})
+                    ({[item.type, item.units].filter(Boolean).map(toDisplayText).join(", ")})
                   </span>
                 )}
               </li>
@@ -236,11 +237,11 @@ const Conversation = () => {
           <p className="text-xs text-muted-foreground">None yet</p>
         ) : (
           <dl className="space-y-1">
-            {collectedInfos.map((item, i) => (
+            {safeArray<CollectedInfo>(collectedInfos, "collectedInfos").map((item, i) => (
               <div key={i} className="text-xs font-mono">
-                <dt className="text-muted-foreground inline">{item.field_name || item.name}: </dt>
-                <dd className="inline text-foreground font-medium">{String(item.value ?? "—")}</dd>
-                {item.units && <span className="text-muted-foreground ml-1">({item.units})</span>}
+                <dt className="text-muted-foreground inline">{toDisplayText(item.field_name || item.name)}: </dt>
+                <dd className="inline text-foreground font-medium">{toDisplayText(item.value)}</dd>
+                {item.units && <span className="text-muted-foreground ml-1">({toDisplayText(item.units)})</span>}
               </div>
             ))}
           </dl>
