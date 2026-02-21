@@ -244,11 +244,25 @@ const LeadDetail = () => {
             {collectedInfos.map((info: any, i: number) => {
               const fieldName = (info.field_name || info.name || "").toLowerCase();
               if (fieldName === "pictures") {
+                const picUrls: string[] = Array.isArray(info.value) ? info.value.filter((v: any) => typeof v === "string") : [];
+                const picLinks: { label: string; url: string }[] =
+                  Array.isArray((info as any).links)
+                    ? (info as any).links
+                    : picUrls.map((url, j) => ({ label: `Picture ${j + 1}`, url }));
                 return (
                   <div key={i} className="flex flex-col gap-1 text-sm">
-                    <dt className="font-mono text-muted-foreground">pictures:</dt>
+                    <dt className="font-mono text-muted-foreground">Pictures received:</dt>
                     <dd>
-                      <PicturesThumbnails urls={Array.isArray(info.value) ? info.value.filter((v: any) => typeof v === "string") : []} />
+                      {picLinks.length > 0 && (
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mb-1">
+                          {picLinks.map((link, j) => (
+                            <a key={j} href={link.url} target="_blank" rel="noopener noreferrer" className="text-accent underline hover:text-accent/80 text-sm">
+                              {link.label}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                      <PicturesThumbnails urls={picUrls} />
                     </dd>
                   </div>
                 );
