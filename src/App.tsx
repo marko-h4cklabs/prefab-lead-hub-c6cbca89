@@ -16,6 +16,7 @@ import Simulation from "./pages/Simulation";
 import LeadDetail from "./pages/LeadDetail";
 import Conversation from "./pages/Conversation";
 import Fields from "./pages/Fields";
+import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -64,6 +65,7 @@ const App = () => {
             <Route path="/leads/:leadId" element={<LeadDetail />} />
             <Route path="/leads/:leadId/conversation" element={<Conversation />} />
             <Route path="/fields" element={<Fields />} />
+            <Route path="/analytics" element={<Analytics />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
           <Route path="*" element={<NotFound />} />

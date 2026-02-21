@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { api, requireCompanyId, clearAuth } from "@/lib/apiClient";
-import { LayoutList, FlaskConical, Bot, Settings, LogOut } from "lucide-react";
+import { LayoutList, FlaskConical, Bot, BarChart3, Settings, LogOut } from "lucide-react";
 import NotificationsDropdown from "@/components/NotificationsDropdown";
 
 const navItems = [
   { to: "/leads", label: "Inbox", icon: LayoutList },
   { to: "/simulation", label: "Simulation", icon: FlaskConical },
   { to: "/fields", label: "Chatbot", icon: Bot },
+  { to: "/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
