@@ -9,7 +9,7 @@ import {
   LineChart, Line, PieChart, Pie, Cell, Legend,
 } from "recharts";
 
-// ---------- types ----------
+// ---------- types (match exact backend camelCase) ----------
 interface Filters {
   range: 7 | 30 | 90;
   source: string;
@@ -18,19 +18,21 @@ interface Filters {
 
 interface DashboardData {
   summary?: {
-    total_leads?: number;
-    new_leads_today?: number;
-    conversations_started?: number;
-    quote_completion_rate?: number;
-    avg_collected_fields?: number;
-    inbox_count?: number;
-    simulation_count?: number;
+    totalLeads?: number;
+    newLeadsToday?: number;
+    conversationsStarted?: number;
+    quoteDataCompletionRate?: number;
+    avgCollectedFieldsPerLead?: number;
+    inboxCount?: number;
+    simulationCount?: number;
+    inboxPct?: number;
+    simulationPct?: number;
   };
-  leads_over_time?: { date: string; count: number; inbox?: number; simulation?: number }[];
-  channel_breakdown?: { channel: string; count: number }[];
-  status_breakdown?: { status: string; count: number; name?: string }[];
-  field_completion?: { field: string; collected: number; eligible: number; rate: number }[];
-  top_signals?: { channel: string; leads: number; conversations: number; conversion: number }[];
+  leadsOverTime?: { day: string; inbox: number; simulation: number; total: number }[];
+  channelBreakdown?: { channel: string; count: number }[];
+  statusBreakdown?: { status: string; count: number }[];
+  fieldCompletion?: { field: string; label: string; collected: number; total: number; pct: number }[];
+  topSignals?: { channel: string; total: number; withConversation: number; conversionPct: number }[];
   available_channels?: string[];
   applied_filters?: { range?: number; source?: string; channel?: string };
 }
@@ -48,11 +50,11 @@ const SOURCE_OPTIONS = [
 ];
 
 const CHART_COLORS = [
-  "hsl(213, 40%, 32%)",   // primary
-  "hsl(25, 95%, 53%)",    // accent
-  "hsl(152, 60%, 40%)",   // success
-  "hsl(38, 92%, 50%)",    // warning
-  "hsl(0, 72%, 51%)",     // destructive
+  "hsl(213, 40%, 32%)",
+  "hsl(25, 95%, 53%)",
+  "hsl(152, 60%, 40%)",
+  "hsl(38, 92%, 50%)",
+  "hsl(0, 72%, 51%)",
   "hsl(220, 14%, 60%)",
   "hsl(270, 50%, 50%)",
   "hsl(190, 60%, 45%)",
@@ -78,31 +80,28 @@ const Analytics = () => {
         source: f.source.toLowerCase(),
         channel: f.channel.toLowerCase(),
       };
-      const cid = getCompanyId();
-      console.log("[Analytics] companyId:", cid);
+      console.log("[Analytics] companyId:", getCompanyId());
       console.log("[Analytics] fetch params:", params);
-      console.log("[Analytics] request URL:", `/api/analytics/dashboard?range=${params.range}&source=${params.source}&channel=${params.channel}`);
+
       const raw = await api.getAnalyticsDashboard(params);
 
       // Normalize: backend may wrap payload in { data: {...} } or return flat
       const res: DashboardData = raw?.data && typeof raw.data === "object" && !Array.isArray(raw.data) ? raw.data : raw;
 
-      console.log("[Analytics] payload summary:", {
-        keys: res ? Object.keys(res) : [],
-        total_leads: res?.summary?.total_leads,
-        leads_over_time: (res?.leads_over_time ?? []).length,
-        channel_breakdown: (res?.channel_breakdown ?? []).length,
-        status_breakdown: (res?.status_breakdown ?? []).length,
-        field_completion: (res?.field_completion ?? []).length,
-        top_signals: (res?.top_signals ?? []).length,
-        available_channels: res?.available_channels,
-      });
+      console.log("[Analytics] payload keys:", res ? Object.keys(res) : []);
+      console.log("[Analytics] summary.totalLeads:", res?.summary?.totalLeads);
+      console.log("[Analytics] leadsOverTime length:", (res?.leadsOverTime ?? []).length);
+      console.log("[Analytics] channelBreakdown length:", (res?.channelBreakdown ?? []).length);
+      console.log("[Analytics] statusBreakdown length:", (res?.statusBreakdown ?? []).length);
+      console.log("[Analytics] fieldCompletion length:", (res?.fieldCompletion ?? []).length);
+      console.log("[Analytics] topSignals length:", (res?.topSignals ?? []).length);
+      console.log("[Analytics] available_channels:", res?.available_channels);
 
       setData(res);
 
-      // Build channel options from available_channels OR channel_breakdown
+      // Build channel options
       const channels = res?.available_channels
-        ?? (res?.channel_breakdown ?? []).map((c: any) => c.channel).filter(Boolean);
+        ?? (res?.channelBreakdown ?? []).map((c) => c.channel).filter(Boolean);
       if (channels.length > 0) {
         setAvailableChannels(channels);
         if (f.channel !== "all" && !channels.includes(f.channel)) {
@@ -114,7 +113,6 @@ const Analytics = () => {
     } catch (err: unknown) {
       const msg = getErrorMessage(err);
       setError(msg);
-      // Keep last successful data visible
       toast({ title: "Failed to load analytics", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);
@@ -123,16 +121,16 @@ const Analytics = () => {
 
   useEffect(() => { fetchData(filters); }, [filters, fetchData]);
 
-  const channelOptions = useMemo(() => {
-    return [
-      { value: "all", label: "All Channels" },
-      ...availableChannels.map((c) => ({ value: c, label: c })),
-    ];
-  }, [availableChannels]);
+  const channelOptions = useMemo(() => [
+    { value: "all", label: "All Channels" },
+    ...availableChannels.map((c) => ({
+      value: c.toLowerCase(),
+      label: c.charAt(0).toUpperCase() + c.slice(1),
+    })),
+  ], [availableChannels]);
 
   const s = data?.summary ?? {};
 
-  // ---------- render ----------
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -147,11 +145,7 @@ const Analytics = () => {
               Updated {lastUpdated.toLocaleTimeString()}
             </span>
           )}
-          <button
-            onClick={() => fetchData(filters)}
-            disabled={loading}
-            className="industrial-btn-ghost px-2 py-1.5"
-          >
+          <button onClick={() => fetchData(filters)} disabled={loading} className="industrial-btn-ghost px-2 py-1.5">
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
           </button>
         </div>
@@ -159,7 +153,6 @@ const Analytics = () => {
 
       {/* Filters */}
       <div className="industrial-card p-4 flex flex-wrap items-center gap-4">
-        {/* Range */}
         <div className="flex items-center gap-1 rounded-sm border border-border overflow-hidden">
           {RANGE_OPTIONS.map((opt) => (
             <button
@@ -176,7 +169,6 @@ const Analytics = () => {
           ))}
         </div>
 
-        {/* Source */}
         <div className="flex items-center gap-1 rounded-sm border border-border overflow-hidden">
           {SOURCE_OPTIONS.map((opt) => (
             <button
@@ -193,7 +185,6 @@ const Analytics = () => {
           ))}
         </div>
 
-        {/* Channel */}
         <select
           value={filters.channel}
           onChange={(e) => setFilters((p) => ({ ...p, channel: e.target.value }))}
@@ -214,62 +205,56 @@ const Analytics = () => {
       {error && !loading && (
         <div className="industrial-card p-6 border-destructive/50 bg-destructive/5 text-center space-y-3">
           <p className="text-sm text-destructive font-medium">{error}</p>
-          <button onClick={() => fetchData(filters)} className="industrial-btn-primary text-xs">
-            Retry
-          </button>
+          <button onClick={() => fetchData(filters)} className="industrial-btn-primary text-xs">Retry</button>
         </div>
       )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <KpiCard label="Total Leads" value={s.total_leads} icon={<Users size={14} />} loading={loading} />
-        <KpiCard label="New Today" value={s.new_leads_today} icon={<TrendingUp size={14} />} loading={loading} />
-        <KpiCard label="Conversations" value={s.conversations_started} icon={<MessageSquare size={14} />} loading={loading} />
-        <KpiCard label="Quote Completion" value={s.quote_completion_rate != null ? `${Math.round(s.quote_completion_rate)}%` : undefined} icon={<CheckCircle size={14} />} loading={loading} />
-        <KpiCard label="Avg Fields" value={s.avg_collected_fields != null ? Number(s.avg_collected_fields).toFixed(1) : undefined} icon={<BarChart3 size={14} />} loading={loading} />
-        <KpiCard label="Inbox / Sim" value={s.inbox_count != null ? `${s.inbox_count} / ${s.simulation_count ?? 0}` : undefined} icon={<Inbox size={14} />} loading={loading} />
+        <KpiCard label="Total Leads" value={s.totalLeads} icon={<Users size={14} />} loading={loading} />
+        <KpiCard label="New Today" value={s.newLeadsToday} icon={<TrendingUp size={14} />} loading={loading} />
+        <KpiCard label="Conversations" value={s.conversationsStarted} icon={<MessageSquare size={14} />} loading={loading} />
+        <KpiCard label="Quote Completion" value={s.quoteDataCompletionRate != null ? `${Math.round(s.quoteDataCompletionRate)}%` : undefined} icon={<CheckCircle size={14} />} loading={loading} />
+        <KpiCard label="Avg Fields" value={s.avgCollectedFieldsPerLead != null ? Number(s.avgCollectedFieldsPerLead).toFixed(1) : undefined} icon={<BarChart3 size={14} />} loading={loading} />
+        <KpiCard label="Inbox / Sim" value={s.inboxCount != null ? `${s.inboxCount} / ${s.simulationCount ?? 0}` : undefined} icon={<Inbox size={14} />} loading={loading} />
       </div>
 
       {/* Charts */}
       {!error && (
         <div className="space-y-6">
-          {/* Leads Over Time */}
           <div className="industrial-card p-6">
             <h2 className="text-sm font-bold uppercase tracking-wider mb-4">Leads Over Time</h2>
             {loading ? <Skeleton className="h-64 w-full" /> : (
-              <ChartLeadsOverTime data={data?.leads_over_time ?? []} emptyMsg={getEmptyMessage(filters)} />
+              <ChartLeadsOverTime data={data?.leadsOverTime ?? []} emptyMsg={getEmptyMessage(filters)} />
             )}
           </div>
 
-          {/* Channel + Status side by side */}
           <div className="grid md:grid-cols-2 gap-6">
             <div className="industrial-card p-6">
               <h2 className="text-sm font-bold uppercase tracking-wider mb-4">Channel Breakdown</h2>
               {loading ? <Skeleton className="h-56 w-full" /> : (
-                <ChartChannelBreakdown data={data?.channel_breakdown ?? []} emptyMsg={getEmptyMessage(filters)} />
+                <ChartChannelBreakdown data={data?.channelBreakdown ?? []} emptyMsg={getEmptyMessage(filters)} />
               )}
             </div>
             <div className="industrial-card p-6">
               <h2 className="text-sm font-bold uppercase tracking-wider mb-4">Status Breakdown</h2>
               {loading ? <Skeleton className="h-56 w-full" /> : (
-                <ChartStatusBreakdown data={data?.status_breakdown ?? []} emptyMsg={getEmptyMessage(filters)} />
+                <ChartStatusBreakdown data={data?.statusBreakdown ?? []} emptyMsg={getEmptyMessage(filters)} />
               )}
             </div>
           </div>
 
-          {/* Field Completion */}
           <div className="industrial-card p-6">
             <h2 className="text-sm font-bold uppercase tracking-wider mb-4">Field Completion</h2>
             {loading ? <Skeleton className="h-48 w-full" /> : (
-              <FieldCompletionTable data={data?.field_completion ?? []} />
+              <FieldCompletionTable data={data?.fieldCompletion ?? []} />
             )}
           </div>
 
-          {/* Top Signals */}
           <div className="industrial-card p-6">
             <h2 className="text-sm font-bold uppercase tracking-wider mb-4">Channel Conversion</h2>
             {loading ? <Skeleton className="h-48 w-full" /> : (
-              <TopSignalsTable data={data?.top_signals ?? []} />
+              <TopSignalsTable data={data?.topSignals ?? []} />
             )}
           </div>
         </div>
@@ -305,24 +290,25 @@ function getEmptyMessage(filters: Filters): string {
   return "No leads found for this period. Try switching to 30D/90D or a different source.";
 }
 
-function ChartLeadsOverTime({ data, emptyMsg }: { data: DashboardData["leads_over_time"]; emptyMsg: string }) {
+function ChartLeadsOverTime({ data, emptyMsg }: { data: DashboardData["leadsOverTime"]; emptyMsg: string }) {
   if (!data || data.length === 0) return <EmptyChart message={emptyMsg} />;
-  const hasBreakdown = data.some((d) => d.inbox != null);
+  const hasBreakdown = data.some((d) => d.inbox != null || d.simulation != null);
 
   return (
     <ResponsiveContainer width="100%" height={260}>
       <LineChart data={data}>
         <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,13%,86%)" />
-        <XAxis dataKey="date" tick={{ fontSize: 11 }} stroke="hsl(220,10%,46%)" />
+        <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="hsl(220,10%,46%)" />
         <YAxis allowDecimals={false} tick={{ fontSize: 11 }} stroke="hsl(220,10%,46%)" />
         <Tooltip contentStyle={{ fontSize: 12, borderRadius: 4, border: "1px solid hsl(220,13%,86%)" }} />
         {hasBreakdown ? (
           <>
             <Line type="monotone" dataKey="inbox" stroke={CHART_COLORS[0]} strokeWidth={2} dot={false} name="Inbox" />
             <Line type="monotone" dataKey="simulation" stroke={CHART_COLORS[1]} strokeWidth={2} dot={false} name="Simulation" />
+            <Line type="monotone" dataKey="total" stroke={CHART_COLORS[2]} strokeWidth={2} dot={false} name="Total" />
           </>
         ) : (
-          <Line type="monotone" dataKey="count" stroke={CHART_COLORS[0]} strokeWidth={2} dot={false} name="Leads" />
+          <Line type="monotone" dataKey="total" stroke={CHART_COLORS[0]} strokeWidth={2} dot={false} name="Leads" />
         )}
         <Legend />
       </LineChart>
@@ -330,7 +316,7 @@ function ChartLeadsOverTime({ data, emptyMsg }: { data: DashboardData["leads_ove
   );
 }
 
-function ChartChannelBreakdown({ data, emptyMsg }: { data: DashboardData["channel_breakdown"]; emptyMsg: string }) {
+function ChartChannelBreakdown({ data, emptyMsg }: { data: DashboardData["channelBreakdown"]; emptyMsg: string }) {
   if (!data || data.length === 0) return <EmptyChart message={emptyMsg} />;
   const sorted = [...data].sort((a, b) => b.count - a.count);
 
@@ -347,13 +333,13 @@ function ChartChannelBreakdown({ data, emptyMsg }: { data: DashboardData["channe
   );
 }
 
-function ChartStatusBreakdown({ data, emptyMsg }: { data: DashboardData["status_breakdown"]; emptyMsg: string }) {
+function ChartStatusBreakdown({ data, emptyMsg }: { data: DashboardData["statusBreakdown"]; emptyMsg: string }) {
   if (!data || data.length === 0) return <EmptyChart message={emptyMsg} />;
 
   return (
     <ResponsiveContainer width="100%" height={240}>
       <PieChart>
-        <Pie data={data.map(d => ({ ...d, label: d.name || d.status || "Unknown" }))} dataKey="count" nameKey="label" cx="50%" cy="50%" outerRadius={90} label={({ label, percent }) => `${label} ${(percent * 100).toFixed(0)}%`} labelLine={false} fontSize={11}>
+        <Pie data={data} dataKey="count" nameKey="status" cx="50%" cy="50%" outerRadius={90} label={({ status, percent }) => `${status} ${(percent * 100).toFixed(0)}%`} labelLine={false} fontSize={11}>
           {data.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
         </Pie>
         <Tooltip contentStyle={{ fontSize: 12, borderRadius: 4, border: "1px solid hsl(220,13%,86%)" }} />
@@ -362,7 +348,7 @@ function ChartStatusBreakdown({ data, emptyMsg }: { data: DashboardData["status_
   );
 }
 
-function FieldCompletionTable({ data }: { data: DashboardData["field_completion"] }) {
+function FieldCompletionTable({ data }: { data: DashboardData["fieldCompletion"] }) {
   if (!data || data.length === 0) return <EmptyChart message="No field completion data yet." />;
 
   return (
@@ -372,21 +358,21 @@ function FieldCompletionTable({ data }: { data: DashboardData["field_completion"
           <tr>
             <th>Field</th>
             <th>Collected</th>
-            <th>Eligible</th>
+            <th>Total</th>
             <th>Rate</th>
             <th className="w-40">Progress</th>
           </tr>
         </thead>
         <tbody>
           {data.map((row) => (
-            <tr key={row.field}>
-              <td className="font-medium capitalize">{row.field}</td>
+            <tr key={row.field || row.label}>
+              <td className="font-medium capitalize">{row.label || row.field}</td>
               <td className="font-mono tabular-nums">{row.collected}</td>
-              <td className="font-mono tabular-nums">{row.eligible}</td>
-              <td className="font-mono tabular-nums">{Math.round(row.rate)}%</td>
+              <td className="font-mono tabular-nums">{row.total}</td>
+              <td className="font-mono tabular-nums">{Math.round(row.pct)}%</td>
               <td>
                 <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                  <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(row.rate, 100)}%` }} />
+                  <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(row.pct, 100)}%` }} />
                 </div>
               </td>
             </tr>
@@ -397,9 +383,9 @@ function FieldCompletionTable({ data }: { data: DashboardData["field_completion"
   );
 }
 
-function TopSignalsTable({ data }: { data: DashboardData["top_signals"] }) {
+function TopSignalsTable({ data }: { data: DashboardData["topSignals"] }) {
   if (!data || data.length === 0) return <EmptyChart message="No conversion data yet." />;
-  const sorted = [...data].sort((a, b) => b.conversion - a.conversion);
+  const sorted = [...data].sort((a, b) => b.conversionPct - a.conversionPct);
 
   return (
     <div className="overflow-auto">
@@ -407,8 +393,8 @@ function TopSignalsTable({ data }: { data: DashboardData["top_signals"] }) {
         <thead>
           <tr>
             <th>Channel</th>
-            <th>Leads</th>
-            <th>Conversations</th>
+            <th>Total</th>
+            <th>With Conversation</th>
             <th>Conversion %</th>
           </tr>
         </thead>
@@ -416,9 +402,9 @@ function TopSignalsTable({ data }: { data: DashboardData["top_signals"] }) {
           {sorted.map((row) => (
             <tr key={row.channel}>
               <td className="font-medium capitalize">{row.channel}</td>
-              <td className="font-mono tabular-nums">{row.leads}</td>
-              <td className="font-mono tabular-nums">{row.conversations}</td>
-              <td className="font-mono tabular-nums">{Math.round(row.conversion)}%</td>
+              <td className="font-mono tabular-nums">{row.total}</td>
+              <td className="font-mono tabular-nums">{row.withConversation}</td>
+              <td className="font-mono tabular-nums">{Math.round(row.conversionPct)}%</td>
             </tr>
           ))}
         </tbody>
