@@ -419,6 +419,32 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  // --- Scheduling Requests ---
+  getSchedulingRequests: (params?: { status?: string; type?: string; source?: string; search?: string; limit?: number }) => {
+    const search = new URLSearchParams();
+    if (params?.status && params.status !== "all") search.set("status", params.status);
+    if (params?.type && params.type !== "all") search.set("type", params.type);
+    if (params?.source && params.source !== "all") search.set("source", params.source);
+    if (params?.search) search.set("search", params.search);
+    if (params?.limit) search.set("limit", String(params.limit));
+    return request<any>(`/api/scheduling-requests?${search.toString()}`);
+  },
+
+  getLeadSchedulingRequests: (leadId: string) =>
+    request<any>(`/api/leads/${leadId}/scheduling-requests`),
+
+  updateSchedulingRequest: (id: string, data: any) =>
+    request<any>(`/api/scheduling-requests/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+
+  convertSchedulingRequest: (id: string, appointmentData?: any) =>
+    request<any>(`/api/scheduling-requests/${id}/convert`, {
+      method: "POST",
+      body: appointmentData ? JSON.stringify(appointmentData) : undefined,
+    }),
+
+  closeSchedulingRequest: (id: string) =>
+    request<any>(`/api/scheduling-requests/${id}`, { method: "PATCH", body: JSON.stringify({ status: "closed" }) }),
+
   // --- Admin ---
   runSnapshot: () =>
     request<any>("/api/admin/snapshot", { method: "POST" }),

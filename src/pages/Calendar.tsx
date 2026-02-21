@@ -8,6 +8,8 @@ import { getErrorMessage } from "@/lib/errorUtils";
 import AppointmentModal, { AppointmentFormData } from "@/components/appointments/AppointmentModal";
 import AppointmentDetailDrawer from "@/components/appointments/AppointmentDetailDrawer";
 import UpcomingPanel from "@/components/appointments/UpcomingPanel";
+import CalendarSchedulingRequests from "@/components/scheduling/CalendarSchedulingRequests";
+import { NormalizedSchedulingRequest, REQUEST_TYPE_LABELS } from "@/lib/schedulingRequestUtils";
 import {
   normalizeAppointmentList,
   NormalizedAppointment,
@@ -32,7 +34,11 @@ const SOURCE_OPTIONS = ["all", "manual", "chatbot", "inbox", "simulation"];
 const STATUS_OPTIONS = ["all", "scheduled", "completed", "cancelled", "no_show"];
 const TYPE_OPTIONS = ["all", "call", "site_visit", "meeting", "follow_up"];
 
+const CALENDAR_TABS = ["Appointments", "Scheduling Requests"] as const;
+type CalendarTab = (typeof CALENDAR_TABS)[number];
+
 const Calendar = () => {
+  const [calendarTab, setCalendarTab] = useState<CalendarTab>("Appointments");
   const [appointments, setAppointments] = useState<NormalizedAppointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +51,9 @@ const Calendar = () => {
   const [editingAppt, setEditingAppt] = useState<AppointmentFormData | null>(null);
   const [detailAppt, setDetailAppt] = useState<NormalizedAppointment | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [schedulingRequestPrefill, setSchedulingRequestPrefill] = useState<Partial<AppointmentFormData> | null>(null);
+  const [convertingReqId, setConvertingReqId] = useState<string | null>(null);
+  const [schedulingRequestInfo, setSchedulingRequestInfo] = useState<string | undefined>(undefined);
 
   const fetchAppointments = useCallback(() => {
     setLoading(true);
@@ -116,6 +125,24 @@ const Calendar = () => {
     setDetailOpen(true);
   };
 
+  const handleConvertRequest = (req: NormalizedSchedulingRequest) => {
+    const typeName = REQUEST_TYPE_LABELS[req.requestType] || req.requestType;
+    const leadName = req.lead?.name || "Lead";
+    setSchedulingRequestPrefill({
+      lead_id: req.leadId,
+      lead_name: leadName,
+      title: `${typeName} with ${leadName}`,
+      type: req.requestType,
+      date: req.preferredDate || undefined,
+      start_time: req.preferredTime || undefined,
+      notes: req.notes || "",
+    });
+    setConvertingReqId(req.id);
+    setSchedulingRequestInfo(`Created from scheduling request · ${leadName}`);
+    setEditingAppt(null);
+    setModalOpen(true);
+  };
+
   return (
     <div>
       {/* Header */}
@@ -133,6 +160,27 @@ const Calendar = () => {
         </Button>
       </div>
 
+      {/* Tab bar */}
+      <div className="flex gap-1 mb-4 border-b border-border">
+        {CALENDAR_TABS.map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setCalendarTab(tab)}
+            className={`px-4 py-2 text-sm font-semibold uppercase tracking-wider transition-colors -mb-px ${
+              calendarTab === tab
+                ? "border-b-2 border-accent text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {calendarTab === "Scheduling Requests" ? (
+        <CalendarSchedulingRequests onConvertToAppointment={handleConvertRequest} />
+      ) : (
+      <>
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2 my-4">
         {/* Range */}
@@ -273,12 +321,31 @@ const Calendar = () => {
           ))}
         </div>
       )}
+      </>
+      )}
 
       <AppointmentModal
         open={modalOpen}
-        onClose={() => { setModalOpen(false); setEditingAppt(null); }}
-        onSaved={fetchAppointments}
+        onClose={() => {
+          setModalOpen(false);
+          setEditingAppt(null);
+          setSchedulingRequestPrefill(null);
+          setConvertingReqId(null);
+          setSchedulingRequestInfo(undefined);
+        }}
+        onSaved={async () => {
+          fetchAppointments();
+          if (convertingReqId) {
+            try {
+              await api.updateSchedulingRequest(convertingReqId, { status: "converted" });
+            } catch { /* best effort */ }
+            setConvertingReqId(null);
+          }
+        }}
         existing={editingAppt}
+        prefill={schedulingRequestPrefill || undefined}
+        lockLead={!!schedulingRequestPrefill}
+        schedulingRequestInfo={schedulingRequestInfo}
       />
 
       <AppointmentDetailDrawer

@@ -65,6 +65,8 @@ interface Props {
   existing?: AppointmentFormData | null;
   /** If true, lead field is read-only */
   lockLead?: boolean;
+  /** Info strip shown when created from a scheduling request */
+  schedulingRequestInfo?: string;
 }
 
 function defaultForm(prefill?: Partial<AppointmentFormData>): AppointmentFormData {
@@ -84,7 +86,7 @@ function defaultForm(prefill?: Partial<AppointmentFormData>): AppointmentFormDat
   };
 }
 
-export default function AppointmentModal({ open, onClose, onSaved, prefill, existing, lockLead }: Props) {
+export default function AppointmentModal({ open, onClose, onSaved, prefill, existing, lockLead, schedulingRequestInfo }: Props) {
   const isEdit = !!existing?.id;
   const [form, setForm] = useState<AppointmentFormData>(() =>
     existing ? { ...existing } : defaultForm(prefill)
@@ -240,6 +242,12 @@ export default function AppointmentModal({ open, onClose, onSaved, prefill, exis
         </DialogHeader>
 
         <div className="space-y-4 py-2">
+          {/* Scheduling request info strip */}
+          {schedulingRequestInfo && (
+            <div className="rounded-sm bg-accent/10 border border-accent/20 px-3 py-2 text-xs text-accent font-mono">
+              {schedulingRequestInfo}
+            </div>
+          )}
           {/* Lead */}
           <div>
             <Label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Lead</Label>

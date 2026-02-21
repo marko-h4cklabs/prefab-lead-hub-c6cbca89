@@ -15,11 +15,13 @@ function timeAgo(dateStr: string) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-/** Detect if notification is appointment-related */
+/** Detect if notification is appointment or scheduling-request related */
 function isAppointmentNotification(n: AppNotification): boolean {
   const t = (n.title || "").toLowerCase();
   const b = (n.body || "").toLowerCase();
-  return t.includes("appointment") || t.includes("reminder") || b.includes("appointment") || (n as any).type === "appointment_reminder";
+  return t.includes("appointment") || t.includes("reminder") || t.includes("scheduling request") ||
+    b.includes("appointment") || b.includes("scheduling") ||
+    (n as any).type === "appointment_reminder" || (n as any).type === "scheduling_request";
 }
 
 const NotificationsDropdown = () => {
@@ -29,9 +31,14 @@ const NotificationsDropdown = () => {
 
   const handleClick = async (n: AppNotification) => {
     if (!n.read) await markRead(n.id);
-    // Deep-link: appointment notifications go to calendar, others use url
+    // Deep-link: appointment/scheduling notifications go to calendar or lead
     if (isAppointmentNotification(n)) {
-      navigate("/calendar");
+      const payload = n as any;
+      if (payload.leadId || payload.lead_id) {
+        navigate(`/leads/${payload.leadId || payload.lead_id}`);
+      } else {
+        navigate("/calendar");
+      }
     } else if (n.url) {
       navigate(n.url);
     }
