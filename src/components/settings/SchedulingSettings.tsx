@@ -4,6 +4,7 @@ import { Loader2, Save, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
+import ChatbotBookingSettings, { defaultChatbotBookingConfig } from "./ChatbotBookingSettings";
 
 const APPOINTMENT_TYPES = [
   { value: "call", label: "Call" },
@@ -52,6 +53,16 @@ interface SchedulingConfig {
   in_app_reminders: boolean;
   email_reminders: boolean;
   reminder_lead_time_minutes: number;
+  // Chatbot booking fields
+  chatbot_booking_enabled: boolean;
+  booking_mode: string;
+  ask_after_quote: boolean;
+  default_booking_type: string;
+  allow_custom_time: boolean;
+  show_available_slots: boolean;
+  booking_prompt_style: string;
+  require_name: boolean;
+  require_phone: boolean;
 }
 
 const defaultWorkingHours = (): Record<string, DaySchedule> => {
@@ -80,6 +91,7 @@ const defaultConfig = (): SchedulingConfig => ({
   in_app_reminders: true,
   email_reminders: false,
   reminder_lead_time_minutes: 60,
+  ...defaultChatbotBookingConfig(),
 });
 
 export default function SchedulingSettings() {
@@ -327,6 +339,22 @@ export default function SchedulingSettings() {
           </select>
         </div>
       </div>
+
+      {/* E) Chatbot Booking */}
+      <ChatbotBookingSettings
+        config={{
+          chatbot_booking_enabled: config.chatbot_booking_enabled,
+          booking_mode: config.booking_mode,
+          ask_after_quote: config.ask_after_quote,
+          default_booking_type: config.default_booking_type,
+          allow_custom_time: config.allow_custom_time,
+          show_available_slots: config.show_available_slots,
+          booking_prompt_style: config.booking_prompt_style,
+          require_name: config.require_name,
+          require_phone: config.require_phone,
+        }}
+        onChange={(chatbotConfig) => setConfig((c) => ({ ...c, ...chatbotConfig }))}
+      />
 
       {/* Save */}
       <div className="flex justify-end">

@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, requireCompanyId } from "@/lib/apiClient";
 import { toDisplayText, safeArray, getErrorMessage } from "@/lib/errorUtils";
-import { ArrowLeft, Send, Loader2, Bot, Timer, ImagePlus } from "lucide-react";
+import { ArrowLeft, Send, Loader2, Bot, Timer, ImagePlus, CalendarDays } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import PicturesThumbnails from "@/components/PicturesThumbnails";
 
@@ -386,6 +386,30 @@ const Conversation = () => {
             ) : (
               messages.map((msg, i) => {
                 const isUser = msg.role === "user";
+                const isSystem = msg.role === "system";
+                const isSchedulingChip = isSystem && (msg.content || "").toLowerCase().includes("scheduling request");
+
+                if (isSchedulingChip) {
+                  return (
+                    <div key={i} className="flex justify-center">
+                      <div className="inline-flex items-center gap-1.5 rounded-sm bg-accent/10 border border-accent/20 px-3 py-1.5 text-xs font-mono text-accent">
+                        <CalendarDays size={12} />
+                        {msg.content}
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (isSystem) {
+                  return (
+                    <div key={i} className="flex justify-center">
+                      <div className="inline-flex items-center gap-1.5 rounded-sm bg-muted px-3 py-1.5 text-xs font-mono text-muted-foreground">
+                        {msg.content}
+                      </div>
+                    </div>
+                  );
+                }
+
                 return (
                   <div key={i} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
                     <div

@@ -7,8 +7,10 @@ import { toDisplayText, safeArray, getErrorMessage } from "@/lib/errorUtils";
 import PicturesThumbnails from "@/components/PicturesThumbnails";
 import CrmSection from "@/components/crm/CrmSection";
 import LeadAppointments from "@/components/appointments/LeadAppointments";
+import LeadSchedulingRequests from "@/components/scheduling/LeadSchedulingRequests";
 import AppointmentModal, { AppointmentFormData } from "@/components/appointments/AppointmentModal";
-
+import { NormalizedSchedulingRequest } from "@/lib/schedulingRequestUtils";
+import { REQUEST_TYPE_LABELS } from "@/lib/schedulingRequestUtils";
 function normalizeList(payload: unknown, keys: string[] = []): any[] {
   if (Array.isArray(payload)) return payload;
   if (payload && typeof payload === "object") {
@@ -55,6 +57,9 @@ const LeadDetail = () => {
   const [savingName, setSavingName] = useState(false);
   const [apptModalOpen, setApptModalOpen] = useState(false);
   const [apptRefreshKey, setApptRefreshKey] = useState(0);
+  const [schedReqRefreshKey, setSchedReqRefreshKey] = useState(0);
+  const [apptPrefillOverride, setApptPrefillOverride] = useState<Partial<AppointmentFormData> | null>(null);
+  const [convertingRequestId, setConvertingRequestId] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchLead = useCallback(() => {
@@ -145,13 +150,30 @@ const LeadDetail = () => {
   const statusName = lead.status_name || "New";
   const collectedInfos: any[] = safeArray(lead.collected_infos ?? lead.collected, "collectedInfos");
 
-  const apptPrefill: Partial<AppointmentFormData> = {
+  const defaultApptPrefill: Partial<AppointmentFormData> = {
     lead_id: leadId!,
     lead_name: leadName,
     title: `Call with ${leadName !== "—" ? leadName : "Lead"}`,
     notes: collectedInfos.length > 0
       ? collectedInfos.map((i: any) => `${i.field_name || i.name}: ${i.value}`).join("\n")
       : "",
+  };
+
+  const apptPrefill = apptPrefillOverride || defaultApptPrefill;
+
+  const handleConvertRequest = (req: NormalizedSchedulingRequest) => {
+    const typeName = REQUEST_TYPE_LABELS[req.requestType] || req.requestType;
+    setApptPrefillOverride({
+      lead_id: leadId!,
+      lead_name: leadName,
+      title: `${typeName} with ${leadName !== "—" ? leadName : "Lead"}`,
+      type: req.requestType,
+      date: req.preferredDate || undefined,
+      start_time: req.preferredTime || undefined,
+      notes: req.notes || "",
+    });
+    setConvertingRequestId(req.id);
+    setApptModalOpen(true);
   };
 
   return (
@@ -319,16 +341,41 @@ const LeadDetail = () => {
         />
       )}
 
+      {/* Scheduling Requests Section */}
+      {leadId && (
+        <LeadSchedulingRequests
+          key={`sched-${schedReqRefreshKey}`}
+          leadId={leadId}
+          leadName={leadName}
+          onConvertToAppointment={handleConvertRequest}
+        />
+      )}
+
       {/* CRM Section */}
       {leadId && <CrmSection leadId={leadId} />}
 
-      {/* Appointment Modal from header button */}
+      {/* Appointment Modal from header button or convert action */}
       <AppointmentModal
         open={apptModalOpen}
-        onClose={() => setApptModalOpen(false)}
-        onSaved={() => setApptRefreshKey((k) => k + 1)}
+        onClose={() => {
+          setApptModalOpen(false);
+          setApptPrefillOverride(null);
+          setConvertingRequestId(null);
+        }}
+        onSaved={async () => {
+          setApptRefreshKey((k) => k + 1);
+          // If converting a scheduling request, mark it as converted
+          if (convertingRequestId) {
+            try {
+              await api.updateSchedulingRequest(convertingRequestId, { status: "converted" });
+            } catch { /* best effort */ }
+            setConvertingRequestId(null);
+            setSchedReqRefreshKey((k) => k + 1);
+          }
+        }}
         prefill={apptPrefill}
         lockLead
+        schedulingRequestInfo={convertingRequestId ? "Created from scheduling request" : undefined}
       />
     </div>
   );

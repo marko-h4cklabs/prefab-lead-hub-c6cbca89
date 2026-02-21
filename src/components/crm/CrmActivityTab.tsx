@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/apiClient";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
-import { Clock, AlertCircle } from "lucide-react";
+import { Clock, AlertCircle, CalendarDays, CalendarCheck } from "lucide-react";
 
 const EVENT_LABELS: Record<string, string> = {
   lead_created: "Lead created",
@@ -18,7 +18,22 @@ const EVENT_LABELS: Record<string, string> = {
   task_cancelled: "Task cancelled",
   task_reopened: "Task reopened",
   task_deleted: "Task deleted",
+  scheduling_request_created: "Scheduling request created",
+  scheduling_request_converted: "Scheduling request converted",
+  appointment_created: "Appointment created",
+  appointment_status_changed: "Appointment status changed",
+  appointment_cancelled: "Appointment cancelled",
+  appointment_completed: "Appointment completed",
 };
+
+const SCHEDULING_EVENTS = new Set([
+  "scheduling_request_created",
+  "scheduling_request_converted",
+  "appointment_created",
+  "appointment_status_changed",
+  "appointment_cancelled",
+  "appointment_completed",
+]);
 
 function formatEventLabel(type: string): string {
   return EVENT_LABELS[type] || type.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
@@ -76,7 +91,14 @@ export default function CrmActivityTab({ leadId }: Props) {
     <div className="space-y-0">
       {items.map((item, i) => (
         <div key={item.id || i} className="flex gap-3 py-2.5 border-b border-border last:border-0">
-          <div className="mt-0.5 text-muted-foreground"><Clock size={14} /></div>
+          <div className="mt-0.5 text-muted-foreground">
+            {SCHEDULING_EVENTS.has(item.event_type || item.type)
+              ? (item.event_type || item.type || "").includes("appointment")
+                ? <CalendarCheck size={14} className="text-accent" />
+                : <CalendarDays size={14} className="text-accent" />
+              : <Clock size={14} />
+            }
+          </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium">{formatEventLabel(item.event_type || item.type)}</p>
             {item.metadata && typeof item.metadata === "object" && (
