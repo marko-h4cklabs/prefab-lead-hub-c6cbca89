@@ -76,6 +76,61 @@ const defaultWorkingHours = (): Record<string, DaySchedule> => {
   return hours;
 };
 
+/**
+ * Normalize working_hours from backend (may be array or object) into the
+ * Record<string, DaySchedule> shape used by the UI.
+ */
+function normalizeWorkingHoursFromApi(raw: unknown): Record<string, DaySchedule> {
+  const fallback = defaultWorkingHours();
+  if (!raw) return fallback;
+
+  // Backend canonical: array of { day, enabled, ranges }
+  if (Array.isArray(raw)) {
+    const result = { ...fallback };
+    raw.forEach((item: any) => {
+      const day = String(item?.day || "").toLowerCase();
+      if (DAYS.includes(day)) {
+        result[day] = {
+          enabled: Boolean(item.enabled),
+          ranges: Array.isArray(item.ranges) && item.ranges.length
+            ? item.ranges.map((r: any) => ({ start: r.start || "09:00", end: r.end || "17:00" }))
+            : [{ start: "09:00", end: "17:00" }],
+        };
+      }
+    });
+    return result;
+  }
+
+  // Legacy: object keyed by day name
+  if (typeof raw === "object") {
+    const result = { ...fallback };
+    for (const [key, val] of Object.entries(raw as Record<string, any>)) {
+      const day = key.toLowerCase();
+      if (DAYS.includes(day) && val && typeof val === "object") {
+        result[day] = {
+          enabled: Boolean(val.enabled),
+          ranges: Array.isArray(val.ranges) && val.ranges.length
+            ? val.ranges.map((r: any) => ({ start: r.start || "09:00", end: r.end || "17:00" }))
+            : [{ start: "09:00", end: "17:00" }],
+        };
+      }
+    }
+    return result;
+  }
+
+  return fallback;
+}
+
+/**
+ * Convert UI working_hours object back to backend canonical ARRAY shape.
+ */
+function workingHoursToArray(obj: Record<string, DaySchedule>): Array<{ day: string; enabled: boolean; ranges: TimeRange[] }> {
+  return DAYS.map((day) => {
+    const d = obj[day] || { enabled: false, ranges: [{ start: "09:00", end: "17:00" }] };
+    return { day, enabled: d.enabled, ranges: Array.isArray(d.ranges) ? d.ranges : [{ start: "09:00", end: "17:00" }] };
+  });
+}
+
 const defaultConfig = (): SchedulingConfig => ({
   scheduling_enabled: true,
   chatbot_offers_booking: false,
@@ -104,10 +159,13 @@ export default function SchedulingSettings() {
   useEffect(() => {
     api.getSchedulingSettings()
       .then((res) => {
+        console.log("[SchedulingSettings] Loaded payload shape:", res);
         const merged = { ...defaultConfig(), ...res };
-        if (res?.working_hours) {
-          merged.working_hours = { ...defaultWorkingHours(), ...res.working_hours };
-        }
+        // Normalize working_hours from any shape
+        merged.working_hours = normalizeWorkingHoursFromApi(res?.working_hours);
+        // Ensure array fields are safe
+        merged.default_appointment_types = Array.isArray(merged.default_appointment_types)
+          ? merged.default_appointment_types : defaultConfig().default_appointment_types;
         setConfig(merged);
         setOriginal(JSON.stringify(merged));
       })
@@ -122,7 +180,13 @@ export default function SchedulingSettings() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await api.updateSchedulingSettings(config);
+      // Build payload with working_hours as array (backend canonical shape)
+      const payload = {
+        ...config,
+        working_hours: workingHoursToArray(config.working_hours),
+      };
+      console.log("[SchedulingSettings] Saving payload:", payload);
+      await api.updateSchedulingSettings(payload);
       setOriginal(JSON.stringify(config));
       toast({ title: "Scheduling settings saved" });
     } catch (err) {
