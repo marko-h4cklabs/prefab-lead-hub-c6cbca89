@@ -31,6 +31,8 @@ interface DashboardData {
   status_breakdown?: { status: string; count: number; name?: string }[];
   field_completion?: { field: string; collected: number; eligible: number; rate: number }[];
   top_signals?: { channel: string; leads: number; conversations: number; conversion: number }[];
+  available_channels?: string[];
+  applied_filters?: { range?: number; source?: string; channel?: string };
 }
 
 const RANGE_OPTIONS: { value: 7 | 30 | 90; label: string }[] = [
@@ -64,12 +66,24 @@ const Analytics = () => {
   const [error, setError] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
+  const [availableChannels, setAvailableChannels] = useState<string[]>([]);
+  const [channelsLoaded, setChannelsLoaded] = useState(false);
+
   const fetchData = useCallback(async (f: Filters) => {
     setLoading(true);
     setError("");
     try {
       const res = await api.getAnalyticsDashboard(f);
       setData(res);
+      // Update available channels from backend
+      if (res?.available_channels) {
+        setAvailableChannels(res.available_channels);
+        // Reset channel filter if selected channel no longer exists
+        if (f.channel !== "all" && !res.available_channels.includes(f.channel)) {
+          setFilters((p) => ({ ...p, channel: "all" }));
+        }
+      }
+      setChannelsLoaded(true);
       setLastUpdated(new Date());
     } catch (err: unknown) {
       const msg = getErrorMessage(err);
@@ -83,9 +97,11 @@ const Analytics = () => {
   useEffect(() => { fetchData(filters); }, [filters, fetchData]);
 
   const channelOptions = useMemo(() => {
-    const channels = (data?.channel_breakdown ?? []).map((c) => c.channel).filter(Boolean);
-    return [{ value: "all", label: "All Channels" }, ...channels.map((c) => ({ value: c, label: c }))];
-  }, [data?.channel_breakdown]);
+    return [
+      { value: "all", label: "All Channels" },
+      ...availableChannels.map((c) => ({ value: c, label: c })),
+    ];
+  }, [availableChannels]);
 
   const s = data?.summary ?? {};
 
@@ -155,10 +171,15 @@ const Analytics = () => {
           value={filters.channel}
           onChange={(e) => setFilters((p) => ({ ...p, channel: e.target.value }))}
           className="industrial-input py-1.5 text-xs"
+          disabled={!channelsLoaded}
         >
-          {channelOptions.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
+          {!channelsLoaded ? (
+            <option value="all">Loading channels…</option>
+          ) : (
+            channelOptions.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))
+          )}
         </select>
       </div>
 
@@ -189,7 +210,7 @@ const Analytics = () => {
           <div className="industrial-card p-6">
             <h2 className="text-sm font-bold uppercase tracking-wider mb-4">Leads Over Time</h2>
             {loading ? <Skeleton className="h-64 w-full" /> : (
-              <ChartLeadsOverTime data={data?.leads_over_time ?? []} />
+              <ChartLeadsOverTime data={data?.leads_over_time ?? []} emptyMsg={getEmptyMessage(filters)} />
             )}
           </div>
 
@@ -198,13 +219,13 @@ const Analytics = () => {
             <div className="industrial-card p-6">
               <h2 className="text-sm font-bold uppercase tracking-wider mb-4">Channel Breakdown</h2>
               {loading ? <Skeleton className="h-56 w-full" /> : (
-                <ChartChannelBreakdown data={data?.channel_breakdown ?? []} />
+                <ChartChannelBreakdown data={data?.channel_breakdown ?? []} emptyMsg={getEmptyMessage(filters)} />
               )}
             </div>
             <div className="industrial-card p-6">
               <h2 className="text-sm font-bold uppercase tracking-wider mb-4">Status Breakdown</h2>
               {loading ? <Skeleton className="h-56 w-full" /> : (
-                <ChartStatusBreakdown data={data?.status_breakdown ?? []} />
+                <ChartStatusBreakdown data={data?.status_breakdown ?? []} emptyMsg={getEmptyMessage(filters)} />
               )}
             </div>
           </div>
@@ -245,14 +266,20 @@ function KpiCard({ label, value, icon, loading }: { label: string; value?: numbe
 
 function EmptyChart({ message }: { message: string }) {
   return (
-    <div className="flex items-center justify-center h-56 text-sm text-muted-foreground">
+    <div className="flex items-center justify-center h-56 text-sm text-muted-foreground text-center px-4">
       <p>{message}</p>
     </div>
   );
 }
 
-function ChartLeadsOverTime({ data }: { data: DashboardData["leads_over_time"] }) {
-  if (!data || data.length === 0) return <EmptyChart message="No leads data yet. Start collecting leads to populate analytics." />;
+function getEmptyMessage(filters: Filters): string {
+  if (filters.source === "simulation") return "No simulation leads found for this period.";
+  if (filters.source === "inbox") return "No inbox leads found for this period.";
+  return "No leads found for this period. Try switching to 30D/90D or a different source.";
+}
+
+function ChartLeadsOverTime({ data, emptyMsg }: { data: DashboardData["leads_over_time"]; emptyMsg: string }) {
+  if (!data || data.length === 0) return <EmptyChart message={emptyMsg} />;
   const hasBreakdown = data.some((d) => d.inbox != null);
 
   return (
@@ -276,8 +303,8 @@ function ChartLeadsOverTime({ data }: { data: DashboardData["leads_over_time"] }
   );
 }
 
-function ChartChannelBreakdown({ data }: { data: DashboardData["channel_breakdown"] }) {
-  if (!data || data.length === 0) return <EmptyChart message="No channel data yet." />;
+function ChartChannelBreakdown({ data, emptyMsg }: { data: DashboardData["channel_breakdown"]; emptyMsg: string }) {
+  if (!data || data.length === 0) return <EmptyChart message={emptyMsg} />;
   const sorted = [...data].sort((a, b) => b.count - a.count);
 
   return (
@@ -293,8 +320,8 @@ function ChartChannelBreakdown({ data }: { data: DashboardData["channel_breakdow
   );
 }
 
-function ChartStatusBreakdown({ data }: { data: DashboardData["status_breakdown"] }) {
-  if (!data || data.length === 0) return <EmptyChart message="No status data yet." />;
+function ChartStatusBreakdown({ data, emptyMsg }: { data: DashboardData["status_breakdown"]; emptyMsg: string }) {
+  if (!data || data.length === 0) return <EmptyChart message={emptyMsg} />;
 
   return (
     <ResponsiveContainer width="100%" height={240}>
