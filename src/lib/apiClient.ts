@@ -359,6 +359,15 @@ export const api = {
   deleteLeadTask: (leadId: string, taskId: string) =>
     request<any>(`/api/leads/${leadId}/crm/tasks/${taskId}`, { method: "DELETE" }),
 
+  // --- Analytics ---
+  getAnalyticsDashboard: (params: { range?: number; source?: string; channel?: string }) => {
+    const search = new URLSearchParams();
+    if (params.range !== undefined) search.set("range", String(params.range));
+    if (params.source && params.source !== "all") search.set("source", params.source);
+    if (params.channel && params.channel !== "all") search.set("channel", params.channel);
+    return request<any>(`/api/analytics/dashboard?${search.toString()}`);
+  },
+
   // --- Admin ---
   runSnapshot: () =>
     request<any>("/api/admin/snapshot", { method: "POST" }),
