@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api } from "@/lib/apiClient";
+import { api, getCompanyId } from "@/lib/apiClient";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { RefreshCw, TrendingUp, Users, MessageSquare, CheckCircle, BarChart3, Inbox } from "lucide-react";
@@ -78,7 +78,10 @@ const Analytics = () => {
         source: f.source.toLowerCase(),
         channel: f.channel.toLowerCase(),
       };
+      const cid = getCompanyId();
+      console.log("[Analytics] companyId:", cid);
       console.log("[Analytics] fetch params:", params);
+      console.log("[Analytics] request URL:", `/api/analytics/dashboard?range=${params.range}&source=${params.source}&channel=${params.channel}`);
       const raw = await api.getAnalyticsDashboard(params);
 
       // Normalize: backend may wrap payload in { data: {...} } or return flat

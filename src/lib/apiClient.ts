@@ -52,6 +52,8 @@ async function request<T>(
 ): Promise<T> {
   const token = getAuthToken();
 
+  const companyId = getCompanyId();
+
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
@@ -59,6 +61,9 @@ async function request<T>(
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
+  }
+  if (companyId) {
+    headers["x-company-id"] = companyId;
   }
 
   const res = await fetch(`${API_BASE}${path}`, {
