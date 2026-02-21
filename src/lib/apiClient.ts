@@ -315,6 +315,50 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  // --- CRM ---
+  getLeadCrmSummary: (leadId: string) =>
+    request<any>(`/api/leads/${leadId}/crm/summary`),
+
+  getLeadActivity: (leadId: string, params?: { limit?: number; offset?: number }) => {
+    const search = new URLSearchParams();
+    if (params?.limit !== undefined) search.set("limit", String(params.limit));
+    if (params?.offset !== undefined) search.set("offset", String(params.offset));
+    return request<any>(`/api/leads/${leadId}/crm/activity?${search.toString()}`);
+  },
+
+  getLeadNotes: (leadId: string, params?: { limit?: number; offset?: number }) => {
+    const search = new URLSearchParams();
+    if (params?.limit !== undefined) search.set("limit", String(params.limit));
+    if (params?.offset !== undefined) search.set("offset", String(params.offset));
+    return request<any>(`/api/leads/${leadId}/crm/notes?${search.toString()}`);
+  },
+
+  createLeadNote: (leadId: string, body: { content: string }) =>
+    request<any>(`/api/leads/${leadId}/crm/notes`, { method: "POST", body: JSON.stringify(body) }),
+
+  updateLeadNote: (leadId: string, noteId: string, body: { content: string }) =>
+    request<any>(`/api/leads/${leadId}/crm/notes/${noteId}`, { method: "PATCH", body: JSON.stringify(body) }),
+
+  deleteLeadNote: (leadId: string, noteId: string) =>
+    request<any>(`/api/leads/${leadId}/crm/notes/${noteId}`, { method: "DELETE" }),
+
+  getLeadTasks: (leadId: string, params?: { limit?: number; offset?: number; status?: string }) => {
+    const search = new URLSearchParams();
+    if (params?.limit !== undefined) search.set("limit", String(params.limit));
+    if (params?.offset !== undefined) search.set("offset", String(params.offset));
+    if (params?.status) search.set("status", params.status);
+    return request<any>(`/api/leads/${leadId}/crm/tasks?${search.toString()}`);
+  },
+
+  createLeadTask: (leadId: string, payload: { title: string; description?: string; due_at?: string }) =>
+    request<any>(`/api/leads/${leadId}/crm/tasks`, { method: "POST", body: JSON.stringify(payload) }),
+
+  updateLeadTask: (leadId: string, taskId: string, payload: { title?: string; description?: string; due_at?: string; status?: string }) =>
+    request<any>(`/api/leads/${leadId}/crm/tasks/${taskId}`, { method: "PATCH", body: JSON.stringify(payload) }),
+
+  deleteLeadTask: (leadId: string, taskId: string) =>
+    request<any>(`/api/leads/${leadId}/crm/tasks/${taskId}`, { method: "DELETE" }),
+
   // --- Admin ---
   runSnapshot: () =>
     request<any>("/api/admin/snapshot", { method: "POST" }),
