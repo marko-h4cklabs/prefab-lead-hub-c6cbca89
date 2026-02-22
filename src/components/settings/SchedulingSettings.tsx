@@ -195,8 +195,8 @@ export default function SchedulingSettings() {
           allow_custom_time: Boolean(pick(defaults.allow_custom_time, cb.allow_custom_time, res?.allow_custom_time)),
           show_available_slots: Boolean(pick(defaults.show_available_slots, cb.show_available_slots, res?.show_available_slots)),
           booking_prompt_style: String(pick(defaults.booking_prompt_style, cb.booking_prompt_style, res?.booking_prompt_style)),
-          require_name: Boolean(pick(defaults.require_name, cb.require_name, res?.require_name)),
-          require_phone: Boolean(pick(defaults.require_phone, cb.require_phone, res?.require_phone)),
+          require_name: Boolean(pick(defaults.require_name, res?.chatbotBookingRequiresName, cb.require_name, res?.require_name)),
+          require_phone: Boolean(pick(defaults.require_phone, res?.chatbotBookingRequiresPhone, cb.require_phone, res?.require_phone)),
         };
 
         console.log("[SchedulingSettings] Hydrated config:", hydrated);
@@ -243,9 +243,56 @@ export default function SchedulingSettings() {
           require_phone: config.require_phone,
         },
       };
-      console.log("[SchedulingSettings] Saving payload (canonical):", payload);
-      await api.updateSchedulingSettings(payload);
-      setOriginal(JSON.stringify(config));
+      // Also send top-level aliases for backend compatibility
+      const fullPayload = {
+        ...payload,
+        chatbotBookingRequiresName: config.require_name,
+        chatbotBookingRequiresPhone: config.require_phone,
+        require_name: config.require_name,
+        require_phone: config.require_phone,
+      };
+      console.log("[SchedulingSettings] Saving payload (canonical):", fullPayload);
+      await api.updateSchedulingSettings(fullPayload);
+      // Re-fetch to hydrate from server truth
+      try {
+        const fresh = await api.getSchedulingSettings();
+        const cb2 = (fresh?.chatbot_booking && typeof fresh.chatbot_booking === "object")
+          ? fresh.chatbot_booking as Record<string, unknown> : {};
+        const pick2 = <T,>(fb: T, ...cs: unknown[]): T => {
+          for (const c of cs) if (c !== undefined && c !== null) return c as T;
+          return fb;
+        };
+        const defs = defaultConfig();
+        const refreshed: SchedulingConfig = {
+          scheduling_enabled: Boolean(pick2(defs.scheduling_enabled, fresh?.scheduling_enabled)),
+          allow_manual_booking: Boolean(pick2(defs.allow_manual_booking, fresh?.allow_manual_booking)),
+          timezone: String(pick2(defs.timezone, fresh?.timezone)),
+          default_appointment_types: Array.isArray(fresh?.default_appointment_types) ? fresh.default_appointment_types : defs.default_appointment_types,
+          slot_duration_minutes: Number(pick2(defs.slot_duration_minutes, fresh?.slot_duration_minutes)),
+          buffer_before_minutes: Number(pick2(defs.buffer_before_minutes, fresh?.buffer_before_minutes)),
+          buffer_after_minutes: Number(pick2(defs.buffer_after_minutes, fresh?.buffer_after_minutes)),
+          minimum_notice_hours: Number(pick2(defs.minimum_notice_hours, fresh?.minimum_notice_hours)),
+          max_days_ahead: Number(pick2(defs.max_days_ahead, fresh?.max_days_ahead)),
+          working_hours: normalizeWorkingHoursFromApi(fresh?.working_hours),
+          in_app_reminders: Boolean(pick2(defs.in_app_reminders, fresh?.in_app_reminders)),
+          email_reminders: Boolean(pick2(defs.email_reminders, fresh?.email_reminders)),
+          reminder_lead_time_minutes: Number(pick2(defs.reminder_lead_time_minutes, fresh?.reminder_lead_time_minutes)),
+          chatbot_booking_enabled: Boolean(pick2(defs.chatbot_booking_enabled, cb2.chatbot_booking_enabled, cb2.enabled, fresh?.chatbot_booking_enabled)),
+          booking_mode: String(pick2(defs.booking_mode, cb2.booking_mode, fresh?.booking_mode)),
+          ask_after_quote: Boolean(pick2(defs.ask_after_quote, cb2.ask_after_quote, fresh?.ask_after_quote)),
+          default_booking_type: String(pick2(defs.default_booking_type, cb2.default_booking_type, fresh?.default_booking_type)),
+          allow_custom_time: Boolean(pick2(defs.allow_custom_time, cb2.allow_custom_time, fresh?.allow_custom_time)),
+          show_available_slots: Boolean(pick2(defs.show_available_slots, cb2.show_available_slots, fresh?.show_available_slots)),
+          booking_prompt_style: String(pick2(defs.booking_prompt_style, cb2.booking_prompt_style, fresh?.booking_prompt_style)),
+          require_name: Boolean(pick2(defs.require_name, fresh?.chatbotBookingRequiresName, cb2.require_name, fresh?.require_name)),
+          require_phone: Boolean(pick2(defs.require_phone, fresh?.chatbotBookingRequiresPhone, cb2.require_phone, fresh?.require_phone)),
+        };
+        setConfig(refreshed);
+        setOriginal(JSON.stringify(refreshed));
+      } catch (_) {
+        // If re-fetch fails, just keep local state
+        setOriginal(JSON.stringify(config));
+      }
       toast({ title: "Scheduling settings saved" });
     } catch (err) {
       toast({ title: "Failed to save", description: getErrorMessage(err), variant: "destructive" });

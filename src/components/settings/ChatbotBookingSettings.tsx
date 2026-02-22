@@ -133,16 +133,22 @@ export default function ChatbotBookingSettings({ config, onChange }: Props) {
         </div>
 
         <div className="mt-4 space-y-3">
-          <ToggleRow
-            label="Require name before booking request"
-            checked={config.require_name}
-            onChange={(v) => set("require_name", v)}
-          />
-          <ToggleRow
-            label="Require phone before booking request"
-            checked={config.require_phone}
-            onChange={(v) => set("require_phone", v)}
-          />
+          <div>
+            <ToggleRow
+              label="Require name before booking request"
+              checked={!!config.require_name}
+              onChange={(v) => set("require_name", v)}
+            />
+            <p className="text-[10px] text-muted-foreground mt-0.5 ml-0.5">If enabled, chatbot will collect this before sending a booking request.</p>
+          </div>
+          <div>
+            <ToggleRow
+              label="Require phone before booking request"
+              checked={!!config.require_phone}
+              onChange={(v) => set("require_phone", v)}
+            />
+            <p className="text-[10px] text-muted-foreground mt-0.5 ml-0.5">If enabled, chatbot will collect this before sending a booking request.</p>
+          </div>
         </div>
       </div>
     </div>
