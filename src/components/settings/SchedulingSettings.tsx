@@ -160,12 +160,34 @@ export default function SchedulingSettings() {
     api.getSchedulingSettings()
       .then((res) => {
         console.log("[SchedulingSettings] Loaded payload shape:", res);
-        const merged = { ...defaultConfig(), ...res };
+        const defaults = defaultConfig();
+
+        // Flatten chatbot_booking sub-object if backend nests it
+        const chatbotBooking = res?.chatbot_booking && typeof res.chatbot_booking === "object"
+          ? res.chatbot_booking as Record<string, unknown>
+          : {};
+
+        // Merge: defaults ← top-level response ← nested chatbot_booking (higher priority)
+        const merged: SchedulingConfig = {
+          ...defaults,
+          ...res,
+          ...chatbotBooking,
+        };
+
         // Normalize working_hours from any shape
         merged.working_hours = normalizeWorkingHoursFromApi(res?.working_hours);
         // Ensure array fields are safe
         merged.default_appointment_types = Array.isArray(merged.default_appointment_types)
-          ? merged.default_appointment_types : defaultConfig().default_appointment_types;
+          ? merged.default_appointment_types : defaults.default_appointment_types;
+        // Ensure booleans are actual booleans (not undefined)
+        merged.chatbot_booking_enabled = Boolean(merged.chatbot_booking_enabled);
+        merged.ask_after_quote = Boolean(merged.ask_after_quote);
+        merged.allow_custom_time = Boolean(merged.allow_custom_time);
+        merged.show_available_slots = Boolean(merged.show_available_slots);
+        merged.require_name = Boolean(merged.require_name);
+        merged.require_phone = Boolean(merged.require_phone);
+
+        console.log("[SchedulingSettings] Resolved chatbot_booking_enabled:", merged.chatbot_booking_enabled);
         setConfig(merged);
         setOriginal(JSON.stringify(merged));
       })
@@ -181,9 +203,33 @@ export default function SchedulingSettings() {
     setSaving(true);
     try {
       // Build payload with working_hours as array (backend canonical shape)
+      const { chatbot_booking_enabled, booking_mode, ask_after_quote, default_booking_type,
+        allow_custom_time, show_available_slots, booking_prompt_style, require_name, require_phone,
+        ...rest } = config;
       const payload = {
-        ...config,
+        ...rest,
         working_hours: workingHoursToArray(config.working_hours),
+        // Send chatbot booking fields both flat AND nested for backend compatibility
+        chatbot_booking_enabled,
+        booking_mode,
+        ask_after_quote,
+        default_booking_type,
+        allow_custom_time,
+        show_available_slots,
+        booking_prompt_style,
+        require_name,
+        require_phone,
+        chatbot_booking: {
+          chatbot_booking_enabled,
+          booking_mode,
+          ask_after_quote,
+          default_booking_type,
+          allow_custom_time,
+          show_available_slots,
+          booking_prompt_style,
+          require_name,
+          require_phone,
+        },
       };
       console.log("[SchedulingSettings] Saving payload:", payload);
       await api.updateSchedulingSettings(payload);
