@@ -447,20 +447,41 @@ export const api = {
 
   // --- Chatbot Booking ---
   bookSlot: async (companyId: string, leadId: string, data: {
-    slot_id?: string; start: string; end?: string; conversation_id?: string;
+    slot_id?: string; startAt: string; endAt?: string; conversation_id?: string;
     appointment_type?: string; timezone?: string; source?: string; title?: string; notes?: string;
   }) => {
+    // Canonical payload with both snake_case and camelCase for backend compat
+    const payload = {
+      company_id: companyId,
+      companyId,
+      lead_id: leadId,
+      leadId,
+      slot_id: data.slot_id,
+      startAt: data.startAt,
+      start_at: data.startAt,
+      start: data.startAt,
+      endAt: data.endAt,
+      end_at: data.endAt,
+      end: data.endAt,
+      appointment_type: data.appointment_type,
+      appointmentType: data.appointment_type,
+      timezone: data.timezone,
+      source: data.source || "chatbot",
+      title: data.title,
+      notes: data.notes,
+      conversation_id: data.conversation_id,
+    };
     // Try canonical endpoint first, fallback to legacy
     try {
       return await request<any>(`/api/scheduling/book-slot`, {
         method: "POST",
-        body: JSON.stringify({ company_id: companyId, lead_id: leadId, ...data }),
+        body: JSON.stringify(payload),
       });
     } catch (err: any) {
       if (err?.message?.includes("404") || err?.message?.includes("Not Found")) {
         return request<any>(`/api/companies/${companyId}/leads/${leadId}/book-slot`, {
           method: "POST",
-          body: JSON.stringify(data),
+          body: JSON.stringify(payload),
         });
       }
       throw err;

@@ -73,6 +73,7 @@ const Conversation = () => {
     slotsError: string | null;
     lastEndpoint: string | null;
     lastError: string | null;
+    lastPayloadKeys: string | null;
   }>({
     offered: false,
     awaitingSlotSelection: false,
@@ -82,6 +83,7 @@ const Conversation = () => {
     slotsError: null,
     lastEndpoint: null,
     lastError: null,
+    lastPayloadKeys: null,
   });
 
   // Debug panel visibility (simulation only)
@@ -215,6 +217,7 @@ const Conversation = () => {
         bookedAppointmentId: updated.appointment_id || updated.appointment?.id || "confirmed",
         awaitingSlotSelection: false,
         lastEndpoint: "book-slot",
+        lastPayloadKeys: updated.confirmed_slot ? Object.keys(updated.confirmed_slot).join(",") : null,
       }));
     }
   };
@@ -737,6 +740,7 @@ const Conversation = () => {
                 <div>reason: {bookingFlowState.lastOfferReason || "—"}</div>
                 <div>endpoint: {bookingFlowState.lastEndpoint || "—"}</div>
                 <div>error: {bookingFlowState.lastError || "—"}</div>
+                <div>lastPayloadKeys: {bookingFlowState.lastPayloadKeys || "—"}</div>
                 <button
                   onClick={() => {
                     const convKey = conversationId || leadId || "";
@@ -744,7 +748,7 @@ const Conversation = () => {
                     setBookingFlowState({
                       offered: false, awaitingSlotSelection: false, dismissed: false,
                       bookedAppointmentId: null, lastOfferReason: null, slotsError: null,
-                      lastEndpoint: null, lastError: null,
+                      lastEndpoint: null, lastError: null, lastPayloadKeys: null,
                     });
                   }}
                   className="mt-1 text-accent hover:underline"
