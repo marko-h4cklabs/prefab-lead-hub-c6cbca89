@@ -158,38 +158,54 @@ export default function SchedulingSettings() {
 
   useEffect(() => {
     api.getSchedulingSettings()
-      .then((res) => {
-        console.log("[SchedulingSettings] Loaded payload shape:", res);
+      .then((res: any) => {
+        console.log("[SchedulingSettings] Raw API response:", res);
         const defaults = defaultConfig();
 
-        // Flatten chatbot_booking sub-object if backend nests it
-        const chatbotBooking = res?.chatbot_booking && typeof res.chatbot_booking === "object"
+        // Extract chatbot_booking nested object (canonical source for chatbot fields)
+        const cb = (res?.chatbot_booking && typeof res.chatbot_booking === "object")
           ? res.chatbot_booking as Record<string, unknown>
           : {};
 
-        // Merge: defaults ← top-level response ← nested chatbot_booking (higher priority)
-        const merged: SchedulingConfig = {
-          ...defaults,
-          ...res,
-          ...chatbotBooking,
+        // Helper: pick first defined value from candidates
+        const pick = <T,>(fallback: T, ...candidates: unknown[]): T => {
+          for (const c of candidates) if (c !== undefined && c !== null) return c as T;
+          return fallback;
         };
 
-        // Normalize working_hours from any shape
-        merged.working_hours = normalizeWorkingHoursFromApi(res?.working_hours);
-        // Ensure array fields are safe
-        merged.default_appointment_types = Array.isArray(merged.default_appointment_types)
-          ? merged.default_appointment_types : defaults.default_appointment_types;
-        // Ensure booleans are actual booleans (not undefined)
-        merged.chatbot_booking_enabled = Boolean(merged.chatbot_booking_enabled);
-        merged.ask_after_quote = Boolean(merged.ask_after_quote);
-        merged.allow_custom_time = Boolean(merged.allow_custom_time);
-        merged.show_available_slots = Boolean(merged.show_available_slots);
-        merged.require_name = Boolean(merged.require_name);
-        merged.require_phone = Boolean(merged.require_phone);
+        // Hydrate from canonical fields only — ignore aliases
+        const hydrated: SchedulingConfig = {
+          scheduling_enabled: Boolean(pick(defaults.scheduling_enabled, res?.scheduling_enabled)),
+          chatbot_offers_booking: Boolean(pick(defaults.chatbot_offers_booking, res?.chatbot_offers_booking)),
+          allow_manual_booking: Boolean(pick(defaults.allow_manual_booking, res?.allow_manual_booking)),
+          timezone: String(pick(defaults.timezone, res?.timezone)),
+          default_appointment_types: Array.isArray(res?.default_appointment_types)
+            ? res.default_appointment_types : defaults.default_appointment_types,
+          slot_duration_minutes: Number(pick(defaults.slot_duration_minutes, res?.slot_duration_minutes)),
+          buffer_before_minutes: Number(pick(defaults.buffer_before_minutes, res?.buffer_before_minutes)),
+          buffer_after_minutes: Number(pick(defaults.buffer_after_minutes, res?.buffer_after_minutes)),
+          minimum_notice_hours: Number(pick(defaults.minimum_notice_hours, res?.minimum_notice_hours)),
+          max_days_ahead: Number(pick(defaults.max_days_ahead, res?.max_days_ahead)),
+          working_hours: normalizeWorkingHoursFromApi(res?.working_hours),
+          in_app_reminders: Boolean(pick(defaults.in_app_reminders, res?.in_app_reminders)),
+          email_reminders: Boolean(pick(defaults.email_reminders, res?.email_reminders)),
+          reminder_lead_time_minutes: Number(pick(defaults.reminder_lead_time_minutes, res?.reminder_lead_time_minutes)),
+          // Chatbot booking: prefer nested cb.* over top-level aliases
+          chatbot_booking_enabled: Boolean(pick(defaults.chatbot_booking_enabled, cb.chatbot_booking_enabled, cb.enabled, res?.chatbot_booking_enabled)),
+          booking_mode: String(pick(defaults.booking_mode, cb.booking_mode, res?.booking_mode)),
+          ask_after_quote: Boolean(pick(defaults.ask_after_quote, cb.ask_after_quote, res?.ask_after_quote)),
+          default_booking_type: String(pick(defaults.default_booking_type, cb.default_booking_type, res?.default_booking_type)),
+          allow_custom_time: Boolean(pick(defaults.allow_custom_time, cb.allow_custom_time, res?.allow_custom_time)),
+          show_available_slots: Boolean(pick(defaults.show_available_slots, cb.show_available_slots, res?.show_available_slots)),
+          booking_prompt_style: String(pick(defaults.booking_prompt_style, cb.booking_prompt_style, res?.booking_prompt_style)),
+          require_name: Boolean(pick(defaults.require_name, cb.require_name, res?.require_name)),
+          require_phone: Boolean(pick(defaults.require_phone, cb.require_phone, res?.require_phone)),
+        };
 
-        console.log("[SchedulingSettings] Resolved chatbot_booking_enabled:", merged.chatbot_booking_enabled);
-        setConfig(merged);
-        setOriginal(JSON.stringify(merged));
+        console.log("[SchedulingSettings] Hydrated config:", hydrated);
+        console.log("[SchedulingSettings] chatbot_booking_enabled =", hydrated.chatbot_booking_enabled);
+        setConfig(hydrated);
+        setOriginal(JSON.stringify(hydrated));
       })
       .catch((err) => {
         setFetchError(getErrorMessage(err));
@@ -202,36 +218,36 @@ export default function SchedulingSettings() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Build payload with working_hours as array (backend canonical shape)
-      const { chatbot_booking_enabled, booking_mode, ask_after_quote, default_booking_type,
-        allow_custom_time, show_available_slots, booking_prompt_style, require_name, require_phone,
-        ...rest } = config;
+      // Whitelist-only payload — no spreading of raw API response
       const payload = {
-        ...rest,
+        scheduling_enabled: config.scheduling_enabled,
+        chatbot_offers_booking: config.chatbot_offers_booking,
+        allow_manual_booking: config.allow_manual_booking,
+        timezone: config.timezone,
+        default_appointment_types: config.default_appointment_types,
+        slot_duration_minutes: config.slot_duration_minutes,
+        buffer_before_minutes: config.buffer_before_minutes,
+        buffer_after_minutes: config.buffer_after_minutes,
+        minimum_notice_hours: config.minimum_notice_hours,
+        max_days_ahead: config.max_days_ahead,
         working_hours: workingHoursToArray(config.working_hours),
-        // Send chatbot booking fields both flat AND nested for backend compatibility
-        chatbot_booking_enabled,
-        booking_mode,
-        ask_after_quote,
-        default_booking_type,
-        allow_custom_time,
-        show_available_slots,
-        booking_prompt_style,
-        require_name,
-        require_phone,
+        in_app_reminders: config.in_app_reminders,
+        email_reminders: config.email_reminders,
+        reminder_lead_time_minutes: config.reminder_lead_time_minutes,
+        // Single canonical nested object for chatbot booking
         chatbot_booking: {
-          chatbot_booking_enabled,
-          booking_mode,
-          ask_after_quote,
-          default_booking_type,
-          allow_custom_time,
-          show_available_slots,
-          booking_prompt_style,
-          require_name,
-          require_phone,
+          chatbot_booking_enabled: config.chatbot_booking_enabled,
+          booking_mode: config.booking_mode,
+          ask_after_quote: config.ask_after_quote,
+          default_booking_type: config.default_booking_type,
+          allow_custom_time: config.allow_custom_time,
+          show_available_slots: config.show_available_slots,
+          booking_prompt_style: config.booking_prompt_style,
+          require_name: config.require_name,
+          require_phone: config.require_phone,
         },
       };
-      console.log("[SchedulingSettings] Saving payload:", payload);
+      console.log("[SchedulingSettings] Saving payload (canonical):", payload);
       await api.updateSchedulingSettings(payload);
       setOriginal(JSON.stringify(config));
       toast({ title: "Scheduling settings saved" });
