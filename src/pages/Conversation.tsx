@@ -6,6 +6,7 @@ import { ArrowLeft, Send, Loader2, Bot, Timer, ImagePlus, CalendarDays } from "l
 import { toast } from "@/hooks/use-toast";
 import PicturesThumbnails from "@/components/PicturesThumbnails";
 import BookingPanel, { BookingPayload, getBookingFlowLabel } from "@/components/conversation/BookingPanel";
+import { processAiReply, detectBookingIntent } from "@/lib/bookingOrchestrator";
 
 interface QuickReply {
   label: string;
@@ -119,26 +120,35 @@ const Conversation = () => {
     return undefined;
   };
 
-  const applyBackendResponse = (res: any) => {
+  const applyBackendResponse = async (res: any, lastUserMsg?: string) => {
     applyResponseFields(res);
-    if (res?.assistant_message !== undefined) {
-      if (res.conversation_id) setConversationId(res.conversation_id);
-      const quickReplies: QuickReply[] | undefined = Array.isArray(res.quick_replies)
-        ? res.quick_replies
+
+    // Run booking orchestrator shim to inject booking metadata if backend didn't
+    const convKey = conversationId || leadId || "";
+    let finalRes = res;
+    try {
+      const augmented = await processAiReply(res, convKey, lastUserMsg);
+      if (augmented) finalRes = augmented;
+    } catch { /* orchestrator failed, use original response */ }
+
+    if (finalRes?.assistant_message !== undefined) {
+      if (finalRes.conversation_id) setConversationId(finalRes.conversation_id);
+      const quickReplies: QuickReply[] | undefined = Array.isArray(finalRes.quick_replies)
+        ? finalRes.quick_replies
         : undefined;
-      const booking = extractBooking(res);
+      const booking = extractBooking(finalRes);
       setData((prev) => {
         const msgs = prev?.messages || [];
         return {
           ...prev,
           lead_id: prev?.lead_id || leadId || "",
-          messages: [...msgs, { role: "assistant", content: res.assistant_message, quick_replies: quickReplies, booking }],
+          messages: [...msgs, { role: "assistant", content: finalRes.assistant_message, quick_replies: quickReplies, booking }],
           parsed_fields: prev?.parsed_fields || {},
           current_step: prev?.current_step ?? 0,
         };
       });
     } else {
-      setData(res);
+      setData(finalRes);
     }
   };
 
@@ -158,7 +168,7 @@ const Conversation = () => {
     setAiReplying(true);
     try {
       const res = await api.aiReply(companyId, leadId);
-      applyBackendResponse(res);
+      await applyBackendResponse(res);
     } catch {
       toast({ title: "Error", description: "Failed to get AI reply", variant: "destructive" });
     } finally {
@@ -203,7 +213,7 @@ const Conversation = () => {
       const body: any = { role: "user", content };
       if (conversationId) body.conversation_id = conversationId;
       const res = await api.sendMessage(companyId, leadId, body);
-      applyBackendResponse(res);
+      await applyBackendResponse(res, content);
 
       // If automated, start countdown for AI reply
       if (testingMode === "automated") {
@@ -251,8 +261,8 @@ const Conversation = () => {
         const body: any = { role: "user", content: syntheticDraft };
         if (conversationId) body.conversation_id = conversationId;
         api.sendMessage(companyId, leadId, body)
-          .then((res) => {
-            applyBackendResponse(res);
+          .then(async (res) => {
+            await applyBackendResponse(res, syntheticDraft);
             if (testingMode === "automated") startAutoCountdown();
           })
           .catch(() => {
@@ -306,7 +316,7 @@ const Conversation = () => {
         const body: any = { role: "user", content: `Uploaded ${successCount} picture${successCount > 1 ? "s" : ""}.` };
         if (conversationId) body.conversation_id = conversationId;
         const res = await api.sendMessage(companyId, leadId, body);
-        applyBackendResponse(res);
+        await applyBackendResponse(res);
       } catch { /* best-effort */ }
       // Refresh conversation to get updated collected_infos
       try {
