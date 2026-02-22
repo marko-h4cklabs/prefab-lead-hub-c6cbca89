@@ -5,7 +5,7 @@ import { toDisplayText, safeArray, getErrorMessage } from "@/lib/errorUtils";
 import { ArrowLeft, Send, Loader2, Bot, Timer, ImagePlus, CalendarDays } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import PicturesThumbnails from "@/components/PicturesThumbnails";
-import BookingPanel, { BookingPayload } from "@/components/conversation/BookingPanel";
+import BookingPanel, { BookingPayload, getBookingFlowLabel } from "@/components/conversation/BookingPanel";
 
 interface QuickReply {
   label: string;
@@ -106,6 +106,19 @@ const Conversation = () => {
 
   useEffect(() => { scrollToBottom(); }, [data?.messages]);
 
+  /** Extract booking payload from multiple possible response locations */
+  const extractBooking = (res: any): BookingPayload | undefined => {
+    const candidates = [
+      res?.booking,
+      res?.meta?.booking,
+      res?.ui_action?.booking,
+    ];
+    for (const b of candidates) {
+      if (b && typeof b === "object" && b.mode) return b as BookingPayload;
+    }
+    return undefined;
+  };
+
   const applyBackendResponse = (res: any) => {
     applyResponseFields(res);
     if (res?.assistant_message !== undefined) {
@@ -113,10 +126,7 @@ const Conversation = () => {
       const quickReplies: QuickReply[] | undefined = Array.isArray(res.quick_replies)
         ? res.quick_replies
         : undefined;
-      const booking: BookingPayload | undefined =
-        res.booking && typeof res.booking === "object" && res.booking.mode
-          ? res.booking
-          : undefined;
+      const booking = extractBooking(res);
       setData((prev) => {
         const msgs = prev?.messages || [];
         return {
@@ -319,8 +329,30 @@ const Conversation = () => {
   const messages = data?.messages || [];
   const currentStep = data?.current_step ?? 0;
 
+  // Derive latest booking flow status from the last message with booking data
+  const latestBookingLabel = (() => {
+    const msgs = data?.messages || [];
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const label = getBookingFlowLabel(msgs[i]?.booking);
+      if (label) return label;
+    }
+    return null;
+  })();
+
   const HighlightsPanel = () => (
     <div className="space-y-4">
+      {/* Booking flow status hint */}
+      {latestBookingLabel && (
+        <div>
+          <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1">
+            Booking flow
+          </h3>
+          <span className="inline-flex items-center gap-1.5 rounded-sm bg-accent/10 border border-accent/20 px-2 py-1 text-xs font-mono text-accent">
+            <CalendarDays size={11} />
+            {latestBookingLabel}
+          </span>
+        </div>
+      )}
       {/* Looking for (required_infos) */}
       <div>
         <h3 className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">
