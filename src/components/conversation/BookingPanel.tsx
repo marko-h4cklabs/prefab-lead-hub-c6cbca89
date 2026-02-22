@@ -78,6 +78,7 @@ interface Props {
   conversationId?: string | null;
   onBookingUpdate?: (updated: BookingPayload) => void;
   onSendMessage?: (content: string) => void;
+  onDismiss?: () => void;
 }
 
 function slotStart(slot: BookingSlot): string {
@@ -145,7 +146,7 @@ export function getBookingFlowLabel(booking?: BookingPayload | null): string | n
   }
 }
 
-export default function BookingPanel({ booking, leadId, conversationId, onBookingUpdate, onSendMessage }: Props) {
+export default function BookingPanel({ booking, leadId, conversationId, onBookingUpdate, onSendMessage, onDismiss }: Props) {
   const navigate = useNavigate();
   const [bookingInProgress, setBookingInProgress] = useState<string | null>(null);
 
@@ -160,6 +161,9 @@ export default function BookingPanel({ booking, leadId, conversationId, onBookin
         start: slotStart(slot),
         end: slotEnd(slot) || undefined,
         conversation_id: conversationId || undefined,
+        appointment_type: booking.appointment_type || booking.appointmentType,
+        timezone: booking.timezone,
+        source: "chatbot",
       });
       if (onBookingUpdate && res?.booking) {
         onBookingUpdate(res.booking);
@@ -187,7 +191,6 @@ export default function BookingPanel({ booking, leadId, conversationId, onBookin
       const actions = quickActions.length > 0 ? quickActions : [
         { label: "Show available slots", value: "Show available slots" },
         { label: "Propose a time", value: "I'd like to propose a time" },
-        { label: "Not now", value: "Not now" },
       ];
       return (
         <div className="mt-2 flex gap-2 flex-wrap">
@@ -195,17 +198,20 @@ export default function BookingPanel({ booking, leadId, conversationId, onBookin
             <button
               key={i}
               onClick={() => onSendMessage?.(a.value)}
-              className={`inline-flex items-center gap-1.5 rounded-sm border px-3 py-1.5 text-xs font-mono transition-colors ${
-                a.label.toLowerCase().includes("not")
-                  ? "border-border bg-muted/30 text-muted-foreground hover:bg-muted/50"
-                  : "border-accent bg-accent/10 text-accent hover:bg-accent/20"
-              }`}
+              className="inline-flex items-center gap-1.5 rounded-sm border border-accent bg-accent/10 px-3 py-1.5 text-xs font-mono text-accent hover:bg-accent/20 transition-colors"
             >
               {a.label.toLowerCase().includes("slot") && <CalendarDays size={12} />}
               {a.label.toLowerCase().includes("propose") && <Clock size={12} />}
               {a.label}
             </button>
           ))}
+          <button
+            onClick={() => onDismiss?.()}
+            className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-muted/30 px-3 py-1.5 text-xs font-mono text-muted-foreground hover:bg-muted/50 transition-colors"
+          >
+            <X size={12} />
+            Not now
+          </button>
         </div>
       );
     }
