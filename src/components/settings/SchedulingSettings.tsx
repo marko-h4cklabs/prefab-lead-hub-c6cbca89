@@ -40,7 +40,6 @@ interface DaySchedule {
 
 interface SchedulingConfig {
   scheduling_enabled: boolean;
-  chatbot_offers_booking: boolean;
   allow_manual_booking: boolean;
   timezone: string;
   default_appointment_types: string[];
@@ -133,7 +132,6 @@ function workingHoursToArray(obj: Record<string, DaySchedule>): Array<{ day: str
 
 const defaultConfig = (): SchedulingConfig => ({
   scheduling_enabled: true,
-  chatbot_offers_booking: false,
   allow_manual_booking: true,
   timezone: "Europe/Zagreb",
   default_appointment_types: ["call", "site_visit", "meeting", "follow_up"],
@@ -176,7 +174,6 @@ export default function SchedulingSettings() {
         // Hydrate from canonical fields only — ignore aliases
         const hydrated: SchedulingConfig = {
           scheduling_enabled: Boolean(pick(defaults.scheduling_enabled, res?.scheduling_enabled)),
-          chatbot_offers_booking: Boolean(pick(defaults.chatbot_offers_booking, res?.chatbot_offers_booking)),
           allow_manual_booking: Boolean(pick(defaults.allow_manual_booking, res?.allow_manual_booking)),
           timezone: String(pick(defaults.timezone, res?.timezone)),
           default_appointment_types: Array.isArray(res?.default_appointment_types)
@@ -221,7 +218,6 @@ export default function SchedulingSettings() {
       // Whitelist-only payload — no spreading of raw API response
       const payload = {
         scheduling_enabled: config.scheduling_enabled,
-        chatbot_offers_booking: config.chatbot_offers_booking,
         allow_manual_booking: config.allow_manual_booking,
         timezone: config.timezone,
         default_appointment_types: config.default_appointment_types,
@@ -331,7 +327,7 @@ export default function SchedulingSettings() {
         <h2 className="text-sm font-bold uppercase tracking-wider">Booking Controls</h2>
 
         <ToggleRow label="Enable scheduling" checked={config.scheduling_enabled} onChange={(v) => set("scheduling_enabled", v)} />
-        <ToggleRow label="Chatbot offers booking" checked={config.chatbot_offers_booking} onChange={(v) => set("chatbot_offers_booking", v)} />
+        <ToggleRow label="Chatbot offers booking" checked={config.chatbot_booking_enabled} onChange={(v) => set("chatbot_booking_enabled", v)} />
         <ToggleRow label="Allow manual booking from lead detail" checked={config.allow_manual_booking} onChange={(v) => set("allow_manual_booking", v)} />
 
         <div>
