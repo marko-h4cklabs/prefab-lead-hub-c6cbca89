@@ -6,10 +6,16 @@ import { ArrowLeft, Send, Loader2, Bot, Timer, ImagePlus, CalendarDays } from "l
 import { toast } from "@/hooks/use-toast";
 import PicturesThumbnails from "@/components/PicturesThumbnails";
 
+interface QuickReply {
+  label: string;
+  value: string;
+}
+
 interface Message {
   role: string;
   content: string;
   timestamp?: string;
+  quick_replies?: QuickReply[];
 }
 
 interface ConversationData {
@@ -102,12 +108,15 @@ const Conversation = () => {
     applyResponseFields(res);
     if (res?.assistant_message !== undefined) {
       if (res.conversation_id) setConversationId(res.conversation_id);
+      const quickReplies: QuickReply[] | undefined = Array.isArray(res.quick_replies)
+        ? res.quick_replies
+        : undefined;
       setData((prev) => {
         const msgs = prev?.messages || [];
         return {
           ...prev,
           lead_id: prev?.lead_id || leadId || "",
-          messages: [...msgs, { role: "assistant", content: res.assistant_message }],
+          messages: [...msgs, { role: "assistant", content: res.assistant_message, quick_replies: quickReplies }],
           parsed_fields: prev?.parsed_fields || {},
           current_step: prev?.current_step ?? 0,
         };
@@ -186,6 +195,45 @@ const Conversation = () => {
     } finally {
       setSending(false);
     }
+  };
+
+  const handleQuickReply = (reply: QuickReply) => {
+    setDraft(reply.value);
+    // Clear quick replies from the message that triggered them
+    setData((prev) => {
+      if (!prev) return prev;
+      const msgs = [...prev.messages];
+      // Remove quick_replies from all messages to avoid re-rendering old chips
+      const cleaned = msgs.map((m) => ({ ...m, quick_replies: undefined }));
+      return { ...prev, messages: cleaned };
+    });
+    // Auto-send
+    setTimeout(() => {
+      const syntheticDraft = reply.value;
+      if (syntheticDraft && leadId && !sending) {
+        setDraft("");
+        setSending(true);
+        clearTimers();
+        setData((prev) => ({
+          ...prev,
+          lead_id: prev?.lead_id || leadId || "",
+          messages: [...(prev?.messages || []), { role: "user", content: syntheticDraft }],
+          parsed_fields: prev?.parsed_fields || {},
+          current_step: prev?.current_step ?? 0,
+        }));
+        const body: any = { role: "user", content: syntheticDraft };
+        if (conversationId) body.conversation_id = conversationId;
+        api.sendMessage(companyId, leadId, body)
+          .then((res) => {
+            applyBackendResponse(res);
+            if (testingMode === "automated") startAutoCountdown();
+          })
+          .catch(() => {
+            toast({ title: "Error", description: "Failed to send message", variant: "destructive" });
+          })
+          .finally(() => setSending(false));
+      }
+    }, 0);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -411,26 +459,44 @@ const Conversation = () => {
                 }
 
                 return (
-                  <div key={i} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-                    <div
-                      className={`max-w-[75%] rounded-sm px-4 py-3 text-sm ${
-                        isUser
-                          ? "bg-primary text-primary-foreground"
-                          : "industrial-card border-l-2 border-l-accent"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[10px] font-mono uppercase tracking-wider opacity-70">
-                          {msg.role}
-                        </span>
-                        {msg.timestamp && (
-                          <span className="text-[10px] font-mono opacity-50">
-                            {new Date(msg.timestamp).toLocaleString()}
+                  <div key={i}>
+                    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+                      <div
+                        className={`max-w-[75%] rounded-sm px-4 py-3 text-sm ${
+                          isUser
+                            ? "bg-primary text-primary-foreground"
+                            : "industrial-card border-l-2 border-l-accent"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[10px] font-mono uppercase tracking-wider opacity-70">
+                            {msg.role}
                           </span>
-                        )}
+                          {msg.timestamp && (
+                            <span className="text-[10px] font-mono opacity-50">
+                              {new Date(msg.timestamp).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
                       </div>
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
                     </div>
+                    {/* Quick reply chips */}
+                    {!isUser && Array.isArray(msg.quick_replies) && msg.quick_replies.length > 0 && (
+                      <div className="flex justify-start mt-2 ml-1 gap-2 flex-wrap">
+                        {msg.quick_replies.map((qr, qi) => (
+                          <button
+                            key={qi}
+                            onClick={() => handleQuickReply(qr)}
+                            disabled={sending || aiReplying}
+                            className="inline-flex items-center gap-1.5 rounded-sm border border-accent bg-accent/10 px-3 py-1.5 text-xs font-mono text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
+                          >
+                            {qr.label === "Schedule now" && <CalendarDays size={12} />}
+                            {qr.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })
