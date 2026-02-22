@@ -5,6 +5,7 @@ import { toDisplayText, safeArray, getErrorMessage } from "@/lib/errorUtils";
 import { ArrowLeft, Send, Loader2, Bot, Timer, ImagePlus, CalendarDays } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import PicturesThumbnails from "@/components/PicturesThumbnails";
+import BookingPanel, { BookingPayload } from "@/components/conversation/BookingPanel";
 
 interface QuickReply {
   label: string;
@@ -16,6 +17,7 @@ interface Message {
   content: string;
   timestamp?: string;
   quick_replies?: QuickReply[];
+  booking?: BookingPayload;
 }
 
 interface ConversationData {
@@ -111,12 +113,16 @@ const Conversation = () => {
       const quickReplies: QuickReply[] | undefined = Array.isArray(res.quick_replies)
         ? res.quick_replies
         : undefined;
+      const booking: BookingPayload | undefined =
+        res.booking && typeof res.booking === "object" && res.booking.mode
+          ? res.booking
+          : undefined;
       setData((prev) => {
         const msgs = prev?.messages || [];
         return {
           ...prev,
           lead_id: prev?.lead_id || leadId || "",
-          messages: [...msgs, { role: "assistant", content: res.assistant_message, quick_replies: quickReplies }],
+          messages: [...msgs, { role: "assistant", content: res.assistant_message, quick_replies: quickReplies, booking }],
           parsed_fields: prev?.parsed_fields || {},
           current_step: prev?.current_step ?? 0,
         };
@@ -124,6 +130,17 @@ const Conversation = () => {
     } else {
       setData(res);
     }
+  };
+
+  const handleBookingUpdate = (msgIndex: number, updated: BookingPayload) => {
+    setData((prev) => {
+      if (!prev) return prev;
+      const msgs = [...prev.messages];
+      if (msgs[msgIndex]) {
+        msgs[msgIndex] = { ...msgs[msgIndex], booking: updated, quick_replies: undefined };
+      }
+      return { ...prev, messages: msgs };
+    });
   };
 
   const triggerAiReply = useCallback(async () => {
@@ -479,6 +496,19 @@ const Conversation = () => {
                           )}
                         </div>
                         <p className="whitespace-pre-wrap">{msg.content}</p>
+                        {/* Inline booking panel */}
+                        {!isUser && msg.booking && msg.booking.mode && (
+                          <BookingPanel
+                            booking={msg.booking}
+                            leadId={leadId || ""}
+                            conversationId={conversationId}
+                            onBookingUpdate={(updated) => handleBookingUpdate(i, updated)}
+                            onSendMessage={(content) => {
+                              setDraft(content);
+                              setTimeout(() => handleSend(), 0);
+                            }}
+                          />
+                        )}
                       </div>
                     </div>
                     {/* Quick reply chips */}
