@@ -446,11 +446,26 @@ export const api = {
     request<any>(`/api/scheduling-requests/${id}`, { method: "PATCH", body: JSON.stringify({ status: "closed" }) }),
 
   // --- Chatbot Booking ---
-  bookSlot: (companyId: string, leadId: string, data: { slot_id?: string; start: string; end?: string; conversation_id?: string }) =>
-    request<any>(`/api/companies/${companyId}/leads/${leadId}/book-slot`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+  bookSlot: async (companyId: string, leadId: string, data: {
+    slot_id?: string; start: string; end?: string; conversation_id?: string;
+    appointment_type?: string; timezone?: string; source?: string; title?: string; notes?: string;
+  }) => {
+    // Try canonical endpoint first, fallback to legacy
+    try {
+      return await request<any>(`/api/scheduling/book-slot`, {
+        method: "POST",
+        body: JSON.stringify({ company_id: companyId, lead_id: leadId, ...data }),
+      });
+    } catch (err: any) {
+      if (err?.message?.includes("404") || err?.message?.includes("Not Found")) {
+        return request<any>(`/api/companies/${companyId}/leads/${leadId}/book-slot`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        });
+      }
+      throw err;
+    }
+  },
 
   // --- Admin ---
   runSnapshot: () =>

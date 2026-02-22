@@ -2,11 +2,11 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, requireCompanyId } from "@/lib/apiClient";
 import { toDisplayText, safeArray, getErrorMessage } from "@/lib/errorUtils";
-import { ArrowLeft, Send, Loader2, Bot, Timer, ImagePlus, CalendarDays } from "lucide-react";
+import { ArrowLeft, Send, Loader2, Bot, Timer, ImagePlus, CalendarDays, Bug, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import PicturesThumbnails from "@/components/PicturesThumbnails";
 import BookingPanel, { BookingPayload, getBookingFlowLabel } from "@/components/conversation/BookingPanel";
-import { processAiReply, detectBookingIntent } from "@/lib/bookingOrchestrator";
+import { processAiReply, detectBookingIntent, getFlow, dismissBookingFlow, resetBookingFlow, type BookingFlowState } from "@/lib/bookingOrchestrator";
 
 interface QuickReply {
   label: string;
@@ -62,6 +62,30 @@ const Conversation = () => {
   const [collectedInfos, setCollectedInfos] = useState<CollectedInfo[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Booking flow state (conversation-level, not per-message)
+  const [bookingFlowState, setBookingFlowState] = useState<{
+    offered: boolean;
+    awaitingSlotSelection: boolean;
+    dismissed: boolean;
+    bookedAppointmentId: string | null;
+    lastOfferReason: string | null;
+    slotsError: string | null;
+    lastEndpoint: string | null;
+    lastError: string | null;
+  }>({
+    offered: false,
+    awaitingSlotSelection: false,
+    dismissed: false,
+    bookedAppointmentId: null,
+    lastOfferReason: null,
+    slotsError: null,
+    lastEndpoint: null,
+    lastError: null,
+  });
+
+  // Debug panel visibility (simulation only)
+  const [debugOpen, setDebugOpen] = useState(false);
 
   // Testing mode state
   const [testingMode, setTestingMode] = useState<"manual" | "automated">("manual");
@@ -120,16 +144,35 @@ const Conversation = () => {
     return undefined;
   };
 
+  const syncBookingFlowState = useCallback(() => {
+    const convKey = conversationId || leadId || "";
+    const flow = getFlow(convKey);
+    setBookingFlowState((prev) => ({
+      ...prev,
+      offered: flow.offerShown,
+      awaitingSlotSelection: flow.stage === "awaiting_slot_choice",
+      dismissed: flow.stage === "declined",
+      bookedAppointmentId: flow.completed ? "completed" : null,
+      lastOfferReason: flow.stage,
+    }));
+  }, [conversationId, leadId]);
+
   const applyBackendResponse = async (res: any, lastUserMsg?: string) => {
     applyResponseFields(res);
 
-    // Run booking orchestrator shim to inject booking metadata if backend didn't
+    // If dismissed or already booked, don't run orchestrator
     const convKey = conversationId || leadId || "";
+    const flow = getFlow(convKey);
+
     let finalRes = res;
-    try {
-      const augmented = await processAiReply(res, convKey, lastUserMsg);
-      if (augmented) finalRes = augmented;
-    } catch { /* orchestrator failed, use original response */ }
+
+    // Only run orchestrator if NOT dismissed and NOT already completed
+    if (flow.stage !== "declined" && !flow.completed) {
+      try {
+        const augmented = await processAiReply(res, convKey, lastUserMsg);
+        if (augmented) finalRes = augmented;
+      } catch { /* orchestrator failed, use original response */ }
+    }
 
     if (finalRes?.assistant_message !== undefined) {
       if (finalRes.conversation_id) setConversationId(finalRes.conversation_id);
@@ -150,6 +193,9 @@ const Conversation = () => {
     } else {
       setData(finalRes);
     }
+
+    // Sync flow state after processing
+    syncBookingFlowState();
   };
 
   const handleBookingUpdate = (msgIndex: number, updated: BookingPayload) => {
@@ -161,6 +207,27 @@ const Conversation = () => {
       }
       return { ...prev, messages: msgs };
     });
+    // If confirmed, update flow state
+    const normalizedMode = updated.mode;
+    if (normalizedMode === "confirmed" || normalizedMode === "booking_success") {
+      setBookingFlowState((prev) => ({
+        ...prev,
+        bookedAppointmentId: updated.appointment_id || updated.appointment?.id || "confirmed",
+        awaitingSlotSelection: false,
+        lastEndpoint: "book-slot",
+      }));
+    }
+  };
+
+  const handleBookingDismiss = () => {
+    const convKey = conversationId || leadId || "";
+    dismissBookingFlow(convKey);
+    setBookingFlowState((prev) => ({
+      ...prev,
+      dismissed: true,
+      offered: false,
+      awaitingSlotSelection: false,
+    }));
   };
 
   const triggerAiReply = useCallback(async () => {
@@ -491,87 +558,104 @@ const Conversation = () => {
                 No messages yet. Send the first message below.
               </div>
             ) : (
-              messages.map((msg, i) => {
-                const isUser = msg.role === "user";
-                const isSystem = msg.role === "system";
-                const isSchedulingChip = isSystem && (msg.content || "").toLowerCase().includes("scheduling request");
-
-                if (isSchedulingChip) {
-                  return (
-                    <div key={i} className="flex justify-center">
-                      <div className="inline-flex items-center gap-1.5 rounded-sm bg-accent/10 border border-accent/20 px-3 py-1.5 text-xs font-mono text-accent">
-                        <CalendarDays size={12} />
-                        {msg.content}
-                      </div>
-                    </div>
-                  );
+              (() => {
+                // Find the LAST message index with active booking data
+                let lastBookingMsgIdx = -1;
+                for (let j = messages.length - 1; j >= 0; j--) {
+                  if (messages[j]?.booking?.mode) { lastBookingMsgIdx = j; break; }
                 }
+                // Only show booking panel on that last message, and only if not dismissed/booked
+                const shouldShowBooking = !bookingFlowState.dismissed && !bookingFlowState.bookedAppointmentId;
+                // For confirmed state, show on last booking message regardless
+                const lastBookingMode = lastBookingMsgIdx >= 0 ? messages[lastBookingMsgIdx]?.booking?.mode : null;
+                const isConfirmedMode = lastBookingMode === "confirmed" || lastBookingMode === "booking_success";
 
-                if (isSystem) {
-                  return (
-                    <div key={i} className="flex justify-center">
-                      <div className="inline-flex items-center gap-1.5 rounded-sm bg-muted px-3 py-1.5 text-xs font-mono text-muted-foreground">
-                        {msg.content}
+                return messages.map((msg, i) => {
+                  const isUser = msg.role === "user";
+                  const isSystem = msg.role === "system";
+                  const isSchedulingChip = isSystem && (msg.content || "").toLowerCase().includes("scheduling request");
+
+                  if (isSchedulingChip) {
+                    return (
+                      <div key={i} className="flex justify-center">
+                        <div className="inline-flex items-center gap-1.5 rounded-sm bg-accent/10 border border-accent/20 px-3 py-1.5 text-xs font-mono text-accent">
+                          <CalendarDays size={12} />
+                          {msg.content}
+                        </div>
                       </div>
-                    </div>
-                  );
-                }
+                    );
+                  }
 
-                return (
-                  <div key={i}>
-                    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-                      <div
-                        className={`max-w-[75%] rounded-sm px-4 py-3 text-sm ${
-                          isUser
-                            ? "bg-primary text-primary-foreground"
-                            : "industrial-card border-l-2 border-l-accent"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[10px] font-mono uppercase tracking-wider opacity-70">
-                            {msg.role}
-                          </span>
-                          {msg.timestamp && (
-                            <span className="text-[10px] font-mono opacity-50">
-                              {new Date(msg.timestamp).toLocaleString()}
+                  if (isSystem) {
+                    return (
+                      <div key={i} className="flex justify-center">
+                        <div className="inline-flex items-center gap-1.5 rounded-sm bg-muted px-3 py-1.5 text-xs font-mono text-muted-foreground">
+                          {msg.content}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Only render BookingPanel on the LAST message with booking, and only if state allows
+                  const showBookingHere = i === lastBookingMsgIdx && msg.booking?.mode && (shouldShowBooking || isConfirmedMode);
+
+                  return (
+                    <div key={i}>
+                      <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+                        <div
+                          className={`max-w-[75%] rounded-sm px-4 py-3 text-sm ${
+                            isUser
+                              ? "bg-primary text-primary-foreground"
+                              : "industrial-card border-l-2 border-l-accent"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-mono uppercase tracking-wider opacity-70">
+                              {msg.role}
                             </span>
+                            {msg.timestamp && (
+                              <span className="text-[10px] font-mono opacity-50">
+                                {new Date(msg.timestamp).toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                          <p className="whitespace-pre-wrap">{msg.content}</p>
+                          {/* Inline booking panel — only on last active booking message */}
+                          {showBookingHere && (
+                            <BookingPanel
+                              booking={msg.booking!}
+                              leadId={leadId || ""}
+                              conversationId={conversationId}
+                              onBookingUpdate={(updated) => handleBookingUpdate(i, updated)}
+                              onSendMessage={(content) => {
+                                setDraft(content);
+                                setTimeout(() => handleSend(), 0);
+                              }}
+                              onDismiss={handleBookingDismiss}
+                            />
                           )}
                         </div>
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
-                        {/* Inline booking panel */}
-                        {!isUser && msg.booking && msg.booking.mode && (
-                          <BookingPanel
-                            booking={msg.booking}
-                            leadId={leadId || ""}
-                            conversationId={conversationId}
-                            onBookingUpdate={(updated) => handleBookingUpdate(i, updated)}
-                            onSendMessage={(content) => {
-                              setDraft(content);
-                              setTimeout(() => handleSend(), 0);
-                            }}
-                          />
-                        )}
                       </div>
+                      {/* Quick reply chips */}
+                      {!isUser && Array.isArray(msg.quick_replies) && msg.quick_replies.length > 0 && (
+                        <div className="flex justify-start mt-2 ml-1 gap-2 flex-wrap">
+                          {msg.quick_replies.map((qr, qi) => (
+                            <button
+                              key={qi}
+                              onClick={() => handleQuickReply(qr)}
+                              disabled={sending || aiReplying}
+                              className="inline-flex items-center gap-1.5 rounded-sm border border-accent bg-accent/10 px-3 py-1.5 text-xs font-mono text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
+                            >
+                              {qr.label === "Schedule now" && <CalendarDays size={12} />}
+                              {qr.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    {/* Quick reply chips */}
-                    {!isUser && Array.isArray(msg.quick_replies) && msg.quick_replies.length > 0 && (
-                      <div className="flex justify-start mt-2 ml-1 gap-2 flex-wrap">
-                        {msg.quick_replies.map((qr, qi) => (
-                          <button
-                            key={qi}
-                            onClick={() => handleQuickReply(qr)}
-                            disabled={sending || aiReplying}
-                            className="inline-flex items-center gap-1.5 rounded-sm border border-accent bg-accent/10 px-3 py-1.5 text-xs font-mono text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
-                          >
-                            {qr.label === "Schedule now" && <CalendarDays size={12} />}
-                            {qr.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
+                  );
+                });
+              })()
             )}
             <div ref={messagesEndRef} />
           </div>
@@ -630,9 +714,45 @@ const Conversation = () => {
         </div>
 
         {/* Sidebar: Highlights */}
-        <aside className="hidden md:block w-64 shrink-0 overflow-y-auto">
+        <aside className="hidden md:block w-64 shrink-0 overflow-y-auto space-y-3">
           <div className="industrial-card p-4">
             <HighlightsPanel />
+          </div>
+          {/* Debug panel (simulation only) */}
+          <div className="industrial-card p-3">
+            <button
+              onClick={() => setDebugOpen(!debugOpen)}
+              className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground w-full"
+            >
+              {debugOpen ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+              <Bug size={10} />
+              Booking Debug
+            </button>
+            {debugOpen && (
+              <div className="mt-2 space-y-1 text-[10px] font-mono text-muted-foreground">
+                <div>offered: {String(bookingFlowState.offered)}</div>
+                <div>awaitingSlots: {String(bookingFlowState.awaitingSlotSelection)}</div>
+                <div>dismissed: {String(bookingFlowState.dismissed)}</div>
+                <div>booked: {bookingFlowState.bookedAppointmentId || "—"}</div>
+                <div>reason: {bookingFlowState.lastOfferReason || "—"}</div>
+                <div>endpoint: {bookingFlowState.lastEndpoint || "—"}</div>
+                <div>error: {bookingFlowState.lastError || "—"}</div>
+                <button
+                  onClick={() => {
+                    const convKey = conversationId || leadId || "";
+                    resetBookingFlow(convKey);
+                    setBookingFlowState({
+                      offered: false, awaitingSlotSelection: false, dismissed: false,
+                      bookedAppointmentId: null, lastOfferReason: null, slotsError: null,
+                      lastEndpoint: null, lastError: null,
+                    });
+                  }}
+                  className="mt-1 text-accent hover:underline"
+                >
+                  Reset flow
+                </button>
+              </div>
+            )}
           </div>
         </aside>
       </div>

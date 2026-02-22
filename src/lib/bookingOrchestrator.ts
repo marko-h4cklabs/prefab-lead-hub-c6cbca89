@@ -59,7 +59,7 @@ export interface BookingFlowState {
 
 const flowStates = new Map<string, BookingFlowState>();
 
-function getFlow(conversationKey: string): BookingFlowState {
+export function getFlow(conversationKey: string): BookingFlowState {
   if (!flowStates.has(conversationKey)) {
     flowStates.set(conversationKey, {
       active: false,
@@ -82,6 +82,11 @@ function getFlow(conversationKey: string): BookingFlowState {
 function updateFlow(key: string, patch: Partial<BookingFlowState>) {
   const f = getFlow(key);
   Object.assign(f, patch);
+}
+
+/** Dismiss booking flow for a conversation */
+export function dismissBookingFlow(conversationKey: string) {
+  updateFlow(conversationKey, { active: false, stage: "declined", completed: false });
 }
 
 // ─── Normalized scheduling settings ───
@@ -301,13 +306,13 @@ export async function processAiReply(
     return handleActiveBookingFlow(flow, conversationKey, settings, lastUserMessage, aiResponse);
   }
 
-  // ── Check for booking intent in user message ──
-  if (lastUserMessage && detectBookingIntent(lastUserMessage)) {
+  // ── Check for booking intent in user message (only if not already completed/dismissed) ──
+  if (lastUserMessage && !flow.completed && flow.stage !== "declined" && detectBookingIntent(lastUserMessage)) {
     return startBookingFlow(conversationKey, settings, aiResponse);
   }
 
   // ── Check if all required fields collected (post-quote trigger) ──
-  if (settings.askAfterQuote && !flow.offerShown) {
+  if (settings.askAfterQuote && !flow.offerShown && !flow.completed && flow.stage !== "declined") {
     const requiredInfos = aiResponse?.required_infos || aiResponse?.looking_for || [];
     const allCollected = Array.isArray(requiredInfos) && requiredInfos.length === 0;
     
