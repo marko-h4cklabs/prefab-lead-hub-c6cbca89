@@ -8,6 +8,7 @@ import PicturesThumbnails from "@/components/PicturesThumbnails";
 import CrmSection from "@/components/crm/CrmSection";
 import LeadAppointments from "@/components/appointments/LeadAppointments";
 import LeadSchedulingRequests from "@/components/scheduling/LeadSchedulingRequests";
+import LeadDetailAppointments from "@/components/appointments/LeadDetailAppointments";
 import AppointmentModal, { AppointmentFormData } from "@/components/appointments/AppointmentModal";
 import { NormalizedSchedulingRequest } from "@/lib/schedulingRequestUtils";
 import { REQUEST_TYPE_LABELS } from "@/lib/schedulingRequestUtils";
@@ -331,7 +332,10 @@ const LeadDetail = () => {
         )}
       </div>
 
-      {/* Appointments Section */}
+      {/* Inline Appointments from lead response */}
+      <LeadDetailAppointments appointments={Array.isArray(lead?.appointments) ? lead.appointments : []} />
+
+      {/* Appointments Section (fetched separately) */}
       {leadId && (
         <LeadAppointments
           key={apptRefreshKey}
