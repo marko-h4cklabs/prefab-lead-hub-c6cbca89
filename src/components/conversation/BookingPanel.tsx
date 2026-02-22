@@ -82,11 +82,45 @@ interface Props {
 }
 
 function slotStart(slot: BookingSlot): string {
-  return slot.startAt || slot.start || "";
+  return slot.startAt || (slot as any).start_at || slot.start || (slot as any).slotStart || "";
 }
 
 function slotEnd(slot: BookingSlot): string {
-  return slot.endAt || slot.end || "";
+  return slot.endAt || (slot as any).end_at || slot.end || (slot as any).slotEnd || "";
+}
+
+/** Normalize a slot into canonical booking payload fields */
+export function normalizeSlotForBooking(
+  slot: BookingSlot,
+  defaults?: { defaultAppointmentType?: string; timezone?: string }
+): { startAt: string; endAt: string; appointmentType: string; timezone: string } {
+  return {
+    startAt: slotStart(slot),
+    endAt: slotEnd(slot),
+    appointmentType: (slot as any).appointmentType || (slot as any).appointment_type || (slot as any).type || defaults?.defaultAppointmentType || "call",
+    timezone: slot.timezone || (slot as any).timeZone || defaults?.timezone || "Europe/Zagreb",
+  };
+}
+
+/** Dedupe and sort slots, filtering out invalid ones */
+export function dedupeSlots(
+  slots: BookingSlot[],
+  defaults?: { defaultAppointmentType?: string; timezone?: string },
+  max: number = 5
+): BookingSlot[] {
+  const seen = new Set<string>();
+  const valid: BookingSlot[] = [];
+  for (const slot of slots) {
+    const n = normalizeSlotForBooking(slot, defaults);
+    if (!n.startAt) continue; // skip invalid
+    const key = `${n.startAt}|${n.endAt}|${n.appointmentType}|${n.timezone}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    valid.push(slot);
+  }
+  // Sort by startAt ascending
+  valid.sort((a, b) => slotStart(a).localeCompare(slotStart(b)));
+  return valid.slice(0, max);
 }
 
 function formatSlotLabel(slot: BookingSlot): string {
@@ -156,13 +190,17 @@ export default function BookingPanel({ booking, leadId, conversationId, onBookin
     setBookingInProgress(slotKey);
     try {
       const companyId = requireCompanyId();
+      const normalized = normalizeSlotForBooking(slot, {
+        defaultAppointmentType: booking.appointment_type || booking.appointmentType || "call",
+        timezone: booking.timezone,
+      });
       const res = await api.bookSlot(companyId, leadId, {
         slot_id: slot.id,
-        start: slotStart(slot),
-        end: slotEnd(slot) || undefined,
+        startAt: normalized.startAt,
+        endAt: normalized.endAt || undefined,
         conversation_id: conversationId || undefined,
-        appointment_type: booking.appointment_type || booking.appointmentType,
-        timezone: booking.timezone,
+        appointment_type: normalized.appointmentType,
+        timezone: normalized.timezone,
         source: "chatbot",
       });
       if (onBookingUpdate && res?.booking) {
@@ -179,14 +217,15 @@ export default function BookingPanel({ booking, leadId, conversationId, onBookin
   };
 
   const safeSlots = Array.isArray(booking.slots) ? booking.slots : Array.isArray(booking.availableSlots) ? booking.availableSlots : [];
-  const visibleSlots = safeSlots.slice(0, 5);
+  const slotDefaults = { defaultAppointmentType: booking.appointment_type || booking.appointmentType || "call", timezone: booking.timezone || "Europe/Zagreb" };
+  const visibleSlots = dedupeSlots(safeSlots, slotDefaults, 5);
   const apptType = booking.appointment_type || booking.appointmentType || "";
-  const normalized = normalizeMode(booking.mode);
+  const normalizedMode = normalizeMode(booking.mode);
 
   // Quick action buttons from backend or inferred
   const quickActions = Array.isArray(booking.quickActions) ? booking.quickActions : [];
 
-  switch (normalized) {
+  switch (normalizedMode) {
     case "offer": {
       const actions = quickActions.length > 0 ? quickActions : [
         { label: "Show available slots", value: "Show available slots" },
