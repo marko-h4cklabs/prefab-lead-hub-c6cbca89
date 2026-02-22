@@ -445,6 +445,13 @@ export const api = {
   closeSchedulingRequest: (id: string) =>
     request<any>(`/api/scheduling-requests/${id}`, { method: "PATCH", body: JSON.stringify({ status: "closed" }) }),
 
+  // --- Chatbot Booking ---
+  bookSlot: (companyId: string, leadId: string, data: { slot_id?: string; start: string; end?: string; conversation_id?: string }) =>
+    request<any>(`/api/companies/${companyId}/leads/${leadId}/book-slot`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
   // --- Admin ---
   runSnapshot: () =>
     request<any>("/api/admin/snapshot", { method: "POST" }),
