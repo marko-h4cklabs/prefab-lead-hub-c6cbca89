@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, requireCompanyId } from "@/lib/apiClient";
-import { Activity, Loader2, Save } from "lucide-react";
+import { Activity, Loader2, Save, Wand2 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import NotificationSettings from "@/components/settings/NotificationSettings";
@@ -200,12 +201,15 @@ const Settings = () => {
             </form>
           </div>
 
-          {/* Help */}
+          {/* Help & Setup */}
           <div className="industrial-card p-6 mt-6 space-y-3">
             <h2 className="text-sm font-bold uppercase tracking-wider">Help &amp; Support</h2>
             <p className="text-sm text-muted-foreground">
               Need assistance? Contact your account administrator or reach out to support.
             </p>
+            <Link to="/onboarding" className="inline-flex items-center gap-2 text-sm text-accent hover:text-accent/80 transition-colors">
+              <Wand2 size={14} /> Setup Wizard
+            </Link>
           </div>
 
           {/* Admin Snapshot */}

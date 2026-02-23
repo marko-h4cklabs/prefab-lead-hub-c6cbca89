@@ -34,6 +34,16 @@ const statusClass = (name: string) => {
   return "status-pending";
 };
 
+const ScoreBadge = ({ score }: { score: number | null | undefined }) => {
+  if (score === null || score === undefined || score === 0) {
+    return <span className="status-badge bg-muted text-muted-foreground">—</span>;
+  }
+  let cls = "bg-destructive/15 text-destructive";
+  if (score > 60) cls = "bg-success/15 text-success";
+  else if (score > 30) cls = "bg-warning/15 text-warning";
+  return <span className={`status-badge ${cls}`}>{score}</span>;
+};
+
 const Leads = () => {
   const companyId = requireCompanyId();
   const navigate = useNavigate();
@@ -192,6 +202,7 @@ const Leads = () => {
             <tr>
               <th>Channel</th>
               <th>Name</th>
+              <th>Score</th>
               <th>Status</th>
               <th>Created</th>
             </tr>
@@ -200,13 +211,13 @@ const Leads = () => {
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={`skel-${i}`}>
-                  {Array.from({ length: 4 }).map((_, j) => (
+                  {Array.from({ length: 5 }).map((_, j) => (
                     <td key={j}><div className="h-4 rounded-sm bg-muted animate-pulse" /></td>
                   ))}
                 </tr>
               ))
             ) : leads.length === 0 ? (
-              <tr><td colSpan={4} className="text-center py-8 text-muted-foreground">No leads found</td></tr>
+              <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">No leads found</td></tr>
             ) : (
               leads.map((lead) => (
                 <tr
@@ -216,6 +227,7 @@ const Leads = () => {
                 >
                   <td className="font-mono text-sm">{lead.channel}</td>
                   <td className="text-sm truncate max-w-[200px]">{getLeadName(lead)}</td>
+                  <td><ScoreBadge score={lead.score} /></td>
                   <td>
                     <div className="flex items-center gap-1.5">
                       <select
