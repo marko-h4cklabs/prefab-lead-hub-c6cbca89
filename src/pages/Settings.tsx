@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, requireCompanyId } from "@/lib/apiClient";
-import { Activity, Loader2, Save, Wand2 } from "lucide-react";
+import { Activity, Loader2, Save, Wand2, Instagram } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
@@ -30,6 +30,12 @@ const Settings = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
 
+  // Instagram settings
+  const [igAccountId, setIgAccountId] = useState("");
+  const [igPageToken, setIgPageToken] = useState("");
+  const [igLoading, setIgLoading] = useState(false);
+  const [savingIg, setSavingIg] = useState(false);
+
   useEffect(() => {
     Promise.all([
       api.getCompany(companyId),
@@ -46,6 +52,16 @@ const Settings = () => {
       })
       .catch((err: Error) => setFetchError(err.message || "Failed to load settings"))
       .finally(() => setLoading(false));
+
+    // Load Instagram settings
+    setIgLoading(true);
+    api.getInstagramSettings()
+      .then((res) => {
+        setIgAccountId(res?.instagram_account_id || "");
+        setIgPageToken(res?.meta_page_access_token || "");
+      })
+      .catch(() => {})
+      .finally(() => setIgLoading(false));
   }, []);
 
   const handleEmailUpdate = async (e: React.FormEvent) => {
@@ -210,6 +226,66 @@ const Settings = () => {
             <Link to="/onboarding" className="inline-flex items-center gap-2 text-sm text-accent hover:text-accent/80 transition-colors">
               <Wand2 size={14} /> Setup Wizard
             </Link>
+          </div>
+
+          {/* Instagram Connection */}
+          <div className="industrial-card p-6 mt-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <Instagram size={16} className="text-muted-foreground" />
+              <h2 className="text-sm font-bold uppercase tracking-wider">Instagram Connection</h2>
+            </div>
+            {igLoading ? (
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                <Loader2 size={14} className="animate-spin" /> Loading…
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">Instagram Account ID</label>
+                  <input
+                    value={igAccountId}
+                    onChange={(e) => setIgAccountId(e.target.value)}
+                    className="industrial-input w-full"
+                    placeholder="e.g. 17841400123456789"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">Page Access Token</label>
+                  <input
+                    type="password"
+                    value={igPageToken}
+                    onChange={(e) => setIgPageToken(e.target.value)}
+                    className="industrial-input w-full"
+                    placeholder="Long-lived page access token"
+                  />
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!igAccountId.trim()) {
+                      toast({ title: "Account ID is required", variant: "destructive" });
+                      return;
+                    }
+                    setSavingIg(true);
+                    try {
+                      await api.saveInstagramSettings({
+                        instagram_account_id: igAccountId.trim(),
+                        meta_page_access_token: igPageToken.trim(),
+                      });
+                      toast({ title: "Instagram settings saved" });
+                    } catch (err: unknown) {
+                      toast({ title: "Failed to save", description: getErrorMessage(err), variant: "destructive" });
+                    } finally {
+                      setSavingIg(false);
+                    }
+                  }}
+                  disabled={savingIg}
+                  className="industrial-btn-primary"
+                >
+                  {savingIg ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  <span className="ml-1">Save</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Admin Snapshot */}

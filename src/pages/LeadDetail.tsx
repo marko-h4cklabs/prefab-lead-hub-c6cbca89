@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, requireCompanyId } from "@/lib/apiClient";
-import { ArrowLeft, MessageSquare, Loader2, CalendarPlus } from "lucide-react";
+import { ArrowLeft, MessageSquare, Loader2, CalendarPlus, Copy, Check } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { toDisplayText, safeArray, getErrorMessage } from "@/lib/errorUtils";
 import PicturesThumbnails from "@/components/PicturesThumbnails";
@@ -56,6 +56,7 @@ const LeadDetail = () => {
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
   const [savingName, setSavingName] = useState(false);
+  const [copiedId, setCopiedId] = useState(false);
   const [apptModalOpen, setApptModalOpen] = useState(false);
   const [apptRefreshKey, setApptRefreshKey] = useState(0);
   const [schedReqRefreshKey, setSchedReqRefreshKey] = useState(0);
@@ -203,6 +204,26 @@ const LeadDetail = () => {
 
       <div className="industrial-card p-6">
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+          {/* Lead ID */}
+          <div>
+            <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-0.5">Lead ID</dt>
+            <dd className="text-sm font-medium font-mono flex items-center gap-1.5">
+              <span className="truncate max-w-[180px]">{leadId}</span>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(leadId || "");
+                  setCopiedId(true);
+                  setTimeout(() => setCopiedId(false), 2000);
+                }}
+                className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                title={copiedId ? "Copied!" : "Copy Lead ID"}
+              >
+                {copiedId ? <Check size={12} className="text-success" /> : <Copy size={12} />}
+              </button>
+              {copiedId && <span className="text-[10px] text-success font-mono">Copied!</span>}
+            </dd>
+          </div>
+
           {/* Channel */}
           <div>
             <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-0.5">Channel</dt>

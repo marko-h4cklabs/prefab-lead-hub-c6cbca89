@@ -10,6 +10,7 @@ import AppointmentDetailDrawer from "@/components/appointments/AppointmentDetail
 import UpcomingPanel from "@/components/appointments/UpcomingPanel";
 import CalendarSchedulingRequests from "@/components/scheduling/CalendarSchedulingRequests";
 import { NormalizedSchedulingRequest, REQUEST_TYPE_LABELS } from "@/lib/schedulingRequestUtils";
+import FollowUpQueue from "@/components/calendar/FollowUpQueue";
 import {
   normalizeAppointmentList,
   NormalizedAppointment,
@@ -34,7 +35,7 @@ const SOURCE_OPTIONS = ["all", "manual", "chatbot", "inbox", "simulation"];
 const STATUS_OPTIONS = ["all", "scheduled", "completed", "cancelled", "no_show"];
 const TYPE_OPTIONS = ["all", "call", "site_visit", "meeting", "follow_up"];
 
-const CALENDAR_TABS = ["Appointments", "Scheduling Requests"] as const;
+const CALENDAR_TABS = ["Appointments", "Scheduling Requests", "Follow-ups"] as const;
 type CalendarTab = (typeof CALENDAR_TABS)[number];
 
 const Calendar = () => {
@@ -177,7 +178,9 @@ const Calendar = () => {
         ))}
       </div>
 
-      {calendarTab === "Scheduling Requests" ? (
+      {calendarTab === "Follow-ups" ? (
+        <FollowUpQueue />
+      ) : calendarTab === "Scheduling Requests" ? (
         <CalendarSchedulingRequests onConvertToAppointment={handleConvertRequest} />
       ) : (
       <>

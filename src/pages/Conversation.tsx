@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { api, requireCompanyId } from "@/lib/apiClient";
 import { toDisplayText, safeArray, getErrorMessage } from "@/lib/errorUtils";
 import { ArrowLeft, Send, Loader2, Bot, Timer, ImagePlus, CalendarDays, Bug, ChevronDown, ChevronRight } from "lucide-react";
+import AudioPlayer from "@/components/conversation/AudioPlayer";
+import VoiceRecorder from "@/components/conversation/VoiceRecorder";
 import { toast } from "@/hooks/use-toast";
 import PicturesThumbnails from "@/components/PicturesThumbnails";
 import BookingPanel, { BookingPayload, getBookingFlowLabel } from "@/components/conversation/BookingPanel";
@@ -19,6 +21,8 @@ interface Message {
   timestamp?: string;
   quick_replies?: QuickReply[];
   booking?: BookingPayload;
+  type?: string;
+  audio_url?: string;
 }
 
 interface ConversationData {
@@ -622,7 +626,20 @@ const Conversation = () => {
                               </span>
                             )}
                           </div>
-                          <p className="whitespace-pre-wrap">{msg.content}</p>
+                          {/* Audio message */}
+                          {(msg.type === "audio" || msg.audio_url) && msg.audio_url ? (
+                            <div className="space-y-2">
+                              <AudioPlayer src={msg.audio_url} />
+                              {msg.content && (
+                                <div>
+                                  <span className="text-[10px] font-mono uppercase tracking-wider opacity-50">Transcription</span>
+                                  <p className="whitespace-pre-wrap italic opacity-80">{msg.content}</p>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="whitespace-pre-wrap">{msg.content}</p>
+                          )}
                           {/* Inline booking panel — only on last active booking message */}
                           {showBookingHere && (
                             <BookingPanel
@@ -683,6 +700,20 @@ const Conversation = () => {
                 >
                   {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                 </button>
+                <VoiceRecorder
+                  onSend={async (blob) => {
+                    const convId = conversationId || leadId || "";
+                    const res = await api.sendVoiceMessage(convId, blob);
+                    if (res?.message || res?.assistant_message) {
+                      await applyBackendResponse(res);
+                    } else {
+                      // Refresh conversation
+                      const convo = await api.getConversation(companyId, leadId!);
+                      setData(convo);
+                      applyResponseFields(convo);
+                    }
+                  }}
+                />
                 <button
                   onClick={() => { clearTimers(); triggerAiReply(); }}
                   disabled={aiReplying}

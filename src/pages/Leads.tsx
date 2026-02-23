@@ -158,7 +158,11 @@ const Leads = () => {
 
   const getStatusId = (lead: any) => lead.status_id || "";
   const getStatusName = (lead: any) => lead.status_name || "New";
-  const getLeadName = (lead: any) => lead.name || lead.external_id || "—";
+  const getLeadName = (lead: any) => {
+    if (lead.name) return lead.name;
+    if (lead.channel && lead.external_id) return `${lead.channel} · ${lead.external_id}`;
+    return lead.external_id || "—";
+  };
 
   return (
     <div>
