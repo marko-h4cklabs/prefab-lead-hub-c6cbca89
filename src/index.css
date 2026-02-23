@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,49 +6,52 @@
 
 @layer base {
   :root {
-    --background: 220 14% 96%;
-    --foreground: 220 20% 10%;
+    --background: 0 0% 4%;
+    --foreground: 0 0% 100%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 220 20% 10%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 100%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 20% 10%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 100%;
 
-    --primary: 213 40% 32%;
-    --primary-foreground: 0 0% 98%;
+    --primary: 48 92% 53%;
+    --primary-foreground: 0 0% 4%;
 
-    --secondary: 220 14% 90%;
-    --secondary-foreground: 220 20% 10%;
+    --secondary: 0 0% 16%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 220 14% 92%;
-    --muted-foreground: 220 10% 46%;
+    --muted: 0 0% 13%;
+    --muted-foreground: 0 0% 63%;
 
-    --accent: 25 95% 53%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 48 92% 53%;
+    --accent-foreground: 0 0% 4%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 220 13% 86%;
-    --input: 220 13% 86%;
-    --ring: 213 40% 32%;
+    --border: 0 0% 16%;
+    --input: 0 0% 16%;
+    --ring: 48 92% 53%;
 
-    --radius: 0.375rem;
+    --radius: 0.5rem;
 
-    --sidebar-background: 220 20% 12%;
-    --sidebar-foreground: 220 10% 75%;
-    --sidebar-primary: 25 95% 53%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 18% 18%;
-    --sidebar-accent-foreground: 220 10% 90%;
-    --sidebar-border: 220 15% 20%;
-    --sidebar-ring: 25 95% 53%;
+    --sidebar-background: 0 0% 4%;
+    --sidebar-foreground: 0 0% 63%;
+    --sidebar-primary: 48 92% 53%;
+    --sidebar-primary-foreground: 0 0% 4%;
+    --sidebar-accent: 0 0% 13%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 0% 16%;
+    --sidebar-ring: 48 92% 53%;
 
-    --success: 152 60% 40%;
+    --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 10%;
+
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 100%;
   }
 }
 
@@ -62,66 +65,96 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-heading font-bold tracking-tight;
+    @apply font-sans font-bold tracking-tight;
+  }
+
+  /* Custom scrollbars */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(0 0% 7%);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(48 92% 53% / 0.3);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(48 92% 53% / 0.5);
   }
 }
 
 @layer components {
-  .industrial-input {
-    @apply bg-card border border-border rounded-sm px-3 py-2 text-sm font-mono
-           focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent
-           placeholder:text-muted-foreground transition-all;
+  .dark-input {
+    @apply bg-card border border-border rounded-md px-3 py-2 text-sm
+           focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent
+           placeholder:text-muted-foreground transition-all text-foreground;
   }
 
-  .industrial-btn {
+  .dark-btn {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold
-           rounded-sm transition-all duration-150 cursor-pointer
+           rounded-md transition-all duration-150 cursor-pointer
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
-  .industrial-btn-primary {
-    @apply industrial-btn bg-primary text-primary-foreground hover:bg-primary/90;
+  .dark-btn-primary {
+    @apply dark-btn bg-primary text-primary-foreground hover:bg-primary/90;
   }
 
-  .industrial-btn-accent {
-    @apply industrial-btn bg-accent text-accent-foreground hover:bg-accent/90;
+  .dark-btn-secondary {
+    @apply dark-btn bg-secondary text-secondary-foreground hover:bg-secondary/80;
   }
 
-  .industrial-btn-ghost {
-    @apply industrial-btn bg-transparent text-foreground hover:bg-secondary;
+  .dark-btn-ghost {
+    @apply dark-btn bg-transparent text-foreground hover:bg-secondary;
   }
 
-  .industrial-btn-destructive {
-    @apply industrial-btn bg-destructive text-destructive-foreground hover:bg-destructive/90;
+  .dark-btn-destructive {
+    @apply dark-btn bg-destructive text-destructive-foreground hover:bg-destructive/90;
   }
 
-  .industrial-card {
-    @apply bg-card border border-border rounded-sm shadow-sm;
+  .dark-card {
+    @apply bg-card border border-border rounded-lg;
   }
 
-  .industrial-table {
+  .dark-panel {
+    @apply bg-muted border border-border rounded-lg;
+  }
+
+  .dark-table {
     @apply w-full text-sm;
   }
 
-  .industrial-table th {
-    @apply px-4 py-3 text-left text-xs font-mono font-semibold uppercase tracking-wider
-           text-muted-foreground bg-muted/50 border-b;
+  .dark-table th {
+    @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider
+           text-muted-foreground bg-muted/50 border-b border-border;
   }
 
-  .industrial-table td {
+  .dark-table td {
     @apply px-4 py-3 border-b border-border;
   }
 
-  .industrial-table tr:hover td {
+  .dark-table tr:hover td {
     @apply bg-muted/30;
   }
 
+  /* Legacy aliases — keep old class names working */
+  .industrial-input { @apply dark-input; }
+  .industrial-btn { @apply dark-btn; }
+  .industrial-btn-primary { @apply dark-btn bg-secondary text-secondary-foreground hover:bg-secondary/80; }
+  .industrial-btn-accent { @apply dark-btn-primary; }
+  .industrial-btn-ghost { @apply dark-btn-ghost; }
+  .industrial-btn-destructive { @apply dark-btn-destructive; }
+  .industrial-card { @apply dark-card; }
+  .industrial-table { @apply dark-table; }
+
   .status-badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-sm text-xs font-mono font-semibold uppercase tracking-wider;
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold;
   }
 
   .status-new {
-    @apply status-badge bg-accent/15 text-accent;
+    @apply status-badge bg-primary/15 text-primary;
   }
 
   .status-qualified {
@@ -129,10 +162,10 @@
   }
 
   .status-disqualified {
-    @apply status-badge bg-destructive/15 text-destructive;
+    @apply status-badge bg-muted text-muted-foreground;
   }
 
   .status-pending {
-    @apply status-badge bg-warning/15 text-warning;
+    @apply status-badge bg-info/15 text-info;
   }
 }

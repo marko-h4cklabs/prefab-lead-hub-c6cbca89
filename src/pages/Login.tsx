@@ -16,10 +16,8 @@ const Login = () => {
     const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail) { setError("Email is required"); return; }
     if (!password) { setError("Password is required"); return; }
-
     setLoading(true);
     setError("");
-
     try {
       const res = await api.login(trimmedEmail, password);
       const token = res.token;
@@ -44,67 +42,36 @@ const Login = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="w-full max-w-md px-6">
-        <div className="industrial-card p-8">
+      <div className="w-full max-w-sm px-6">
+        <div className="dark-card p-8">
           <div className="mb-8 text-center">
-            <div className="mb-2 font-mono text-xs uppercase tracking-[0.3em] text-muted-foreground">
-              Prefab Lead Control
+            <div className="mx-auto mb-4 h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-lg">P</span>
             </div>
-            <h1 className="text-2xl font-bold text-foreground">System Login</h1>
+            <h1 className="text-xl font-bold text-foreground">Welcome back</h1>
+            <p className="text-sm text-muted-foreground mt-1">Sign in to your account</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => { setEmail(e.target.value); setError(""); }}
-                placeholder="you@company.com"
-                className="industrial-input w-full"
-                autoFocus
-                disabled={loading}
-              />
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Email</label>
+              <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }} placeholder="you@company.com" className="dark-input w-full" autoFocus disabled={loading} />
             </div>
-
             <div>
-              <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                Password
-              </label>
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Password</label>
               <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => { setPassword(e.target.value); setError(""); }}
-                  placeholder="••••••••"
-                  className="industrial-input w-full pr-10"
-                  disabled={loading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  tabIndex={-1}
-                >
+                <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }} placeholder="••••••••" className="dark-input w-full pr-10" disabled={loading} />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" tabIndex={-1}>
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
-
-            {error && (
-              <p className="mt-1.5 text-xs text-destructive font-mono">{error}</p>
-            )}
-
-            <button type="submit" disabled={loading} className="industrial-btn-accent w-full flex items-center justify-center gap-2">
-              {loading ? <><Loader2 size={16} className="animate-spin" /> Logging in…</> : "Log in"}
+            {error && <p className="text-xs text-destructive">{error}</p>}
+            <button type="submit" disabled={loading} className="dark-btn-primary w-full">
+              {loading ? <><Loader2 size={16} className="animate-spin" /> Signing in…</> : "Sign in"}
             </button>
-
             <div className="text-center">
-              <Link to="/signup" className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors">
-                Create account
-              </Link>
+              <Link to="/signup" className="text-xs text-muted-foreground hover:text-primary transition-colors">Create account</Link>
             </div>
           </form>
         </div>
