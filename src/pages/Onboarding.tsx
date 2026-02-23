@@ -8,13 +8,13 @@ const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
 const TOTAL_STEPS = 4;
 
 const QUOTE_PRESETS = [
-  { key: "full_name", label: "Full Name" },
-  { key: "email", label: "Email Address" },
-  { key: "phone", label: "Phone Number" },
-  { key: "budget", label: "Budget" },
-  { key: "location", label: "Location" },
-  { key: "time_window", label: "Time Window" },
-  { key: "additional_notes", label: "Additional Notes" },
+  { key: 'full_name', label: 'Full Name' },
+  { key: 'email_address', label: 'Email Address' },
+  { key: 'phone_number', label: 'Phone Number' },
+  { key: 'budget', label: 'Budget' },
+  { key: 'location', label: 'Location' },
+  { key: 'time_window', label: 'Time Window' },
+  { key: 'notes', label: 'Additional Notes' },
 ];
 
 /* ─── Progress Bar ─── */
@@ -328,8 +328,8 @@ const Onboarding = () => {
   // Step 3 state
   const [quoteEnabled, setQuoteEnabled] = useState<Record<string, boolean>>({
     full_name: true,
-    email: true,
-    phone: true,
+    email_address: true,
+    phone_number: true,
   });
 
   // Step 4 state
