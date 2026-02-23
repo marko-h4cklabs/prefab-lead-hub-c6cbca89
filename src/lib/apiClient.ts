@@ -515,4 +515,42 @@ export const api = {
 
   adminImpersonate: (companyId: string) =>
     request<any>(`/api/admin/workspaces/${companyId}/impersonate`, { method: "POST" }),
+
+  // --- Instagram Settings (read) ---
+  getInstagramSettings: () =>
+    request<any>("/api/settings/instagram"),
+
+  // --- Voice Messages ---
+  sendVoiceMessage: (conversationId: string, audioBlob: Blob) => {
+    const token = getAuthToken();
+    const companyId = getCompanyId();
+    const formData = new FormData();
+    formData.append("audio", audioBlob, "voice.webm");
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    if (companyId) headers["x-company-id"] = companyId;
+    return fetch(`${API_BASE}/api/conversations/${conversationId}/voice-message`, {
+      method: "POST",
+      headers,
+      body: formData,
+    }).then(async (res) => {
+      if (!res.ok) {
+        let message = `Upload failed (${res.status})`;
+        try { const json = await res.json(); message = json?.error || json?.message || message; } catch {}
+        throw new Error(typeof message === "string" ? message : JSON.stringify(message));
+      }
+      if (res.status === 204) return undefined;
+      return res.json();
+    });
+  },
+
+  // --- Follow-up Queue ---
+  getQueueStats: () =>
+    request<any>("/api/admin/queue/stats"),
+
+  scheduleFollowUp: (data: { lead_id: string; type: string; delay_minutes: number; message?: string }) =>
+    request<any>("/api/admin/queue/follow-up", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 };

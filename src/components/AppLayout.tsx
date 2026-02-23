@@ -66,6 +66,7 @@ const AppLayout = () => {
             <LogOut size={16} />
             Logout
           </button>
+          <div className="mt-2 px-3 text-[10px] font-mono text-sidebar-foreground/30">v1.0.0</div>
         </div>
       </aside>
 
