@@ -491,4 +491,21 @@ export const api = {
   // --- Admin ---
   runSnapshot: () =>
     request<any>("/api/admin/snapshot", { method: "POST" }),
+
+  adminGetStats: () =>
+    request<any>("/api/admin/stats"),
+
+  adminGetWorkspaces: (params?: { limit?: number; offset?: number; search?: string }) => {
+    const search = new URLSearchParams();
+    if (params?.limit !== undefined) search.set("limit", String(params.limit));
+    if (params?.offset !== undefined) search.set("offset", String(params.offset));
+    if (params?.search) search.set("search", params.search);
+    return request<any>(`/api/admin/workspaces?${search.toString()}`);
+  },
+
+  adminGetWorkspace: (companyId: string) =>
+    request<any>(`/api/admin/workspaces/${companyId}`),
+
+  adminImpersonate: (companyId: string) =>
+    request<any>(`/api/admin/workspaces/${companyId}/impersonate`, { method: "POST" }),
 };

@@ -20,6 +20,7 @@ import Fields from "./pages/Fields";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import AdminPanel from "./pages/AdminPanel";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +61,7 @@ const App = () => {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/" element={<Navigate to="/leads" replace />} />
+          <Route path="/admin" element={<AdminPanel />} />
           <Route element={<AppLayout />}>
             <Route path="/leads" element={<Leads />} />
             <Route path="/simulation" element={<Simulation />} />
