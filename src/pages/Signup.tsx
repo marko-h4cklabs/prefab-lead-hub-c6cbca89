@@ -34,7 +34,7 @@ const Signup = () => {
       const res = await api.signup(trimmedCompany, trimmedEmail, password);
       localStorage.setItem("auth_token", res.token);
       if (res.companyId) localStorage.setItem("company_id", res.companyId);
-      navigate("/leads");
+      navigate("/onboarding");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Signup failed";
       setError(typeof message === "string" ? message : "Signup failed");

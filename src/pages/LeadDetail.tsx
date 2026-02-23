@@ -279,6 +279,36 @@ const LeadDetail = () => {
         </dl>
       </div>
 
+      {/* Score Card */}
+      {(lead.score !== undefined && lead.score !== null) && (() => {
+        const score = Number(lead.score) || 0;
+        let barColor = "bg-destructive";
+        let textColor = "text-destructive";
+        if (score > 60) { barColor = "bg-success"; textColor = "text-success"; }
+        else if (score > 30) { barColor = "bg-warning"; textColor = "text-warning"; }
+        return (
+          <div className="industrial-card p-6 mt-4">
+            <div className="flex items-center gap-4 mb-3">
+              <div className={`text-3xl font-bold font-mono ${textColor}`}>{score}</div>
+              <div>
+                <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Lead Score</div>
+                {lead.score_updated_at && (
+                  <div className="text-[10px] font-mono text-muted-foreground mt-0.5">
+                    Updated {new Date(lead.score_updated_at).toLocaleString()}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="w-full h-2 rounded-sm bg-muted overflow-hidden">
+              <div className={`h-full rounded-sm transition-all ${barColor}`} style={{ width: `${Math.min(100, score)}%` }} />
+            </div>
+            {lead.score_reason && (
+              <p className="mt-2 text-sm italic text-muted-foreground">{lead.score_reason}</p>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Collected info section */}
       <div className="industrial-card p-6 mt-6">
         <h2 className="text-sm font-bold font-mono uppercase tracking-wider text-muted-foreground mb-4">

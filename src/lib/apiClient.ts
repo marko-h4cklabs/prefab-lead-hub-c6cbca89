@@ -488,6 +488,13 @@ export const api = {
     }
   },
 
+  // --- Instagram Settings ---
+  saveInstagramSettings: (data: { instagram_account_id: string; meta_page_access_token: string }) =>
+    request<any>("/api/settings/instagram", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
   // --- Admin ---
   runSnapshot: () =>
     request<any>("/api/admin/snapshot", { method: "POST" }),
