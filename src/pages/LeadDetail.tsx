@@ -12,6 +12,7 @@ import LeadDetailAppointments from "@/components/appointments/LeadDetailAppointm
 import AppointmentModal, { AppointmentFormData } from "@/components/appointments/AppointmentModal";
 import { NormalizedSchedulingRequest } from "@/lib/schedulingRequestUtils";
 import { REQUEST_TYPE_LABELS } from "@/lib/schedulingRequestUtils";
+
 function normalizeList(payload: unknown, keys: string[] = []): any[] {
   if (Array.isArray(payload)) return payload;
   if (payload && typeof payload === "object") {
@@ -37,12 +38,12 @@ const HIDDEN_FIELDS = new Set([
 
 const POLL_INTERVAL = 7_000;
 
-const statusClass = (name: string) => {
+const statusBadgeClass = (name: string) => {
   const s = name?.toLowerCase();
-  if (s === "new") return "status-new";
-  if (s === "qualified") return "status-qualified";
-  if (s === "disqualified") return "status-disqualified";
-  return "status-pending";
+  if (s === "new") return "bg-primary/15 text-primary";
+  if (s === "qualified") return "bg-success/15 text-success";
+  if (s === "disqualified") return "bg-secondary text-muted-foreground";
+  return "bg-info/15 text-info";
 };
 
 const LeadDetail = () => {
@@ -78,14 +79,12 @@ const LeadDetail = () => {
     fetchLead().finally(() => setLoading(false));
   }, [fetchLead]);
 
-  // Load statuses
   useEffect(() => {
     api.getLeadStatuses()
       .then((res) => setStatuses(normalizeList(res, ["statuses", "items", "data"])))
       .catch(() => {});
   }, []);
 
-  // Polling
   useEffect(() => {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(() => {
@@ -105,10 +104,8 @@ const LeadDetail = () => {
     const prev = { status_id: lead.status_id, status_name: lead.status_name };
     const newObj = statuses.find((s) => s.id === newStatusId);
     if (!newObj) return;
-
     setLead((l: any) => ({ ...l, status_id: newObj.id, status_name: newObj.name, updated_at: new Date().toISOString() }));
     setSavingStatus(true);
-
     try {
       await api.updateLeadStatus(leadId, newStatusId);
     } catch {
@@ -127,7 +124,6 @@ const LeadDetail = () => {
       setEditingName(false);
       return;
     }
-    // Allow only letters, spaces, unicode
     if (!/^[\p{L}\s]+$/u.test(trimmed)) {
       toast({ title: "Invalid name", description: "Name can only contain letters and spaces.", variant: "destructive" });
       return;
@@ -144,8 +140,8 @@ const LeadDetail = () => {
     }
   };
 
-  if (loading) return <div className="text-muted-foreground">Loading…</div>;
-  if (!lead) return <div className="text-destructive">Lead not found</div>;
+  if (loading) return <div className="flex items-center gap-2 p-8 text-muted-foreground"><Loader2 size={16} className="animate-spin" /> Loading…</div>;
+  if (!lead) return <div className="p-8 text-destructive">Lead not found</div>;
 
   const leadName = lead.name || lead.external_id || "—";
   const statusId = lead.status_id || "";
@@ -179,128 +175,73 @@ const LeadDetail = () => {
   };
 
   return (
-    <div>
-      <button onClick={() => navigate("/leads")} className="industrial-btn-ghost mb-4">
-        <ArrowLeft size={16} /> Back to Inbox
-      </button>
-
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold">Lead Detail</h1>
+    <div className="p-6 max-w-4xl space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div>
+            {editingName ? (
+              <div className="flex items-center gap-2">
+                <input className="dark-input py-1 px-2 text-lg font-bold w-48" value={nameValue} onChange={(e) => setNameValue(e.target.value)} onBlur={handleNameSave} onKeyDown={(e) => { if (e.key === "Enter") handleNameSave(); }} disabled={savingName} autoFocus />
+                {savingName && <Loader2 size={14} className="animate-spin text-muted-foreground" />}
+              </div>
+            ) : (
+              <h1 className="text-xl font-bold text-foreground cursor-pointer hover:text-primary transition-colors" onClick={() => { setEditingName(true); setNameValue(leadName); }}>
+                {leadName}
+              </h1>
+            )}
+            <div className="flex items-center gap-2 mt-1">
+              <span className={`status-badge text-xs ${statusBadgeClass(statusName)}`}>{statusName}</span>
+              {lead.channel && <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-md">{lead.channel}</span>}
+            </div>
+          </div>
+        </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setApptModalOpen(true)}
-            className="industrial-btn-accent"
-          >
-            <CalendarPlus size={16} /> Add to Calendar
+          <button onClick={() => setApptModalOpen(true)} className="dark-btn-primary text-sm">
+            <CalendarPlus size={14} /> Add to Calendar
           </button>
-          <button
-            onClick={() => navigate(`/leads/${leadId}/conversation`)}
-            className="industrial-btn-primary"
-          >
-            <MessageSquare size={16} /> View Conversation
+          <button onClick={() => navigate(`/leads/${leadId}/conversation`)} className="dark-btn-secondary text-sm">
+            <MessageSquare size={14} /> Conversation
           </button>
         </div>
       </div>
 
-      <div className="industrial-card p-6">
-        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
-          {/* Lead ID */}
+      {/* Lead metadata card */}
+      <div className="dark-card p-5">
+        <dl className="grid grid-cols-2 gap-x-8 gap-y-3">
           <div>
-            <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-0.5">Lead ID</dt>
-            <dd className="text-sm font-medium font-mono flex items-center gap-1.5">
+            <dt className="text-xs text-muted-foreground mb-0.5">Lead ID</dt>
+            <dd className="text-sm font-mono flex items-center gap-1.5">
               <span className="truncate max-w-[180px]">{leadId}</span>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(leadId || "");
-                  setCopiedId(true);
-                  setTimeout(() => setCopiedId(false), 2000);
-                }}
-                className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                title={copiedId ? "Copied!" : "Copy Lead ID"}
-              >
+              <button onClick={() => { navigator.clipboard.writeText(leadId || ""); setCopiedId(true); setTimeout(() => setCopiedId(false), 2000); }} className="shrink-0 text-muted-foreground hover:text-primary transition-colors" title={copiedId ? "Copied!" : "Copy Lead ID"}>
                 {copiedId ? <Check size={12} className="text-success" /> : <Copy size={12} />}
               </button>
-              {copiedId && <span className="text-[10px] text-success font-mono">Copied!</span>}
+              {copiedId && <span className="text-[10px] text-success">Copied!</span>}
             </dd>
           </div>
-
-          {/* Channel */}
           <div>
-            <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-0.5">Channel</dt>
-            <dd className="text-sm font-medium">{lead.channel || "—"}</dd>
-          </div>
-
-          {/* Name (editable) */}
-          <div>
-            <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-0.5">Name</dt>
-            <dd className="text-sm font-medium">
-              {editingName ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    className="industrial-input py-1 px-2 text-sm w-full max-w-[200px]"
-                    value={nameValue}
-                    onChange={(e) => setNameValue(e.target.value)}
-                    onBlur={handleNameSave}
-                    onKeyDown={(e) => { if (e.key === "Enter") handleNameSave(); }}
-                    disabled={savingName}
-                    autoFocus
-                  />
-                  {savingName && <Loader2 size={14} className="animate-spin text-muted-foreground" />}
-                </div>
-              ) : (
-                <span
-                  className="cursor-pointer hover:underline"
-                  onClick={() => { setEditingName(true); setNameValue(leadName); }}
-                >
-                  {leadName}
-                </span>
-              )}
-            </dd>
-          </div>
-
-          {/* Status (dropdown) */}
-          <div>
-            <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-0.5">Status</dt>
-            <dd className="text-sm font-medium">
+            <dt className="text-xs text-muted-foreground mb-0.5">Status</dt>
+            <dd>
               <div className="flex items-center gap-1.5">
-                <select
-                  value={statusId}
-                  onChange={(e) => handleStatusChange(e.target.value)}
-                  disabled={savingStatus}
-                  className={`industrial-input py-1 px-2 text-xs font-mono w-auto min-w-[100px] ${statusClass(statusName)}`}
-                >
-                  {statuses.length > 0 ? (
-                    statuses.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))
-                  ) : (
-                    <option value="">{statusName}</option>
-                  )}
+                <select value={statusId} onChange={(e) => handleStatusChange(e.target.value)} disabled={savingStatus} className="dark-input py-1 px-2 text-xs w-auto min-w-[100px]">
+                  {statuses.length > 0 ? statuses.map((s) => <option key={s.id} value={s.id}>{s.name}</option>) : <option value="">{statusName}</option>}
                 </select>
                 {savingStatus && <Loader2 size={12} className="animate-spin text-muted-foreground" />}
               </div>
             </dd>
           </div>
-
-          {/* Created at */}
           <div>
-            <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-0.5">Created at</dt>
-            <dd className="text-sm font-medium font-mono">
-              {(lead.created_at || lead.createdAt) ? new Date(lead.created_at || lead.createdAt).toLocaleString() : "—"}
-            </dd>
+            <dt className="text-xs text-muted-foreground mb-0.5">Created</dt>
+            <dd className="text-sm font-mono">{(lead.created_at || lead.createdAt) ? new Date(lead.created_at || lead.createdAt).toLocaleString() : "—"}</dd>
           </div>
-
-          {/* Updated at */}
           <div>
-            <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-0.5">Updated at</dt>
-            <dd className="text-sm font-medium font-mono">
-              {(lead.updated_at || lead.updatedAt) ? new Date(lead.updated_at || lead.updatedAt).toLocaleString() : "—"}
-            </dd>
+            <dt className="text-xs text-muted-foreground mb-0.5">Updated</dt>
+            <dd className="text-sm font-mono">{(lead.updated_at || lead.updatedAt) ? new Date(lead.updated_at || lead.updatedAt).toLocaleString() : "—"}</dd>
           </div>
         </dl>
       </div>
 
-      {/* Score Card */}
+      {/* Score */}
       {(lead.score !== undefined && lead.score !== null) && (() => {
         const score = Number(lead.score) || 0;
         let barColor = "bg-destructive";
@@ -308,56 +249,40 @@ const LeadDetail = () => {
         if (score > 60) { barColor = "bg-success"; textColor = "text-success"; }
         else if (score > 30) { barColor = "bg-warning"; textColor = "text-warning"; }
         return (
-          <div className="industrial-card p-6 mt-4">
+          <div className="dark-card p-5">
             <div className="flex items-center gap-4 mb-3">
               <div className={`text-3xl font-bold font-mono ${textColor}`}>{score}</div>
               <div>
-                <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Lead Score</div>
-                {lead.score_updated_at && (
-                  <div className="text-[10px] font-mono text-muted-foreground mt-0.5">
-                    Updated {new Date(lead.score_updated_at).toLocaleString()}
-                  </div>
-                )}
+                <div className="text-xs text-muted-foreground">Lead Score</div>
+                {lead.score_updated_at && <div className="text-[10px] text-muted-foreground mt-0.5">Updated {new Date(lead.score_updated_at).toLocaleString()}</div>}
               </div>
             </div>
-            <div className="w-full h-2 rounded-sm bg-muted overflow-hidden">
-              <div className={`h-full rounded-sm transition-all ${barColor}`} style={{ width: `${Math.min(100, score)}%` }} />
+            <div className="w-full h-2 rounded-full bg-secondary overflow-hidden">
+              <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${Math.min(100, score)}%` }} />
             </div>
-            {lead.score_reason && (
-              <p className="mt-2 text-sm italic text-muted-foreground">{lead.score_reason}</p>
-            )}
+            {lead.score_reason && <p className="mt-2 text-sm italic text-muted-foreground">{lead.score_reason}</p>}
           </div>
         );
       })()}
 
-      {/* Collected info section */}
-      <div className="industrial-card p-6 mt-6">
-        <h2 className="text-sm font-bold font-mono uppercase tracking-wider text-muted-foreground mb-4">
-          Collected info
-        </h2>
+      {/* Collected info */}
+      <div className="dark-card p-5">
+        <h2 className="text-sm font-semibold text-primary mb-3">Collected Info</h2>
         {collectedInfos.length > 0 ? (
           <dl className="space-y-2">
             {collectedInfos.map((info: any, i: number) => {
               const fieldName = (info.field_name || info.name || "").toLowerCase();
               if (fieldName === "pictures") {
                 const rawValue = info.value;
-                // Never treat pictures as boolean – only accept string URL arrays
                 const picUrls: string[] = Array.isArray(rawValue) ? rawValue.filter((v: any) => typeof v === "string") : [];
-                const picLinks: { label: string; url: string }[] =
-                  Array.isArray((info as any).links)
-                    ? (info as any).links
-                    : picUrls.map((url, j) => ({ label: `Picture ${j + 1}`, url }));
+                const picLinks: { label: string; url: string }[] = Array.isArray((info as any).links) ? (info as any).links : picUrls.map((url, j) => ({ label: `Picture ${j + 1}`, url }));
                 return (
                   <div key={i} className="flex flex-col gap-1 text-sm">
-                    <dt className="font-mono text-muted-foreground">Pictures received:</dt>
+                    <dt className="text-muted-foreground">Pictures received:</dt>
                     <dd>
                       {picLinks.length > 0 && (
                         <div className="flex flex-wrap gap-x-3 gap-y-0.5 mb-1">
-                          {picLinks.map((link, j) => (
-                            <a key={j} href={link.url} target="_blank" rel="noopener noreferrer" className="text-accent underline hover:text-accent/80 text-sm">
-                              {link.label}
-                            </a>
-                          ))}
+                          {picLinks.map((link, j) => <a key={j} href={link.url} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80 text-sm">{link.label}</a>)}
                         </div>
                       )}
                       <PicturesThumbnails urls={picUrls} />
@@ -367,13 +292,8 @@ const LeadDetail = () => {
               }
               return (
                 <div key={i} className="flex gap-2 text-sm">
-                  <dt className="font-mono text-muted-foreground min-w-[140px]">
-                    {info.field_name || info.name || `Field ${i + 1}`}:
-                  </dt>
-                  <dd className="font-medium">
-                    {toDisplayText(info.value)}
-                    {info.units ? ` (${toDisplayText(info.units)})` : ""}
-                  </dd>
+                  <dt className="text-muted-foreground min-w-[140px]">{info.field_name || info.name || `Field ${i + 1}`}:</dt>
+                  <dd className="font-medium">{toDisplayText(info.value)}{info.units ? ` (${toDisplayText(info.units)})` : ""}</dd>
                 </div>
               );
             })}
@@ -383,47 +303,22 @@ const LeadDetail = () => {
         )}
       </div>
 
-      {/* Inline Appointments from lead response */}
+      {/* Appointments */}
       <LeadDetailAppointments appointments={Array.isArray(lead?.appointments) ? lead.appointments : []} />
+      {leadId && <LeadAppointments key={apptRefreshKey} leadId={leadId} leadName={leadName} collectedSummary={collectedInfos.map((i: any) => `${i.field_name || i.name}: ${i.value}`).join(", ")} />}
+      {leadId && <LeadSchedulingRequests key={`sched-${schedReqRefreshKey}`} leadId={leadId} leadName={leadName} onConvertToAppointment={handleConvertRequest} />}
 
-      {/* Appointments Section (fetched separately) */}
-      {leadId && (
-        <LeadAppointments
-          key={apptRefreshKey}
-          leadId={leadId}
-          leadName={leadName}
-          collectedSummary={collectedInfos.map((i: any) => `${i.field_name || i.name}: ${i.value}`).join(", ")}
-        />
-      )}
-
-      {/* Scheduling Requests Section */}
-      {leadId && (
-        <LeadSchedulingRequests
-          key={`sched-${schedReqRefreshKey}`}
-          leadId={leadId}
-          leadName={leadName}
-          onConvertToAppointment={handleConvertRequest}
-        />
-      )}
-
-      {/* CRM Section */}
+      {/* CRM */}
       {leadId && <CrmSection leadId={leadId} />}
 
-      {/* Appointment Modal from header button or convert action */}
+      {/* Appointment Modal */}
       <AppointmentModal
         open={apptModalOpen}
-        onClose={() => {
-          setApptModalOpen(false);
-          setApptPrefillOverride(null);
-          setConvertingRequestId(null);
-        }}
+        onClose={() => { setApptModalOpen(false); setApptPrefillOverride(null); setConvertingRequestId(null); }}
         onSaved={async () => {
           setApptRefreshKey((k) => k + 1);
-          // If converting a scheduling request, mark it as converted
           if (convertingRequestId) {
-            try {
-              await api.updateSchedulingRequest(convertingRequestId, { status: "converted" });
-            } catch { /* best effort */ }
+            try { await api.updateSchedulingRequest(convertingRequestId, { status: "converted" }); } catch {}
             setConvertingRequestId(null);
             setSchedReqRefreshKey((k) => k + 1);
           }

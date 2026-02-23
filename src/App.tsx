@@ -11,6 +11,7 @@ import { getErrorMessage } from "@/lib/errorUtils";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import AppLayout from "./components/AppLayout";
+import InboxLayout from "./components/InboxLayout";
 import Leads from "./pages/Leads";
 import Simulation from "./pages/Simulation";
 import Calendar from "./pages/Calendar";
@@ -34,13 +35,11 @@ const App = () => {
         if (res.company_id) {
           localStorage.setItem("plcs_company_id", res.company_id);
         }
-      }).catch(() => {
-        // 401/403 handled globally in apiClient — token cleared, redirected to /login
-      });
+      }).catch(() => {});
     }
   }, []);
 
-  // Global safety net: catch unhandled promise rejections to prevent blank-page crashes
+  // Global safety net
   useEffect(() => {
     const handler = (event: PromiseRejectionEvent) => {
       console.error("Unhandled rejection:", event.reason);
@@ -65,10 +64,13 @@ const App = () => {
           <Route path="/admin" element={<AdminPanel />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route element={<AppLayout />}>
-            <Route path="/leads" element={<Leads />} />
+            {/* Inbox routes wrapped in InboxLayout (Zone 2 lead list) */}
+            <Route element={<InboxLayout />}>
+              <Route path="/leads" element={<Leads />} />
+              <Route path="/leads/:leadId" element={<LeadDetail />} />
+              <Route path="/leads/:leadId/conversation" element={<Conversation />} />
+            </Route>
             <Route path="/simulation" element={<Simulation />} />
-            <Route path="/leads/:leadId" element={<LeadDetail />} />
-            <Route path="/leads/:leadId/conversation" element={<Conversation />} />
             <Route path="/fields" element={<Fields />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/calendar" element={<Calendar />} />

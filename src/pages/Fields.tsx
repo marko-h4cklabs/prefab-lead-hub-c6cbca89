@@ -17,15 +17,9 @@ const Fields = () => {
     api.getSchedulingSettings()
       .then((res) => {
         const cb = res?.chatbot_booking && typeof res.chatbot_booking === "object" ? res.chatbot_booking : res;
-        setBookingStatus({
-          loaded: true,
-          enabled: Boolean(cb?.chatbot_booking_enabled),
-          mode: cb?.booking_mode || "off",
-        });
+        setBookingStatus({ loaded: true, enabled: Boolean(cb?.chatbot_booking_enabled), mode: cb?.booking_mode || "off" });
       })
-      .catch(() => {
-        setBookingStatus({ loaded: true, enabled: false, mode: "off" });
-      });
+      .catch(() => setBookingStatus({ loaded: true, enabled: false, mode: "off" }));
   }, []);
 
   const fetchSystemContext = () => {
@@ -33,9 +27,8 @@ const Fields = () => {
     api.getSystemContext()
       .then((res) => {
         let ctx = "";
-        if (typeof res === "string") {
-          ctx = res;
-        } else if (res && typeof res === "object") {
+        if (typeof res === "string") ctx = res;
+        else if (res && typeof res === "object") {
           const r = res as Record<string, unknown>;
           if (typeof r.systemContext === "string") ctx = r.systemContext;
           else if (typeof r.system_context === "string") ctx = r.system_context;
@@ -58,58 +51,55 @@ const Fields = () => {
 
   return (
     <div className="max-w-3xl space-y-6">
-      <h1 className="text-xl font-bold">Chatbot</h1>
+      <h1 className="text-xl font-bold">AI Agent</h1>
 
-      {/* Booking Status Indicator */}
-      <div className="industrial-card px-5 py-3 flex items-center justify-between">
+      {/* Booking Status */}
+      <div className="dark-card px-5 py-3 flex items-center justify-between border-l-4 border-l-primary">
         <div className="flex items-center gap-2.5">
-          <CalendarCheck size={14} className="text-muted-foreground" />
-          <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Booking offers</span>
+          <CalendarCheck size={14} className="text-primary" />
+          <span className="text-xs font-medium text-muted-foreground">Booking offers</span>
           {!bookingStatus.loaded ? (
             <Loader2 size={12} className="animate-spin text-muted-foreground" />
           ) : bookingStatus.enabled ? (
-            <span className="status-badge bg-accent/15 text-accent text-[10px]">
+            <span className="status-badge bg-primary/15 text-primary text-[10px]">
               Enabled · {bookingStatus.mode === "direct_booking" ? "Direct" : "Manual request"}
             </span>
           ) : (
-            <span className="status-badge bg-muted text-muted-foreground text-[10px]">Disabled</span>
+            <span className="status-badge bg-secondary text-muted-foreground text-[10px]">Disabled</span>
           )}
         </div>
-        <button
-          onClick={() => navigate("/settings")}
-          className="flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
-        >
+        <button onClick={() => navigate("/settings")} className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-primary transition-colors">
           <Settings size={10} /> Scheduling settings <ExternalLink size={8} />
         </button>
       </div>
 
-      <CompanyInfoSection />
-      <ChatbotBehaviorSection />
-      <QuoteFieldsSection />
+      {/* Agent Identity */}
+      <div className="dark-card border-l-4 border-l-primary">
+        <CompanyInfoSection />
+      </div>
+
+      {/* Behavior Rules */}
+      <div className="dark-card border-l-4 border-l-primary">
+        <ChatbotBehaviorSection />
+      </div>
+
+      {/* Data Collection */}
+      <div className="dark-card border-l-4 border-l-primary">
+        <QuoteFieldsSection />
+      </div>
 
       {/* System Context Preview */}
-      <div className="industrial-card">
-        <button
-          onClick={loadSystemContext}
-          className="flex w-full items-center justify-between px-6 py-4 text-sm font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
-        >
+      <div className="dark-card">
+        <button onClick={loadSystemContext} className="flex w-full items-center justify-between px-6 py-4 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors">
           System Context Preview
-          {contextLoading ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <ChevronDown size={14} className={`transition-transform ${contextOpen ? "rotate-180" : ""}`} />
-          )}
+          {contextLoading ? <Loader2 size={14} className="animate-spin" /> : <ChevronDown size={14} className={`transition-transform ${contextOpen ? "rotate-180" : ""}`} />}
         </button>
         {contextOpen && (
           <div className="px-6 pb-4">
             {systemContext ? (
-              <pre className="overflow-auto max-h-64 rounded-sm bg-muted p-4 text-xs font-mono whitespace-pre-wrap">
-                {systemContext}
-              </pre>
+              <pre className="overflow-auto max-h-64 rounded-md bg-secondary p-4 text-xs font-mono whitespace-pre-wrap">{systemContext}</pre>
             ) : (
-              <p className="text-sm text-muted-foreground py-4">
-                No context yet — fill Company info / Behavior / Quote requirements and Save.
-              </p>
+              <p className="text-sm text-muted-foreground py-4">No context yet — fill Agent Identity / Behavior / Data Collection and Save.</p>
             )}
           </div>
         )}
