@@ -14,7 +14,8 @@ interface QuickReply { label: string; value: string; }
 interface Message { role: string; content: string; timestamp?: string; quick_replies?: QuickReply[]; booking?: BookingPayload; type?: string; audio_url?: string; }
 interface ConversationData { lead_id: string; messages: Message[]; parsed_fields: Record<string, any>; current_step: number; }
 interface RequiredInfo { name: string; type?: string; units?: string; }
-interface BookingState { offered: boolean; awaitingSlotSelection: boolean; dismissed: boolean; bookedAppointmentId: string | null; lastOfferReason: string | null; slotsError: string | null; lastEndpoint: string | null; lastError: string | null; lastPayloadKeys: string | null; }
+interface CollectedInfo { field_name?: string; name?: string; value: any; units?: string; }
+interface BookingState { offered: boolean; awaitingSlotSelection: boolean; dismissed: boolean; bookedAppointmentId: string | null; lastOfferReason: string | null; slotsError: string | null; lastEndpoint: string | null; lastError: string | null; }
 
 const Conversation = () => {
   const { leadId } = useParams();
@@ -325,7 +326,7 @@ const Conversation = () => {
                 <div>awaitingSlots: {String(bookingFlowState.awaitingSlotSelection)}</div>
                 <div>dismissed: {String(bookingFlowState.dismissed)}</div>
                 <div>booked: {bookingFlowState.bookedAppointmentId || "—"}</div>
-                <button onClick={() => { const convKey = conversationId || leadId || ""; resetBookingFlow(convKey); setBookingFlowState({ offered: false, awaitingSlotSelection: false, dismissed: false, bookedAppointmentId: null, lastOfferReason: null, slotsError: null, lastEndpoint: null, lastError: null, lastPayloadKeys: null }); }} className="mt-1 text-primary hover:underline">Reset flow</button>
+                <button onClick={() => { const convKey = conversationId || leadId || ""; resetBookingFlow(convKey); setBookingFlowState({ offered: false, awaitingSlotSelection: false, dismissed: false, bookedAppointmentId: null, lastOfferReason: null, slotsError: null, lastEndpoint: null, lastError: null }); }} className="mt-1 text-primary hover:underline">Reset flow</button>
               </div>
             )}
           </div>
