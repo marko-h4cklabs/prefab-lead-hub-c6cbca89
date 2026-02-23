@@ -374,10 +374,10 @@ const Onboarding = () => {
     setSaving(true);
     try {
       const presets = QUOTE_PRESETS.map((p, i) => ({
-        key: p.key,
+        name: p.key,
         label: p.label,
-        enabled: !!quoteEnabled[p.key],
-        rank: i + 1,
+        is_enabled: !!quoteEnabled[p.key],
+        priority: i + 1,
       }));
       await api.putQuoteFields({ presets });
       setStep(4);
