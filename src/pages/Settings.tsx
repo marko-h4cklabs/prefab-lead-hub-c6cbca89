@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { api, requireCompanyId } from "@/lib/apiClient";
-import { Activity, Loader2, Save, Wand2, MessageSquare } from "lucide-react";
+import { Activity, Loader2, Save, Wand2, MessageSquare, Eye, EyeOff, Check } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
@@ -32,9 +32,15 @@ const Settings = () => {
 
   // ManyChat settings
   const [mcApiKey, setMcApiKey] = useState("");
+  const [mcApiKeyInitial, setMcApiKeyInitial] = useState("");
   const [mcPageId, setMcPageId] = useState("");
+  const [mcPageIdInitial, setMcPageIdInitial] = useState("");
   const [mcLoading, setMcLoading] = useState(false);
   const [savingMc, setSavingMc] = useState(false);
+  const [mcShowKey, setMcShowKey] = useState(false);
+  const [mcSaveSuccess, setMcSaveSuccess] = useState(false);
+  const [mcSaveError, setMcSaveError] = useState("");
+  const mcSuccessTimer = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     Promise.all([
@@ -57,8 +63,12 @@ const Settings = () => {
     setMcLoading(true);
     api.getManychatSettings()
       .then((res) => {
-        setMcApiKey(res?.manychat_api_key || "");
-        setMcPageId(res?.manychat_page_id || "");
+        const key = res?.manychat_api_key || "";
+        const pid = res?.manychat_page_id || "";
+        setMcApiKey(key);
+        setMcApiKeyInitial(key);
+        setMcPageId(pid);
+        setMcPageIdInitial(pid);
       })
       .catch(() => {})
       .finally(() => setMcLoading(false));
@@ -229,61 +239,113 @@ const Settings = () => {
           </div>
 
           {/* ManyChat Connection */}
-          <div className="industrial-card p-6 mt-6 space-y-4">
+          <div className="mt-6 rounded-lg border border-[hsl(0_0%_16.5%)] bg-[hsl(0_0%_10%)] border-l-4 border-l-primary space-y-4 p-6">
             <div className="flex items-center gap-2">
-              <MessageSquare size={16} className="text-muted-foreground" />
+              <MessageSquare size={16} className="text-primary" />
               <h2 className="text-sm font-bold uppercase tracking-wider">ManyChat Connection</h2>
             </div>
+
+            {/* Connection status */}
+            {!mcLoading && (
+              <div className="flex items-center gap-2">
+                {mcApiKeyInitial && mcPageIdInitial ? (
+                  <>
+                    <span className="h-2 w-2 rounded-full bg-green-500" />
+                    <span className="text-xs font-medium text-green-500">Connected</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="h-2 w-2 rounded-full bg-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground">Not configured</span>
+                  </>
+                )}
+              </div>
+            )}
+
             {mcLoading ? (
               <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <Loader2 size={14} className="animate-spin" /> Loading…
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
+                {/* API Key */}
                 <div>
                   <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">ManyChat API Key</label>
-                  <input
-                    type="password"
-                    value={mcApiKey}
-                    onChange={(e) => setMcApiKey(e.target.value)}
-                    className="industrial-input w-full"
-                    placeholder="Your ManyChat API key"
-                  />
+                  <div className="relative">
+                    <input
+                      type={mcShowKey ? "text" : "password"}
+                      value={mcApiKey}
+                      onChange={(e) => setMcApiKey(e.target.value)}
+                      className="industrial-input w-full pr-10"
+                      placeholder="Paste your ManyChat API key"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setMcShowKey((v) => !v)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {mcShowKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">Find this in ManyChat → Settings → API</p>
                 </div>
+
+                {/* Page ID */}
                 <div>
                   <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">ManyChat Page ID</label>
                   <input
+                    type="text"
                     value={mcPageId}
                     onChange={(e) => setMcPageId(e.target.value)}
                     className="industrial-input w-full"
-                    placeholder="e.g. 123456789"
+                    placeholder="e.g. fb4424565"
                   />
+                  <p className="mt-1 text-xs text-muted-foreground">Found in your ManyChat dashboard URL: app.manychat.com/YOUR_PAGE_ID/...</p>
                 </div>
+
+                {/* Save button */}
                 <button
                   onClick={async () => {
-                    if (!mcApiKey.trim()) {
-                      toast({ title: "API Key is required", variant: "destructive" });
-                      return;
-                    }
+                    setMcSaveError("");
                     setSavingMc(true);
                     try {
-                      await api.saveManychatSettings({
-                        manychat_api_key: mcApiKey.trim(),
-                        manychat_page_id: mcPageId.trim(),
-                      });
-                      toast({ title: "ManyChat settings saved" });
+                      const body: Record<string, string> = {};
+                      if (mcApiKey.trim() !== mcApiKeyInitial) body.manychat_api_key = mcApiKey.trim();
+                      if (mcPageId.trim() !== mcPageIdInitial) body.manychat_page_id = mcPageId.trim();
+                      if (Object.keys(body).length === 0) {
+                        setSavingMc(false);
+                        return;
+                      }
+                      await api.saveManychatSettings(body as any);
+                      setMcApiKeyInitial(mcApiKey.trim());
+                      setMcPageIdInitial(mcPageId.trim());
+                      setMcSaveSuccess(true);
+                      if (mcSuccessTimer.current) clearTimeout(mcSuccessTimer.current);
+                      mcSuccessTimer.current = setTimeout(() => setMcSaveSuccess(false), 2000);
                     } catch (err: unknown) {
-                      toast({ title: "Failed to save", description: getErrorMessage(err), variant: "destructive" });
+                      setMcSaveError(getErrorMessage(err));
                     } finally {
                       setSavingMc(false);
                     }
                   }}
-                  disabled={savingMc}
-                  className="industrial-btn-primary"
+                  disabled={savingMc || mcSaveSuccess}
+                  className="w-full rounded-md bg-primary text-primary-foreground font-semibold py-2.5 px-4 flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-60"
                 >
-                  {savingMc ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                  <span className="ml-1">Save</span>
+                  {savingMc ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : mcSaveSuccess ? (
+                    <>
+                      <Check size={16} />
+                      <span>Saved</span>
+                    </>
+                  ) : (
+                    <span>Save ManyChat Settings</span>
+                  )}
                 </button>
+
+                {mcSaveError && (
+                  <p className="text-sm text-destructive">{mcSaveError}</p>
+                )}
               </div>
             )}
           </div>
