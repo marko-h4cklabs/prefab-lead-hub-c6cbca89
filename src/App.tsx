@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -23,22 +23,33 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import AdminPanel from "./pages/AdminPanel";
 import Onboarding from "./pages/Onboarding";
+import ModeSelectionScreen from "./components/ModeSelectionScreen";
 
 const queryClient = new QueryClient();
 
-const App = () => {
+const ModeGate = ({ children }: { children: React.ReactNode }) => {
+  const [checking, setChecking] = useState(true);
+  const [needsMode, setNeedsMode] = useState(false);
+
   useEffect(() => {
-    // Session restore: validate existing token on app load
-    const token = localStorage.getItem("plcs_token");
-    if (token) {
-      api.me().then((res) => {
-        if (res.company_id) {
-          localStorage.setItem("plcs_company_id", res.company_id);
-        }
-      }).catch(() => {});
-    }
+    const token = localStorage.getItem("auth_token") || localStorage.getItem("plcs_token");
+    if (!token) { setChecking(false); return; }
+    api.me()
+      .then((res) => {
+        if (res.company_id) localStorage.setItem("plcs_company_id", res.company_id);
+        const mode = (res as any).operating_mode ?? (res.user as any)?.operating_mode ?? null;
+        setNeedsMode(mode === null || mode === undefined);
+      })
+      .catch(() => {})
+      .finally(() => setChecking(false));
   }, []);
 
+  if (checking) return null;
+  if (needsMode) return <ModeSelectionScreen />;
+  return <>{children}</>;
+};
+
+const App = () => {
   // Global safety net
   useEffect(() => {
     const handler = (event: PromiseRejectionEvent) => {
@@ -63,7 +74,7 @@ const App = () => {
           <Route path="/" element={<Navigate to="/leads" replace />} />
           <Route path="/admin" element={<AdminPanel />} />
           <Route path="/onboarding" element={<Onboarding />} />
-          <Route element={<AppLayout />}>
+          <Route element={<ModeGate><AppLayout /></ModeGate>}>
             {/* Inbox routes wrapped in InboxLayout (Zone 2 lead list) */}
             <Route element={<InboxLayout />}>
               <Route path="/leads" element={<Leads />} />

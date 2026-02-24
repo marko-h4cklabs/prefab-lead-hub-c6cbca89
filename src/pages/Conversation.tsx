@@ -9,6 +9,8 @@ import { toast } from "@/hooks/use-toast";
 import PicturesThumbnails from "@/components/PicturesThumbnails";
 import BookingPanel, { BookingPayload, getBookingFlowLabel } from "@/components/conversation/BookingPanel";
 import { processAiReply, detectBookingIntent, getFlow, dismissBookingFlow, resetBookingFlow, type BookingFlowState } from "@/lib/bookingOrchestrator";
+import LeadIntelligence from "@/components/LeadIntelligence";
+import ReplySuggestions from "@/components/conversation/ReplySuggestions";
 
 interface QuickReply { label: string; value: string; }
 interface Message { role: string; content: string; timestamp?: string; quick_replies?: QuickReply[]; booking?: BookingPayload; type?: string; audio_url?: string; }
@@ -42,6 +44,7 @@ const Conversation = () => {
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const delayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [operatingMode, setOperatingMode] = useState<string | null>(null);
 
   const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
   const clearTimers = useCallback(() => {
@@ -63,6 +66,14 @@ const Conversation = () => {
     api.getConversation(companyId, leadId).then((convo) => { setData(convo); applyResponseFields(convo); }).catch(() => { toast({ title: "Error", description: "Failed to load conversation", variant: "destructive" }); }).finally(() => setLoading(false));
   }, [leadId]);
   useEffect(() => { scrollToBottom(); }, [data?.messages]);
+
+  // Fetch operating mode
+  useEffect(() => {
+    api.me().then((res) => {
+      const mode = (res as any).operating_mode ?? (res.user as any)?.operating_mode ?? null;
+      setOperatingMode(mode);
+    }).catch(() => {});
+  }, []);
 
   const extractBooking = (res: any): BookingPayload | undefined => {
     const candidates = [res?.booking, res?.meta?.booking, res?.ui_action?.booking];
@@ -283,38 +294,52 @@ const Conversation = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Composer */}
-          <div className="shrink-0 p-4 border-t border-border bg-card">
-            <div className="flex gap-2">
-              <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={handleKeyDown} placeholder="Type a message… (Enter to send)" rows={2} className="dark-input flex-1 resize-none" disabled={sending} />
-              <div className="flex flex-col gap-1 self-end">
-                <button onClick={handleSend} disabled={!draft.trim() || sending} className="dark-btn-primary h-[28px] px-4">
-                  {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                </button>
-                <VoiceRecorder onSend={async (blob) => {
-                  const convId = conversationId || leadId || "";
-                  const res = await api.sendVoiceMessage(convId, blob);
-                  if (res?.message || res?.assistant_message) { await applyBackendResponse(res); } else { const convo = await api.getConversation(companyId, leadId!); setData(convo); applyResponseFields(convo); }
-                }} />
-                <button onClick={() => { clearTimers(); triggerAiReply(); }} disabled={aiReplying} className="dark-btn bg-secondary text-secondary-foreground hover:bg-secondary/80 h-[28px] px-3">
-                  {aiReplying ? <Loader2 size={14} className="animate-spin" /> : <Bot size={14} />}
-                  <span className="text-xs ml-1">AI</span>
-                </button>
-                {picturesRequired && (
-                  <>
-                    <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleImageUpload(e.target.files)} />
-                    <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="dark-btn-ghost h-[28px] px-3 border border-border">
-                      {uploading ? <Loader2 size={14} className="animate-spin" /> : <ImagePlus size={14} />}
-                    </button>
-                  </>
-                )}
+          {/* Composer / Suggestions */}
+          {operatingMode === "copilot" ? (
+            <ReplySuggestions
+              leadId={leadId || ""}
+              conversationId={conversationId}
+              onMessageSent={(content) => {
+                setData((prev) => ({ ...prev, lead_id: prev?.lead_id || leadId || "", messages: [...(prev?.messages || []), { role: "user", content }], parsed_fields: prev?.parsed_fields || {}, current_step: prev?.current_step ?? 0 }));
+                // Re-fetch conversation to get backend state
+                if (leadId) api.getConversation(companyId, leadId).then((convo) => { setData(convo); applyResponseFields(convo); }).catch(() => {});
+              }}
+              lastMessageCount={messages.length}
+            />
+          ) : (
+            <div className="shrink-0 p-4 border-t border-border bg-card">
+              <div className="flex gap-2">
+                <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={handleKeyDown} placeholder="Type a message… (Enter to send)" rows={2} className="dark-input flex-1 resize-none" disabled={sending} />
+                <div className="flex flex-col gap-1 self-end">
+                  <button onClick={handleSend} disabled={!draft.trim() || sending} className="dark-btn-primary h-[28px] px-4">
+                    {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                  </button>
+                  <VoiceRecorder onSend={async (blob) => {
+                    const convId = conversationId || leadId || "";
+                    const res = await api.sendVoiceMessage(convId, blob);
+                    if (res?.message || res?.assistant_message) { await applyBackendResponse(res); } else { const convo = await api.getConversation(companyId, leadId!); setData(convo); applyResponseFields(convo); }
+                  }} />
+                  <button onClick={() => { clearTimers(); triggerAiReply(); }} disabled={aiReplying} className="dark-btn bg-secondary text-secondary-foreground hover:bg-secondary/80 h-[28px] px-3">
+                    {aiReplying ? <Loader2 size={14} className="animate-spin" /> : <Bot size={14} />}
+                    <span className="text-xs ml-1">AI</span>
+                  </button>
+                  {picturesRequired && (
+                    <>
+                      <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleImageUpload(e.target.files)} />
+                      <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="dark-btn-ghost h-[28px] px-3 border border-border">
+                        {uploading ? <Loader2 size={14} className="animate-spin" /> : <ImagePlus size={14} />}
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Sidebar */}
         <aside className="hidden lg:block w-64 shrink-0 overflow-y-auto border-l border-border bg-card p-4 space-y-3">
+          {leadId && <LeadIntelligence leadId={leadId} />}
           <HighlightsPanel />
           <div className="dark-panel p-3">
             <button onClick={() => setDebugOpen(!debugOpen)} className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground hover:text-foreground w-full">

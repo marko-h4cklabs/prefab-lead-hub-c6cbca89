@@ -6,6 +6,7 @@ import { toast } from "@/hooks/use-toast";
 import { toDisplayText, safeArray, getErrorMessage } from "@/lib/errorUtils";
 import PicturesThumbnails from "@/components/PicturesThumbnails";
 import CrmSection from "@/components/crm/CrmSection";
+import LeadIntelligence from "@/components/LeadIntelligence";
 import LeadAppointments from "@/components/appointments/LeadAppointments";
 import LeadSchedulingRequests from "@/components/scheduling/LeadSchedulingRequests";
 import LeadDetailAppointments from "@/components/appointments/LeadDetailAppointments";
@@ -302,6 +303,9 @@ const LeadDetail = () => {
           <p className="text-sm text-muted-foreground">None yet</p>
         )}
       </div>
+
+      {/* Intelligence */}
+      {leadId && <LeadIntelligence leadId={leadId} />}
 
       {/* Appointments */}
       <LeadDetailAppointments appointments={Array.isArray(lead?.appointments) ? lead.appointments : []} />
