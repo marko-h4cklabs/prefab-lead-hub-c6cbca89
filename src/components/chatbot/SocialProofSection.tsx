@@ -20,6 +20,8 @@ const PLACEHOLDER = `• "We helped a coaching business go from 3 to 12 clients 
 • "Our average client sees ROI within the first 30 days"
 • "Over 500 businesses have used our system"`;
 
+const STORAGE_KEY = "chatbot_social_draft";
+
 const SocialProofSection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirty?: () => void }) => {
   const [data, setData] = useState<SocialProofState>(DEFAULTS);
   const [loading, setLoading] = useState(true);
@@ -41,17 +43,38 @@ const SocialProofSection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirt
       api.getSocialProofImages().catch(() => []),
     ]).then(([res, imgs]) => {
       if (res) {
-        const merged: SocialProofState = {
-          enabled: res.enabled ?? res.social_proof_enabled ?? false,
-          examples: res.examples || res.social_proof_examples || "",
-        };
-        setData(merged);
-        initialRef.current = JSON.stringify(merged);
+        const hasRealData = res.examples || res.social_proof_examples || res.enabled || res.social_proof_enabled;
+        if (hasRealData) {
+          const merged: SocialProofState = {
+            enabled: res.enabled ?? res.social_proof_enabled ?? false,
+            examples: res.examples || res.social_proof_examples || "",
+          };
+          setData(merged);
+          initialRef.current = JSON.stringify(merged);
+          sessionStorage.removeItem(STORAGE_KEY);
+        } else {
+          const draft = sessionStorage.getItem(STORAGE_KEY);
+          if (draft) {
+            try { setData(JSON.parse(draft)); } catch {}
+          }
+        }
+      } else {
+        const draft = sessionStorage.getItem(STORAGE_KEY);
+        if (draft) {
+          try { setData(JSON.parse(draft)); } catch {}
+        }
       }
       const imgList = Array.isArray(imgs) ? imgs : (imgs as any)?.images || [];
       setImages(imgList);
     }).finally(() => setLoading(false));
   }, []);
+
+  // SessionStorage backup
+  useEffect(() => {
+    if (!loading) {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+  }, [data, loading]);
 
   const update = (patch: Partial<SocialProofState>) => {
     setData((prev) => {
@@ -71,6 +94,7 @@ const SocialProofSection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirt
       initialRef.current = JSON.stringify(data);
       setIsDirty(false);
       setSaveStatus('saved');
+      sessionStorage.removeItem(STORAGE_KEY);
       onSaved?.();
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (err: any) {

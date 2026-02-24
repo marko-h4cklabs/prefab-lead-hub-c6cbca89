@@ -90,7 +90,7 @@ function reassignPriorities(presets: AllPresetsState, orderedIds: string[]): All
   return next;
 }
 
-const QuoteFieldsSection = () => {
+const QuoteFieldsSection = ({ onFieldsChanged }: { onFieldsChanged?: () => void }) => {
   const [presets, setPresets] = useState<AllPresetsState>(buildDefault);
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [loading, setLoading] = useState(true);
@@ -220,6 +220,7 @@ const QuoteFieldsSection = () => {
       setNewLabel("");
       setNewType("text");
       toast({ title: "Custom field added" });
+      onFieldsChanged?.();
     } catch (err) {
       toast({ title: "Failed to add field", description: getErrorMessage(err), variant: "destructive" });
     } finally { setAddingCustom(false); }
@@ -232,6 +233,7 @@ const QuoteFieldsSection = () => {
       await api.deleteQuoteField(id);
       setCustomFields((prev) => prev.filter((f) => f.id !== id));
       toast({ title: "Field removed" });
+      onFieldsChanged?.();
     } catch (err) {
       toast({ title: "Failed to remove", description: getErrorMessage(err), variant: "destructive" });
     } finally { setDeletingId(null); }

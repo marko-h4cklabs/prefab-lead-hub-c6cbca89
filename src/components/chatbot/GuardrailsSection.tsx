@@ -18,6 +18,8 @@ const DEFAULTS: GuardrailsState = {
   max_messages_before_handoff: 20,
 };
 
+const STORAGE_KEY = "chatbot_guardrails_draft";
+
 const GuardrailsSection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirty?: () => void }) => {
   const [data, setData] = useState<GuardrailsState>(DEFAULTS);
   const [loading, setLoading] = useState(true);
@@ -29,19 +31,40 @@ const GuardrailsSection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirty
   useEffect(() => {
     api.getGuardrails()
       .then((res) => {
-        const merged: GuardrailsState = {
-          bot_deny_response: res.bot_deny_response || "",
-          prohibited_topics: res.prohibited_topics || "",
-          handoff_trigger: res.handoff_trigger || "",
-          human_fallback_message: res.human_fallback_message || "",
-          max_messages_before_handoff: res.max_messages_before_handoff ?? 20,
-        };
-        setData(merged);
-        initialRef.current = JSON.stringify(merged);
+        const hasRealData = res.bot_deny_response || res.prohibited_topics || res.handoff_trigger;
+        if (hasRealData) {
+          const merged: GuardrailsState = {
+            bot_deny_response: res.bot_deny_response || "",
+            prohibited_topics: res.prohibited_topics || "",
+            handoff_trigger: res.handoff_trigger || "",
+            human_fallback_message: res.human_fallback_message || "",
+            max_messages_before_handoff: res.max_messages_before_handoff ?? 20,
+          };
+          setData(merged);
+          initialRef.current = JSON.stringify(merged);
+          sessionStorage.removeItem(STORAGE_KEY);
+        } else {
+          const draft = sessionStorage.getItem(STORAGE_KEY);
+          if (draft) {
+            try { setData(JSON.parse(draft)); } catch {}
+          }
+        }
       })
-      .catch(() => {})
+      .catch(() => {
+        const draft = sessionStorage.getItem(STORAGE_KEY);
+        if (draft) {
+          try { setData(JSON.parse(draft)); } catch {}
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
+
+  // SessionStorage backup
+  useEffect(() => {
+    if (!loading) {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+  }, [data, loading]);
 
   const update = (patch: Partial<GuardrailsState>) => {
     setData((prev) => {
@@ -61,6 +84,7 @@ const GuardrailsSection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirty
       initialRef.current = JSON.stringify(data);
       setIsDirty(false);
       setSaveStatus('saved');
+      sessionStorage.removeItem(STORAGE_KEY);
       onSaved?.();
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (err: any) {

@@ -42,6 +42,8 @@ const DEFAULTS: StrategyState = {
   price_reveal: "qualify",
 };
 
+const STORAGE_KEY = "chatbot_strategy_draft";
+
 const ConversationStrategySection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirty?: () => void }) => {
   const [data, setData] = useState<StrategyState>(DEFAULTS);
   const [loading, setLoading] = useState(true);
@@ -53,19 +55,40 @@ const ConversationStrategySection = ({ onSaved, onDirty }: { onSaved?: () => voi
   useEffect(() => {
     api.getConversationStrategy()
       .then((res) => {
-        const merged: StrategyState = {
-          primary_goal: res.primary_goal || res.conversation_goal || "",
-          follow_up_style: res.follow_up_style || "gentle",
-          closing_style: res.closing_style || "soft",
-          competitor_mentions: res.competitor_mentions || "deflect",
-          price_reveal: res.price_reveal || "qualify",
-        };
-        setData(merged);
-        initialRef.current = JSON.stringify(merged);
+        const hasRealData = res.primary_goal || res.conversation_goal || res.follow_up_style;
+        if (hasRealData) {
+          const merged: StrategyState = {
+            primary_goal: res.primary_goal || res.conversation_goal || "",
+            follow_up_style: res.follow_up_style || "gentle",
+            closing_style: res.closing_style || "soft",
+            competitor_mentions: res.competitor_mentions || "deflect",
+            price_reveal: res.price_reveal || "qualify",
+          };
+          setData(merged);
+          initialRef.current = JSON.stringify(merged);
+          sessionStorage.removeItem(STORAGE_KEY);
+        } else {
+          const draft = sessionStorage.getItem(STORAGE_KEY);
+          if (draft) {
+            try { setData(JSON.parse(draft)); } catch {}
+          }
+        }
       })
-      .catch(() => {})
+      .catch(() => {
+        const draft = sessionStorage.getItem(STORAGE_KEY);
+        if (draft) {
+          try { setData(JSON.parse(draft)); } catch {}
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
+
+  // SessionStorage backup
+  useEffect(() => {
+    if (!loading) {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+  }, [data, loading]);
 
   const update = (patch: Partial<StrategyState>) => {
     setData((prev) => {
@@ -85,6 +108,7 @@ const ConversationStrategySection = ({ onSaved, onDirty }: { onSaved?: () => voi
       initialRef.current = JSON.stringify(data);
       setIsDirty(false);
       setSaveStatus('saved');
+      sessionStorage.removeItem(STORAGE_KEY);
       onSaved?.();
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (err: any) {

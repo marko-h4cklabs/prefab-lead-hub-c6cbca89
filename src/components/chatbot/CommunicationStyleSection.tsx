@@ -55,6 +55,8 @@ const DEFAULTS: StyleState = {
   language: "en",
 };
 
+const STORAGE_KEY = "chatbot_style_draft";
+
 const CommunicationStyleSection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirty?: () => void }) => {
   const [data, setData] = useState<StyleState>(DEFAULTS);
   const [loading, setLoading] = useState(true);
@@ -66,19 +68,40 @@ const CommunicationStyleSection = ({ onSaved, onDirty }: { onSaved?: () => void;
   useEffect(() => {
     api.getChatbotBehavior()
       .then((res) => {
-        const merged: StyleState = {
-          tone: res.tone || "professional",
-          response_length: res.response_length || "medium",
-          opener_style: res.opener_style || "casual",
-          emojis_enabled: res.emojis_enabled ?? false,
-          language: res.language_code || res.language || "en",
-        };
-        setData(merged);
-        initialRef.current = JSON.stringify(merged);
+        const hasRealData = res.tone || res.response_length;
+        if (hasRealData) {
+          const merged: StyleState = {
+            tone: res.tone || "professional",
+            response_length: res.response_length || "medium",
+            opener_style: res.opener_style || "casual",
+            emojis_enabled: res.emojis_enabled ?? false,
+            language: res.language_code || res.language || "en",
+          };
+          setData(merged);
+          initialRef.current = JSON.stringify(merged);
+          sessionStorage.removeItem(STORAGE_KEY);
+        } else {
+          const draft = sessionStorage.getItem(STORAGE_KEY);
+          if (draft) {
+            try { setData(JSON.parse(draft)); } catch {}
+          }
+        }
       })
-      .catch(() => {})
+      .catch(() => {
+        const draft = sessionStorage.getItem(STORAGE_KEY);
+        if (draft) {
+          try { setData(JSON.parse(draft)); } catch {}
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
+
+  // SessionStorage backup
+  useEffect(() => {
+    if (!loading) {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+  }, [data, loading]);
 
   const update = (patch: Partial<StyleState>) => {
     setData((prev) => {
@@ -104,6 +127,7 @@ const CommunicationStyleSection = ({ onSaved, onDirty }: { onSaved?: () => void;
       initialRef.current = JSON.stringify(data);
       setIsDirty(false);
       setSaveStatus('saved');
+      sessionStorage.removeItem(STORAGE_KEY);
       onSaved?.();
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (err: any) {

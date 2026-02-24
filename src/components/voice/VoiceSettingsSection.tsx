@@ -61,7 +61,6 @@ const VoiceSettingsSection = () => {
   const [clones, setClones] = useState<VoiceClone[]>([]);
   const [usage, setUsage] = useState<VoiceUsage | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
 
   // Voice preview
   const [previewingId, setPreviewingId] = useState<string | null>(null);
@@ -82,10 +81,12 @@ const VoiceSettingsSection = () => {
   // Fine-tuning
   const [testText, setTestText] = useState("Hey, thanks for reaching out! I'd love to tell you more about what we offer.");
   const [testPlaying, setTestPlaying] = useState(false);
-  const [settingsSaved, setSettingsSaved] = useState(false);
 
   // Voice tab
   const [voiceTab, setVoiceTab] = useState("library");
+
+  // Keep a ref to current settings for revert on failure
+  const settingsRef = useRef<VoiceSettings | null>(null);
 
   const fetchAll = useCallback(() => {
     setLoading(true);
@@ -95,8 +96,23 @@ const VoiceSettingsSection = () => {
       api.getVoiceUsage().catch(() => null),
       api.getVoiceClones().catch(() => []),
     ]).then(([s, v, u, c]) => {
-      if (s) setSettings(s as VoiceSettings);
-      else setSettings({ voice_enabled: false, voice_mode: "match", voice_model: "eleven_turbo_v2_5", selected_voice_id: null, selected_voice_name: null, stability: 0.5, similarity_boost: 0.75, style: 0, speaker_boost: true });
+      const resolved: VoiceSettings = s ? {
+        voice_enabled: (s as any).voice_enabled ?? false,
+        voice_mode: (s as any).voice_mode ?? "match",
+        voice_model: (s as any).voice_model ?? "eleven_turbo_v2_5",
+        selected_voice_id: (s as any).selected_voice_id ?? null,
+        selected_voice_name: (s as any).selected_voice_name ?? null,
+        stability: (s as any).stability ?? 0.5,
+        similarity_boost: (s as any).similarity_boost ?? 0.75,
+        style: (s as any).style ?? 0,
+        speaker_boost: (s as any).speaker_boost !== false,
+      } : {
+        voice_enabled: false, voice_mode: "match", voice_model: "eleven_turbo_v2_5",
+        selected_voice_id: null, selected_voice_name: null,
+        stability: 0.5, similarity_boost: 0.75, style: 0, speaker_boost: true,
+      };
+      setSettings(resolved);
+      settingsRef.current = resolved;
       const voiceList = Array.isArray(v) ? v : (v as any)?.voices ?? [];
       setVoices(voiceList);
       if (u) setUsage(u as VoiceUsage);
@@ -107,14 +123,20 @@ const VoiceSettingsSection = () => {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  // Auto-save: every change calls the API immediately
   const updateSetting = async (patch: Partial<VoiceSettings>) => {
     if (!settings) return;
+    const previous = { ...settings };
     const updated = { ...settings, ...patch };
     setSettings(updated);
+    settingsRef.current = updated;
     try {
       await api.updateVoiceSettings(patch);
     } catch (err: any) {
       toast({ title: "Failed to save", description: err?.message || "Unknown error", variant: "destructive" });
+      // Revert on failure
+      setSettings(previous);
+      settingsRef.current = previous;
     }
   };
 
@@ -196,25 +218,6 @@ const VoiceSettingsSection = () => {
     } catch (err: any) {
       toast({ title: "Test failed", description: err?.message || "Unknown error", variant: "destructive" });
       setTestPlaying(false);
-    }
-  };
-
-  const handleSaveSettings = async () => {
-    if (!settings) return;
-    setSaving(true);
-    try {
-      await api.updateVoiceSettings({
-        stability: settings.stability,
-        similarity_boost: settings.similarity_boost,
-        style: settings.style,
-        speaker_boost: settings.speaker_boost,
-      });
-      setSettingsSaved(true);
-      setTimeout(() => setSettingsSaved(false), 2000);
-    } catch (err: any) {
-      toast({ title: "Save failed", description: err?.message || "Unknown error", variant: "destructive" });
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -301,6 +304,11 @@ const VoiceSettingsSection = () => {
             )}
           </div>
         )}
+
+        {/* Auto-save indicator */}
+        <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+          <Check size={10} className="text-success" /> All changes saved automatically
+        </p>
       </div>
 
       {/* Sub-section 2 — Voice Selection — always visible so users can browse */}
@@ -556,6 +564,7 @@ const VoiceSettingsSection = () => {
               <Slider
                 value={[settings.stability]}
                 onValueChange={([v]) => setSettings({ ...settings, stability: v })}
+                onValueCommit={([v]) => updateSetting({ stability: v })}
                 min={0} max={1} step={0.05}
                 className="flex-1"
               />
@@ -575,6 +584,7 @@ const VoiceSettingsSection = () => {
               <Slider
                 value={[settings.similarity_boost]}
                 onValueChange={([v]) => setSettings({ ...settings, similarity_boost: v })}
+                onValueCommit={([v]) => updateSetting({ similarity_boost: v })}
                 min={0} max={1} step={0.05}
                 className="flex-1"
               />
@@ -594,6 +604,7 @@ const VoiceSettingsSection = () => {
               <Slider
                 value={[settings.style]}
                 onValueChange={([v]) => setSettings({ ...settings, style: v })}
+                onValueCommit={([v]) => updateSetting({ style: v })}
                 min={0} max={1} step={0.05}
                 className="flex-1"
               />
@@ -610,7 +621,7 @@ const VoiceSettingsSection = () => {
             </div>
             <Switch
               checked={settings.speaker_boost}
-              onCheckedChange={(v) => setSettings({ ...settings, speaker_boost: v })}
+              onCheckedChange={(v) => updateSetting({ speaker_boost: v })}
             />
           </div>
 
@@ -623,10 +634,10 @@ const VoiceSettingsSection = () => {
             </button>
           </div>
 
-          {/* Save */}
-          <button onClick={handleSaveSettings} disabled={saving} className="dark-btn-primary w-full h-10">
-            {saving ? <Loader2 size={14} className="animate-spin" /> : settingsSaved ? "Saved ✓" : "Save Voice Settings"}
-          </button>
+          {/* Auto-save indicator */}
+          <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+            <Check size={10} className="text-success" /> All changes saved automatically
+          </p>
         </div>
       )}
     </div>
