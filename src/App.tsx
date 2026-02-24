@@ -23,6 +23,8 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import AdminPanel from "./pages/AdminPanel";
 import Onboarding from "./pages/Onboarding";
+import VerifyEmailPending from "./pages/VerifyEmailPending";
+import AuthCallback from "./pages/AuthCallback";
 import ModeSelectionScreen from "./components/ModeSelectionScreen";
 import Pipeline from "./pages/Pipeline";
 import Dashboard from "./pages/Dashboard";
@@ -76,6 +78,8 @@ const App = () => {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/verify-email-pending" element={<VerifyEmailPending />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/admin" element={<AdminPanel />} />
           <Route path="/onboarding" element={<Onboarding />} />
