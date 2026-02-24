@@ -443,6 +443,9 @@ const Settings = () => {
           {/* Google Calendar */}
           <GoogleCalendarSettings />
 
+          {/* Calendly Integration */}
+          <CalendlySection />
+
           {/* Lead Import/Export */}
           <LeadManagementSection />
 
@@ -652,6 +655,78 @@ function WebhookUrlSection() {
         {regenerating ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
         <span className="ml-1">Regenerate URL</span>
       </button>
+    </div>
+  );
+}
+
+function CalendlySection() {
+  const [url, setUrl] = useState("");
+  const [initial, setInitial] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    api.getBookingSettings()
+      .then((res) => {
+        const v = res?.calendly_url || "";
+        setUrl(v);
+        setInitial(v);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.putBookingSettings({ calendly_url: url.trim() });
+      setInitial(url.trim());
+      setSaved(true);
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      toast({ title: "Failed to save", description: getErrorMessage(err), variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mt-6 rounded-lg border border-border bg-card border-l-4 border-l-primary space-y-4 p-6">
+      <div className="flex items-center gap-2">
+        <Link2 size={16} className="text-primary" />
+        <h2 className="text-sm font-bold uppercase tracking-wider">Calendly Integration</h2>
+      </div>
+      <p className="text-xs text-muted-foreground">Connect your Calendly link so leads can book directly.</p>
+
+      {loading ? (
+        <div className="h-10 bg-secondary animate-pulse rounded-md" />
+      ) : (
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">
+              Your Calendly URL
+            </label>
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://calendly.com/yourname/30min"
+              className="dark-input w-full"
+            />
+          </div>
+          <button
+            onClick={handleSave}
+            disabled={saving || saved || url.trim() === initial}
+            className="dark-btn bg-primary text-primary-foreground hover:bg-primary/90 text-sm"
+          >
+            {saving ? <Loader2 size={14} className="animate-spin" /> : saved ? <Check size={14} /> : <Save size={14} />}
+            {saving ? "Saving…" : saved ? "Saved ✓" : "Save"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
