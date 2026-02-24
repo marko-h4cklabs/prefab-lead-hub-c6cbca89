@@ -25,6 +25,7 @@ import AdminPanel from "./pages/AdminPanel";
 import Onboarding from "./pages/Onboarding";
 import ModeSelectionScreen from "./components/ModeSelectionScreen";
 import Pipeline from "./pages/Pipeline";
+import Dashboard from "./pages/Dashboard";
 
 const queryClient = new QueryClient();
 
@@ -72,10 +73,11 @@ const App = () => {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-          <Route path="/" element={<Navigate to="/leads" replace />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/admin" element={<AdminPanel />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route element={<ModeGate><AppLayout /></ModeGate>}>
+            <Route path="/dashboard" element={<Dashboard />} />
             {/* Inbox routes wrapped in InboxLayout (Zone 2 lead list) */}
             <Route element={<InboxLayout />}>
               <Route path="/leads" element={<Leads />} />
