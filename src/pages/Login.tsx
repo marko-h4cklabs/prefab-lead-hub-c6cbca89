@@ -27,7 +27,7 @@ const Login = () => {
       if (companyId) localStorage.setItem("company_id", companyId);
       if (res.role) localStorage.setItem("user_role", res.role);
       console.log("[auth] stored token key=auth_token tokenLen=" + token.length);
-      navigate("/leads", { replace: true });
+      navigate("/dashboard", { replace: true });
     } catch (err: unknown) {
       if (err instanceof TypeError) {
         setError("Backend unreachable. Please try again or contact support.");

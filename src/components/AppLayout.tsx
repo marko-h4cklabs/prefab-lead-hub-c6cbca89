@@ -35,6 +35,7 @@ const AppLayout = () => {
 
   // Check if current route is an inbox route (needs special layout)
   const isInboxRoute = location.pathname.startsWith("/leads");
+  const isDashboardRoute = location.pathname === "/dashboard";
 
   return (
     <div className="flex min-h-screen w-full flex-col">
@@ -101,7 +102,7 @@ const AppLayout = () => {
       {/* Zones 2-4: Content area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top header — only show for non-inbox routes (inbox has its own header) */}
-        {!isInboxRoute && (
+        {!isInboxRoute && !isDashboardRoute && (
           <header className="flex items-center justify-between border-b border-border bg-card px-6 h-14 shrink-0">
             <h2 className="text-sm font-semibold text-foreground">{companyName}</h2>
             <div className="text-xs text-muted-foreground font-mono">
@@ -109,7 +110,7 @@ const AppLayout = () => {
             </div>
           </header>
         )}
-        <main className={`flex-1 ${isInboxRoute ? "" : "p-6 overflow-auto"}`}>
+        <main className={`flex-1 ${isInboxRoute ? "" : isDashboardRoute ? "overflow-auto" : "p-6 overflow-auto"}`}>
           <Outlet />
         </main>
       </div>

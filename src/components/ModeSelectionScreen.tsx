@@ -14,7 +14,7 @@ const ModeSelectionScreen = ({ onModeSet }: { onModeSet?: () => void }) => {
     try {
       await api.setOperatingMode(mode);
       onModeSet?.();
-      navigate("/leads", { replace: true });
+      navigate("/dashboard", { replace: true });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to set mode. Please try again.");
     } finally {
