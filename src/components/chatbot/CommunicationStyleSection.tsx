@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { api } from "@/lib/apiClient";
-import { toast } from "@/hooks/use-toast";
-import { Save, Loader2 } from "lucide-react";
+import { Save, Loader2, Check, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
 const TONES = [
@@ -56,10 +55,11 @@ const DEFAULTS: StyleState = {
   language: "en",
 };
 
-const CommunicationStyleSection = ({ onSaved }: { onSaved?: () => void }) => {
+const CommunicationStyleSection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirty?: () => void }) => {
   const [data, setData] = useState<StyleState>(DEFAULTS);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveError, setSaveError] = useState('');
   const [isDirty, setIsDirty] = useState(false);
   const initialRef = useRef(JSON.stringify(DEFAULTS));
 
@@ -71,7 +71,7 @@ const CommunicationStyleSection = ({ onSaved }: { onSaved?: () => void }) => {
           response_length: res.response_length || "medium",
           opener_style: res.opener_style || "casual",
           emojis_enabled: res.emojis_enabled ?? false,
-          language: res.language || "en",
+          language: res.language_code || res.language || "en",
         };
         setData(merged);
         initialRef.current = JSON.stringify(merged);
@@ -83,22 +83,33 @@ const CommunicationStyleSection = ({ onSaved }: { onSaved?: () => void }) => {
   const update = (patch: Partial<StyleState>) => {
     setData((prev) => {
       const next = { ...prev, ...patch };
-      setIsDirty(JSON.stringify(next) !== initialRef.current);
+      const dirty = JSON.stringify(next) !== initialRef.current;
+      setIsDirty(dirty);
+      if (dirty) onDirty?.();
       return next;
     });
   };
 
-  const handleSave = () => {
-    setSaving(true);
-    api.putChatbotBehavior(data as any)
-      .then(() => {
-        toast({ title: "Saved ✓", description: "Communication style updated." });
-        initialRef.current = JSON.stringify(data);
-        setIsDirty(false);
-        onSaved?.();
-      })
-      .catch(() => {})
-      .finally(() => setSaving(false));
+  const handleSave = async () => {
+    setSaveStatus('saving');
+    setSaveError('');
+    try {
+      await api.putChatbotBehavior({
+        tone: data.tone,
+        response_length: data.response_length,
+        opener_style: data.opener_style,
+        emojis_enabled: data.emojis_enabled,
+        language_code: data.language,
+      } as any);
+      initialRef.current = JSON.stringify(data);
+      setIsDirty(false);
+      setSaveStatus('saved');
+      onSaved?.();
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch (err: any) {
+      setSaveStatus('error');
+      setSaveError(err?.message || 'Failed to save. Please try again.');
+    }
   };
 
   if (loading) return <div className="p-6"><Loader2 className="animate-spin text-muted-foreground" size={20} /></div>;
@@ -134,15 +145,8 @@ const CommunicationStyleSection = ({ onSaved }: { onSaved?: () => void }) => {
         <label className="text-xs font-medium text-muted-foreground mb-2 block">Response Length</label>
         <div className="flex rounded-lg border border-border overflow-hidden">
           {LENGTHS.map((l) => (
-            <button
-              key={l.value}
-              onClick={() => update({ response_length: l.value })}
-              className={`flex-1 py-2.5 text-center transition-colors ${
-                data.response_length === l.value
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground hover:text-foreground"
-              }`}
-            >
+            <button key={l.value} onClick={() => update({ response_length: l.value })}
+              className={`flex-1 py-2.5 text-center transition-colors ${data.response_length === l.value ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:text-foreground"}`}>
               <div className="text-sm font-semibold">{l.label}</div>
               <div className="text-[10px] opacity-70">{l.sub}</div>
             </button>
@@ -155,15 +159,8 @@ const CommunicationStyleSection = ({ onSaved }: { onSaved?: () => void }) => {
         <label className="text-xs font-medium text-muted-foreground mb-2 block">Opener Style</label>
         <div className="flex rounded-lg border border-border overflow-hidden">
           {OPENER_STYLES.map((o) => (
-            <button
-              key={o.value}
-              onClick={() => update({ opener_style: o.value })}
-              className={`flex-1 py-2.5 text-sm font-semibold text-center transition-colors ${
-                data.opener_style === o.value
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground hover:text-foreground"
-              }`}
-            >
+            <button key={o.value} onClick={() => update({ opener_style: o.value })}
+              className={`flex-1 py-2.5 text-sm font-semibold text-center transition-colors ${data.opener_style === o.value ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:text-foreground"}`}>
               {o.label}
             </button>
           ))}
@@ -182,25 +179,32 @@ const CommunicationStyleSection = ({ onSaved }: { onSaved?: () => void }) => {
       {/* Language */}
       <div>
         <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Language</label>
-        <select
-          value={data.language}
-          onChange={(e) => update({ language: e.target.value })}
-          className="dark-input w-full max-w-xs"
-        >
+        <select value={data.language} onChange={(e) => update({ language: e.target.value })} className="dark-input w-full max-w-xs">
           {LANGUAGES.map((l) => (
             <option key={l.value} value={l.value}>{l.flag} {l.name}</option>
           ))}
         </select>
       </div>
 
-      <button
-        onClick={handleSave}
-        disabled={saving || !isDirty}
-        className={`dark-btn ${isDirty ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-muted text-muted-foreground"}`}
-      >
-        {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-        {saving ? "Saving…" : "Save"}
-      </button>
+      <div>
+        <button
+          onClick={handleSave}
+          disabled={saveStatus === 'saving' || saveStatus === 'saved' || !isDirty}
+          className={`dark-btn ${
+            saveStatus === 'saved' ? "bg-success/15 text-success" :
+            saveStatus === 'error' ? "bg-destructive/15 text-destructive" :
+            isDirty ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-muted text-muted-foreground"
+          }`}
+        >
+          {saveStatus === 'saving' ? <Loader2 size={16} className="animate-spin" /> :
+           saveStatus === 'saved' ? <Check size={16} /> :
+           saveStatus === 'error' ? <X size={16} /> : <Save size={16} />}
+          {saveStatus === 'saving' ? "Saving…" :
+           saveStatus === 'saved' ? "Saved ✓" :
+           saveStatus === 'error' ? "Save failed" : "Save"}
+        </button>
+        {saveStatus === 'error' && <p className="text-xs text-destructive mt-2">{saveError}</p>}
+      </div>
     </div>
   );
 };

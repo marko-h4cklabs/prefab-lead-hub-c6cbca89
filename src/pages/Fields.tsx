@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/apiClient";
-import { Loader2, CalendarCheck, Settings, ExternalLink, Save } from "lucide-react";
+import { Loader2, CalendarCheck, Settings, ExternalLink, Save, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "@/hooks/use-toast";
@@ -18,12 +18,42 @@ import AutoresponderSection from "@/components/chatbot/AutoresponderSection";
 import VoiceSettingsSection from "@/components/voice/VoiceSettingsSection";
 import PreviewPanel from "@/components/chatbot/PreviewPanel";
 
+const SECTION_LABELS: Record<string, string> = {
+  identity: "Agent Identity",
+  style: "Communication Style",
+  strategy: "Conversation Strategy",
+  guardrails: "Guardrails",
+  booking: "Booking Trigger",
+  social_proof: "Social Proof",
+};
+
 const Fields = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [bookingStatus, setBookingStatus] = useState<{ loaded: boolean; enabled: boolean; mode: string }>({ loaded: false, enabled: false, mode: "off" });
   const [previewKey, setPreviewKey] = useState(0);
   const [savingAll, setSavingAll] = useState(false);
+  const [unsavedSections, setUnsavedSections] = useState<Set<string>>(new Set());
+
+  const markDirty = useCallback((section: string) => {
+    setUnsavedSections(prev => new Set([...prev, section]));
+  }, []);
+
+  const markClean = useCallback((section: string) => {
+    setUnsavedSections(prev => { const n = new Set(prev); n.delete(section); return n; });
+  }, []);
+
+  // Warn before leaving with unsaved changes
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (unsavedSections.size > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [unsavedSections]);
 
   useEffect(() => {
     api.getSchedulingSettings()
@@ -40,14 +70,25 @@ const Fields = () => {
 
   const handleSaveAll = () => {
     setSavingAll(true);
-    // Trigger a global refresh — individual sections handle their own saves
     toast({ title: "Refreshing preview...", description: "Save each section individually for best results." });
     refreshPreview();
     setTimeout(() => setSavingAll(false), 1000);
   };
 
+  const unsavedNames = Array.from(unsavedSections).map(s => SECTION_LABELS[s] || s);
+
   const leftColumn = (
     <div className="space-y-4">
+      {/* Unsaved changes warning */}
+      {unsavedSections.size > 0 && (
+        <div className="sticky top-0 z-10 rounded-lg bg-warning/15 border border-warning/30 px-4 py-2.5 flex items-center gap-2 text-sm">
+          <AlertTriangle size={14} className="text-warning shrink-0" />
+          <span className="text-warning font-medium text-xs">
+            Unsaved changes in: {unsavedNames.join(", ")}. Click "Save" in each section to keep your changes.
+          </span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-foreground">AI Agent</h1>
@@ -83,55 +124,55 @@ const Fields = () => {
 
       {/* Section 1 — Agent Identity */}
       <div className="dark-card border-l-4 border-l-primary">
-        <AgentIdentitySection onSaved={refreshPreview} />
+        <AgentIdentitySection onDirty={() => markDirty('identity')} onSaved={() => { markClean('identity'); refreshPreview(); }} />
       </div>
 
       {/* Section 2 — Communication Style */}
       <div className="dark-card border-l-4 border-l-primary">
-        <CommunicationStyleSection onSaved={refreshPreview} />
+        <CommunicationStyleSection onDirty={() => markDirty('style')} onSaved={() => { markClean('style'); refreshPreview(); }} />
       </div>
 
       {/* Section 3 — Conversation Strategy */}
       <div className="dark-card border-l-4 border-l-primary">
-        <ConversationStrategySection onSaved={refreshPreview} />
+        <ConversationStrategySection onDirty={() => markDirty('strategy')} onSaved={() => { markClean('strategy'); refreshPreview(); }} />
       </div>
 
       {/* Section 4 — Guardrails */}
       <div className="dark-card border-l-4 border-l-primary">
-        <GuardrailsSection onSaved={refreshPreview} />
+        <GuardrailsSection onDirty={() => markDirty('guardrails')} onSaved={() => { markClean('guardrails'); refreshPreview(); }} />
       </div>
 
       {/* Section 5 — Smart Booking Trigger */}
       <div className="dark-card border-l-4 border-l-primary">
-        <BookingTriggerSection onSaved={refreshPreview} />
+        <BookingTriggerSection onDirty={() => markDirty('booking')} onSaved={() => { markClean('booking'); refreshPreview(); }} />
       </div>
 
       {/* Section 6 — Social Proof */}
       <div className="dark-card border-l-4 border-l-primary">
-        <SocialProofSection onSaved={refreshPreview} />
+        <SocialProofSection onDirty={() => markDirty('social_proof')} onSaved={() => { markClean('social_proof'); refreshPreview(); }} />
       </div>
 
-      {/* Section 6 — Data Collection */}
+      {/* Section 7 — Data Collection */}
       <div className="dark-card border-l-4 border-l-primary">
         <QuoteFieldsSection />
       </div>
 
-      {/* Section 7 — Personas */}
+      {/* Section 8 — Personas */}
       <div className="dark-card border-l-4 border-l-primary">
         <PersonasSection />
       </div>
 
-      {/* Section 8 — Message Templates */}
+      {/* Section 9 — Message Templates */}
       <div className="dark-card border-l-4 border-l-primary">
         <TemplatesSection />
       </div>
 
-      {/* Section 9 — Autoresponder Rules */}
+      {/* Section 10 — Autoresponder Rules */}
       <div className="dark-card border-l-4 border-l-primary">
         <AutoresponderSection />
       </div>
 
-      {/* Section 10 — Voice Settings */}
+      {/* Section 11 — Voice Settings */}
       <div className="border-t border-border pt-6">
         <VoiceSettingsSection />
       </div>
@@ -151,12 +192,9 @@ const Fields = () => {
 
   return (
     <div className="flex gap-6 h-full min-h-0">
-      {/* Left Column — 60% */}
       <div className="w-[60%] overflow-auto pr-2 pb-6">
         {leftColumn}
       </div>
-
-      {/* Right Column — 40% sticky preview */}
       <div className="w-[40%] sticky top-0 h-[calc(100vh-4rem)]">
         <PreviewPanel refreshKey={previewKey} />
       </div>

@@ -1,12 +1,11 @@
 import { useEffect, useState, useRef } from "react";
 import { api } from "@/lib/apiClient";
-import { Loader2, Check, Save, ExternalLink, Calendar, Link2 } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
-import { getErrorMessage } from "@/lib/errorUtils";
+import { Loader2, Check, Save, ExternalLink, Calendar, Link2, X } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 
 interface Props {
   onSaved?: () => void;
+  onDirty?: () => void;
 }
 
 interface BookingConfig {
@@ -22,25 +21,21 @@ const DEFAULT: BookingConfig = {
   enabled: false,
   platform: "google_calendar",
   calendly_url: "",
-  required_fields: ["name"],
+  required_fields: ["full_name"],
   custom_offer_message: "",
   intent_threshold: 60,
 };
 
-export default function BookingTriggerSection({ onSaved }: Props) {
+const CORE_BOOKING_FIELDS = ['full_name', 'email_address', 'phone_number', 'budget', 'location'];
+
+export default function BookingTriggerSection({ onSaved, onDirty }: Props) {
   const [config, setConfig] = useState<BookingConfig>(DEFAULT);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveError, setSaveError] = useState('');
   const [gcConnected, setGcConnected] = useState<boolean | null>(null);
-  const [quoteFields, setQuoteFields] = useState<{ key: string; label: string; enabled: boolean }[]>([]);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
-
-  const CORE_BOOKING_FIELDS = ['full_name', 'email_address', 'phone_number', 'budget', 'location'];
-  const CORE_LABELS: Record<string, string> = {
-    full_name: 'Full Name', email_address: 'Email', phone_number: 'Phone',
-    budget: 'Budget', location: 'Location',
-  };
+  const [quoteFields, setQuoteFields] = useState<{ key: string; label: string }[]>([]);
+  const initialRef = useRef(JSON.stringify(DEFAULT));
 
   useEffect(() => {
     Promise.all([
@@ -49,52 +44,74 @@ export default function BookingTriggerSection({ onSaved }: Props) {
       api.getQuoteFields().catch(() => null),
     ]).then(([bs, gc, qf]) => {
       if (bs) {
-        setConfig({
+        const loaded: BookingConfig = {
           enabled: Boolean(bs.enabled ?? bs.booking_trigger_enabled),
-          platform: bs.platform || "google_calendar",
+          platform: bs.platform || bs.booking_platform || "google_calendar",
           calendly_url: bs.calendly_url || "",
-          required_fields: bs.required_fields || ["name"],
-          custom_offer_message: bs.custom_offer_message || "",
-          intent_threshold: bs.intent_threshold ?? 60,
-        });
+          required_fields: bs.required_fields || bs.booking_required_fields || ["full_name"],
+          custom_offer_message: bs.custom_offer_message || bs.booking_offer_message || "",
+          intent_threshold: bs.intent_threshold ?? bs.booking_trigger_score ?? 60,
+        };
+        setConfig(loaded);
+        initialRef.current = JSON.stringify(loaded);
       }
       setGcConnected(Boolean(gc?.connected || gc?.is_connected));
       // Parse quote fields — only show core qualifying fields
       const fields = Array.isArray(qf) ? qf : qf?.fields || qf?.presets || [];
       const allParsed = fields
         .filter((f: any) => f.enabled !== false)
-        .map((f: any) => ({ key: f.key || f.variable_name || f.id || f.label, label: f.label || f.name || f.key, enabled: true }));
+        .map((f: any) => ({ key: f.key || f.variable_name || f.id || f.label, label: f.label || f.name || f.key }));
       const coreFiltered = allParsed.filter((f: any) => CORE_BOOKING_FIELDS.includes(f.key));
-      const finalFields = coreFiltered.length > 0 ? coreFiltered : allParsed.slice(0, 5);
-      setQuoteFields(finalFields);
+      setQuoteFields(coreFiltered.length > 0 ? coreFiltered : allParsed.slice(0, 5));
     }).finally(() => setLoading(false));
   }, []);
 
-  const set = <K extends keyof BookingConfig>(key: K, val: BookingConfig[K]) =>
-    setConfig((prev) => ({ ...prev, [key]: val }));
+  const set = <K extends keyof BookingConfig>(key: K, val: BookingConfig[K]) => {
+    setConfig((prev) => {
+      const next = { ...prev, [key]: val };
+      if (JSON.stringify(next) !== initialRef.current) onDirty?.();
+      return next;
+    });
+  };
 
   const toggleRequired = (key: string) => {
-    if (key === "name") return; // always required
-    setConfig((prev) => ({
-      ...prev,
-      required_fields: prev.required_fields.includes(key)
-        ? prev.required_fields.filter((k) => k !== key)
-        : [...prev.required_fields, key],
-    }));
+    if (key === "full_name") return;
+    setConfig((prev) => {
+      const next = {
+        ...prev,
+        required_fields: prev.required_fields.includes(key)
+          ? prev.required_fields.filter((k) => k !== key)
+          : [...prev.required_fields, key],
+      };
+      if (JSON.stringify(next) !== initialRef.current) onDirty?.();
+      return next;
+    });
   };
 
   const handleSave = async () => {
-    setSaving(true);
+    setSaveStatus('saving');
+    setSaveError('');
     try {
-      await api.putBookingSettings(config);
-      setSaved(true);
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => setSaved(false), 2000);
+      await api.putBookingSettings({
+        booking_trigger_enabled: config.enabled,
+        enabled: config.enabled,
+        platform: config.platform,
+        booking_platform: config.platform,
+        calendly_url: config.calendly_url,
+        custom_offer_message: config.custom_offer_message,
+        booking_offer_message: config.custom_offer_message,
+        intent_threshold: config.intent_threshold,
+        booking_trigger_score: config.intent_threshold,
+        required_fields: config.required_fields,
+        booking_required_fields: config.required_fields,
+      });
+      initialRef.current = JSON.stringify(config);
+      setSaveStatus('saved');
       onSaved?.();
-    } catch (err) {
-      toast({ title: "Failed to save", description: getErrorMessage(err), variant: "destructive" });
-    } finally {
-      setSaving(false);
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch (err: any) {
+      setSaveStatus('error');
+      setSaveError(err?.message || 'Failed to save. Please try again.');
     }
   };
 
@@ -117,15 +134,8 @@ export default function BookingTriggerSection({ onSaved }: Props) {
       {/* Enable toggle */}
       <label className="flex items-center justify-between cursor-pointer">
         <span className="text-sm">Automatically offer to book an appointment when a lead is ready</span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={config.enabled}
-          onClick={() => set("enabled", !config.enabled)}
-          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-            config.enabled ? "bg-primary" : "bg-muted"
-          }`}
-        >
+        <button type="button" role="switch" aria-checked={config.enabled} onClick={() => set("enabled", !config.enabled)}
+          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${config.enabled ? "bg-primary" : "bg-muted"}`}>
           <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-card shadow-sm transition-transform ${config.enabled ? "translate-x-4" : "translate-x-0"}`} />
         </button>
       </label>
@@ -134,82 +144,47 @@ export default function BookingTriggerSection({ onSaved }: Props) {
         <div className="space-y-5">
           {/* Platform cards */}
           <div>
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Booking Platform
-            </label>
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Booking Platform</label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Google Calendar */}
-              <button
-                type="button"
-                onClick={() => set("platform", "google_calendar")}
-                className={`text-left rounded-lg p-4 border-2 transition-all ${
-                  config.platform === "google_calendar"
-                    ? "border-primary bg-primary/5 shadow-[0_0_12px_hsl(48_92%_53%/0.15)]"
-                    : "border-border bg-secondary/30 hover:border-muted-foreground"
-                }`}
-              >
+              <button type="button" onClick={() => set("platform", "google_calendar")}
+                className={`text-left rounded-lg p-4 border-2 transition-all ${config.platform === "google_calendar" ? "border-primary bg-primary/5 shadow-[0_0_12px_hsl(48_92%_53%/0.15)]" : "border-border bg-secondary/30 hover:border-muted-foreground"}`}>
                 <div className="flex items-center gap-2 mb-1.5">
                   <Calendar size={16} className="text-primary" />
                   <span className="text-sm font-bold text-foreground">Google Calendar 📅</span>
                 </div>
-                <p className="text-[11px] text-muted-foreground mb-2">
-                  Use your connected Google Calendar. AI checks your availability and offers real time slots.
-                </p>
-                {gcConnected === null ? (
-                  <Loader2 size={12} className="animate-spin text-muted-foreground" />
-                ) : gcConnected ? (
+                <p className="text-[11px] text-muted-foreground mb-2">Use your connected Google Calendar. AI checks your availability and offers real time slots.</p>
+                {gcConnected === null ? <Loader2 size={12} className="animate-spin text-muted-foreground" /> : gcConnected ? (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/15 text-success font-medium">Connected</span>
                 ) : (
                   <span className="inline-flex items-center gap-1">
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-warning/15 text-warning font-medium">Not connected</span>
-                    <a href="/settings" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
-                      Connect in Settings <ExternalLink size={8} />
-                    </a>
+                    <a href="/settings" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">Connect in Settings <ExternalLink size={8} /></a>
                   </span>
                 )}
               </button>
 
-              {/* Calendly */}
-              <button
-                type="button"
-                onClick={() => set("platform", "calendly")}
-                className={`text-left rounded-lg p-4 border-2 transition-all ${
-                  config.platform === "calendly"
-                    ? "border-primary bg-primary/5 shadow-[0_0_12px_hsl(48_92%_53%/0.15)]"
-                    : "border-border bg-secondary/30 hover:border-muted-foreground"
-                }`}
-              >
+              <button type="button" onClick={() => set("platform", "calendly")}
+                className={`text-left rounded-lg p-4 border-2 transition-all ${config.platform === "calendly" ? "border-primary bg-primary/5 shadow-[0_0_12px_hsl(48_92%_53%/0.15)]" : "border-border bg-secondary/30 hover:border-muted-foreground"}`}>
                 <div className="flex items-center gap-2 mb-1.5">
                   <Link2 size={16} className="text-primary" />
                   <span className="text-sm font-bold text-foreground">Calendly 🔗</span>
                 </div>
-                <p className="text-[11px] text-muted-foreground">
-                  Use your Calendly booking link. Lead picks their own time from your Calendly page.
-                </p>
+                <p className="text-[11px] text-muted-foreground">Use your Calendly booking link. Lead picks their own time from your Calendly page.</p>
               </button>
             </div>
 
             {config.platform === "calendly" && (
               <div className="mt-3">
                 <label className="mb-1 block text-xs font-semibold text-muted-foreground">Calendly URL</label>
-                <input
-                  type="url"
-                  value={config.calendly_url}
-                  onChange={(e) => set("calendly_url", e.target.value)}
-                  placeholder="https://calendly.com/yourname/30min"
-                  className="dark-input w-full"
-                />
+                <input type="url" value={config.calendly_url} onChange={(e) => set("calendly_url", e.target.value)} placeholder="https://calendly.com/yourname/30min" className="dark-input w-full" />
               </div>
             )}
           </div>
 
-          {/* Required fields before offering booking */}
+          {/* Required fields */}
           <div>
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Required info before offering booking
-            </label>
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Required info before offering booking</label>
             <div className="space-y-2">
-              {/* Name is always required */}
               <label className="flex items-center gap-2.5 opacity-60 cursor-not-allowed">
                 <input type="checkbox" checked disabled className="rounded border-border accent-primary" />
                 <span className="text-sm">Name</span>
@@ -219,12 +194,7 @@ export default function BookingTriggerSection({ onSaved }: Props) {
                 .filter((f) => f.key !== "name" && f.key !== "full_name")
                 .map((f) => (
                   <label key={f.key} className="flex items-center gap-2.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={config.required_fields.includes(f.key)}
-                      onChange={() => toggleRequired(f.key)}
-                      className="rounded border-border accent-primary"
-                    />
+                    <input type="checkbox" checked={config.required_fields.includes(f.key)} onChange={() => toggleRequired(f.key)} className="rounded border-border accent-primary" />
                     <span className="text-sm">{f.label}</span>
                   </label>
                 ))}
@@ -233,48 +203,41 @@ export default function BookingTriggerSection({ onSaved }: Props) {
 
           {/* Custom offer message */}
           <div>
-            <label className="mb-1 block text-xs font-semibold text-muted-foreground">
-              What should the AI say when offering to book?
-            </label>
-            <textarea
-              value={config.custom_offer_message}
-              onChange={(e) => set("custom_offer_message", e.target.value)}
-              placeholder="Great, let me set up a quick call! What days work best for you this week?"
-              className="dark-input w-full min-h-[70px] resize-y"
-            />
+            <label className="mb-1 block text-xs font-semibold text-muted-foreground">What should the AI say when offering to book?</label>
+            <textarea value={config.custom_offer_message} onChange={(e) => set("custom_offer_message", e.target.value)} placeholder="Great, let me set up a quick call! What days work best for you this week?" className="dark-input w-full min-h-[70px] resize-y" />
             <p className="text-[10px] text-muted-foreground mt-1">Leave blank to use the default message for your selected platform</p>
           </div>
 
           {/* Intent score threshold */}
           <div>
-            <label className="mb-1 block text-xs font-semibold text-muted-foreground">
-              Minimum lead score before offering booking
-            </label>
+            <label className="mb-1 block text-xs font-semibold text-muted-foreground">Minimum lead score before offering booking</label>
             <div className="flex items-center gap-4">
-              <Slider
-                value={[config.intent_threshold]}
-                onValueChange={([v]) => set("intent_threshold", v)}
-                min={0}
-                max={100}
-                step={5}
-                className="flex-1"
-              />
+              <Slider value={[config.intent_threshold]} onValueChange={([v]) => set("intent_threshold", v)} min={0} max={100} step={5} className="flex-1" />
               <span className="text-sm font-bold text-primary w-12 text-right">{config.intent_threshold}/100</span>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-1">
-              Higher = only offer to highly engaged leads. Lower = offer to everyone.
-            </p>
+            <p className="text-[10px] text-muted-foreground mt-1">Higher = only offer to highly engaged leads. Lower = offer to everyone.</p>
           </div>
 
           {/* Save */}
-          <button
-            onClick={handleSave}
-            disabled={saving || saved}
-            className="dark-btn bg-primary text-primary-foreground hover:bg-primary/90 text-sm"
-          >
-            {saving ? <Loader2 size={14} className="animate-spin" /> : saved ? <Check size={14} /> : <Save size={14} />}
-            {saving ? "Saving…" : saved ? "Saved ✓" : "Save Booking Trigger"}
-          </button>
+          <div>
+            <button
+              onClick={handleSave}
+              disabled={saveStatus === 'saving' || saveStatus === 'saved'}
+              className={`dark-btn ${
+                saveStatus === 'saved' ? "bg-success/15 text-success" :
+                saveStatus === 'error' ? "bg-destructive/15 text-destructive" :
+                "bg-primary text-primary-foreground hover:bg-primary/90"
+              } text-sm`}
+            >
+              {saveStatus === 'saving' ? <Loader2 size={14} className="animate-spin" /> :
+               saveStatus === 'saved' ? <Check size={14} /> :
+               saveStatus === 'error' ? <X size={14} /> : <Save size={14} />}
+              {saveStatus === 'saving' ? "Saving…" :
+               saveStatus === 'saved' ? "Saved ✓" :
+               saveStatus === 'error' ? "Save failed" : "Save Booking Trigger"}
+            </button>
+            {saveStatus === 'error' && <p className="text-xs text-destructive mt-2">{saveError}</p>}
+          </div>
         </div>
       )}
     </div>
