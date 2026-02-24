@@ -663,4 +663,17 @@ export const api = {
 
   getAnalyticsOverview: () =>
     request<any>("/api/analytics/overview"),
+
+  // --- Google Calendar Integration ---
+  getGoogleCalendarStatus: () =>
+    request<any>("/api/integrations/google/status"),
+
+  getGoogleAuthUrl: () =>
+    request<any>("/api/integrations/google/auth"),
+
+  disconnectGoogleCalendar: () =>
+    request<any>("/api/integrations/google/disconnect", { method: "DELETE" }),
+
+  getGoogleUpcomingEvents: () =>
+    request<any>("/api/integrations/google/upcoming"),
 };

@@ -6,6 +6,7 @@ import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import NotificationSettings from "@/components/settings/NotificationSettings";
 import SchedulingSettings from "@/components/settings/SchedulingSettings";
+import GoogleCalendarSettings from "@/components/settings/GoogleCalendarSettings";
 
 const TABS = ["General", "Scheduling", "Notifications"] as const;
 type SettingsTab = (typeof TABS)[number];
@@ -407,6 +408,9 @@ const Settings = () => {
               </div>
             )}
           </div>
+
+          {/* Google Calendar */}
+          <GoogleCalendarSettings />
 
           {/* Admin Snapshot */}
           {(companyRole === "owner" || companyRole === "admin") && (
