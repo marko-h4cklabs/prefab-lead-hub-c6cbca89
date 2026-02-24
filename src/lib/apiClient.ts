@@ -834,6 +834,41 @@ export const api = {
   deleteVoiceClone: (voiceId: string) =>
     request<any>(`/api/voice/clone/${voiceId}`, { method: "DELETE" }),
 
+  // --- Behavior Preview & Test ---
+  getBehaviorPreview: () =>
+    request<any>("/api/chatbot/behavior/preview"),
+
+  testBehavior: (data: { message: string }) =>
+    request<any>("/api/chatbot/behavior/test", { method: "POST", body: JSON.stringify(data) }),
+
+  // --- Agent Identity (extended) ---
+  getAgentIdentity: () =>
+    request<any>("/api/chatbot/identity"),
+
+  putAgentIdentity: (data: any) =>
+    request<any>("/api/chatbot/identity", { method: "PUT", body: JSON.stringify(data) }),
+
+  // --- Conversation Strategy ---
+  getConversationStrategy: () =>
+    request<any>("/api/chatbot/strategy"),
+
+  putConversationStrategy: (data: any) =>
+    request<any>("/api/chatbot/strategy", { method: "PUT", body: JSON.stringify(data) }),
+
+  // --- Guardrails ---
+  getGuardrails: () =>
+    request<any>("/api/chatbot/guardrails"),
+
+  putGuardrails: (data: any) =>
+    request<any>("/api/chatbot/guardrails", { method: "PUT", body: JSON.stringify(data) }),
+
+  // --- Social Proof ---
+  getSocialProof: () =>
+    request<any>("/api/chatbot/social-proof"),
+
+  putSocialProof: (data: any) =>
+    request<any>("/api/chatbot/social-proof", { method: "PUT", body: JSON.stringify(data) }),
+
   // --- Onboarding ---
   getOnboardingStatus: () =>
     request<any>("/api/onboarding/status"),
