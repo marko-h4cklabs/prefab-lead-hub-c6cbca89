@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { api, requireCompanyId, clearAuth } from "@/lib/apiClient";
 import { LayoutList, FlaskConical, Bot, BarChart3, CalendarDays, Settings, LogOut } from "lucide-react";
 import NotificationsDropdown from "@/components/NotificationsDropdown";
+import ImpersonationBanner from "@/components/admin/ImpersonationBanner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const navItems = [
@@ -35,7 +36,9 @@ const AppLayout = () => {
   const isInboxRoute = location.pathname.startsWith("/leads");
 
   return (
-    <div className="flex min-h-screen w-full">
+    <div className="flex min-h-screen w-full flex-col">
+      <ImpersonationBanner />
+      <div className="flex flex-1 min-h-0">
       {/* Zone 1 — Icon Rail */}
       <aside className="flex w-14 flex-col items-center bg-background border-r border-border shrink-0">
         {/* Logo */}
@@ -108,6 +111,7 @@ const AppLayout = () => {
         <main className={`flex-1 ${isInboxRoute ? "" : "p-6 overflow-auto"}`}>
           <Outlet />
         </main>
+      </div>
       </div>
     </div>
   );

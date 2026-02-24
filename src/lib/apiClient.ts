@@ -516,6 +516,37 @@ export const api = {
   adminImpersonate: (companyId: string) =>
     request<any>(`/api/admin/workspaces/${companyId}/impersonate`, { method: "POST" }),
 
+  // --- Admin Companies ---
+  adminGetCompanies: (params?: { limit?: number; offset?: number; search?: string }) => {
+    const search = new URLSearchParams();
+    if (params?.limit !== undefined) search.set("limit", String(params.limit));
+    if (params?.offset !== undefined) search.set("offset", String(params.offset));
+    if (params?.search) search.set("search", params.search);
+    return request<any>(`/api/admin/companies?${search.toString()}`);
+  },
+
+  adminGetCompany: (companyId: string) =>
+    request<any>(`/api/admin/companies/${companyId}`),
+
+  adminGetHotLeads: () =>
+    request<any>("/api/admin/hot-leads"),
+
+  adminImpersonateCompany: (companyId: string) =>
+    request<any>("/api/admin/impersonate", {
+      method: "POST",
+      body: JSON.stringify({ company_id: companyId }),
+    }),
+
+  adminEndImpersonation: () =>
+    request<any>("/api/admin/impersonate/end", { method: "POST" }),
+
+  // --- Admin Users ---
+  adminGetUsers: () =>
+    request<any>("/api/admin/users"),
+
+  adminToggleAdmin: (userId: string) =>
+    request<any>(`/api/admin/users/${userId}/toggle-admin`, { method: "PUT" }),
+
   // --- ManyChat Settings (read) ---
   getManychatSettings: () =>
     request<any>("/api/settings/manychat"),
