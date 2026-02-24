@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { api, requireCompanyId, clearAuth } from "@/lib/apiClient";
-import { LayoutList, FlaskConical, Bot, BarChart3, CalendarDays, Settings, LogOut } from "lucide-react";
+import { LayoutList, FlaskConical, Bot, BarChart3, CalendarDays, Settings, LogOut, Columns3 } from "lucide-react";
 import NotificationsDropdown from "@/components/NotificationsDropdown";
 import ImpersonationBanner from "@/components/admin/ImpersonationBanner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const navItems = [
   { to: "/leads", label: "Inbox", icon: LayoutList },
+  { to: "/pipeline", label: "Pipeline", icon: Columns3 },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/fields", label: "AI Agent", icon: Bot },
   { to: "/calendar", label: "Calendar", icon: CalendarDays },

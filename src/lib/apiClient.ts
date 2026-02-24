@@ -618,4 +618,17 @@ export const api = {
 
   dismissHotLead: (alertId: string) =>
     request<any>(`/api/hot-leads/${alertId}/dismiss`, { method: "POST" }),
+
+  // --- Pipeline ---
+  getPipeline: () =>
+    request<any>("/api/pipeline"),
+
+  getPipelineStats: () =>
+    request<any>("/api/pipeline/stats"),
+
+  updateLeadPipelineStage: (leadId: string, data: { stage: string; notes?: string; deal_value?: number; lost_reason?: string }) =>
+    request<any>(`/api/leads/${leadId}/pipeline-stage`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
 };
