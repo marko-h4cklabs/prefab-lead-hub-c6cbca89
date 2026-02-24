@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import LogDealModal from "@/components/deals/LogDealModal";
 
 const STAGES = [
   { id: "new_inquiry", label: "New Inquiry" },
@@ -77,6 +78,7 @@ const Pipeline = () => {
   const [loading, setLoading] = useState(true);
   const [moveModal, setMoveModal] = useState<MoveModal | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [dealModal, setDealModal] = useState<{ leadId: string; leadName: string; fromStage: string } | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -120,6 +122,12 @@ const Pipeline = () => {
     const lead = columns[fromStage]?.find((l) => l.id === draggableId);
     if (!lead) return;
 
+    // For Closed Won, show the deal logging modal instead
+    if (toStage === "closed_won") {
+      setDealModal({ leadId: lead.id, leadName: lead.name, fromStage });
+      return;
+    }
+
     setMoveModal({
       leadId: lead.id,
       leadName: lead.name,
@@ -131,14 +139,30 @@ const Pipeline = () => {
     });
   };
 
+  const handleDealSuccess = async (deal: any) => {
+    if (!dealModal) return;
+    // Also update pipeline stage
+    try {
+      await api.updateLeadPipelineStage(dealModal.leadId, {
+        stage: "closed_won",
+        deal_value: deal?.amount,
+      });
+      setColumns((prev) => {
+        const from = prev[dealModal.fromStage].filter((l) => l.id !== dealModal.leadId);
+        const lead = prev[dealModal.fromStage].find((l) => l.id === dealModal.leadId);
+        if (!lead) return prev;
+        const updated = { ...lead, stage: "closed_won", deal_value: deal?.amount };
+        return { ...prev, [dealModal.fromStage]: from, closed_won: [...prev.closed_won, updated] };
+      });
+      fetchStats();
+    } catch {}
+    setDealModal(null);
+  };
+
   const confirmMove = async () => {
     if (!moveModal) return;
     const { toStage } = moveModal;
 
-    if (toStage === "closed_won" && !moveModal.deal_value) {
-      toast({ title: "Deal value required", variant: "destructive" });
-      return;
-    }
     if (toStage === "closed_lost" && !moveModal.lost_reason.trim()) {
       toast({ title: "Lost reason required", variant: "destructive" });
       return;
@@ -332,19 +356,6 @@ const Pipeline = () => {
               />
             </div>
 
-            {moveModal?.toStage === "closed_won" && (
-              <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Deal Value € *</label>
-                <Input
-                  type="number"
-                  value={moveModal.deal_value}
-                  onChange={(e) => setMoveModal((m) => m && { ...m, deal_value: e.target.value })}
-                  placeholder="0"
-                  className="bg-secondary border-border text-foreground"
-                />
-              </div>
-            )}
-
             {moveModal?.toStage === "closed_lost" && (
               <div>
                 <label className="text-sm text-muted-foreground mb-1 block">Lost Reason *</label>
@@ -368,6 +379,15 @@ const Pipeline = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Deal modal for Closed Won */}
+      <LogDealModal
+        open={!!dealModal}
+        onClose={() => setDealModal(null)}
+        leadId={dealModal?.leadId || ""}
+        leadName={dealModal?.leadName}
+        onSuccess={handleDealSuccess}
+      />
     </div>
   );
 };
