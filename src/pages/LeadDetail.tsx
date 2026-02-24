@@ -13,6 +13,7 @@ import LeadDetailAppointments from "@/components/appointments/LeadDetailAppointm
 import AppointmentModal, { AppointmentFormData } from "@/components/appointments/AppointmentModal";
 import { NormalizedSchedulingRequest } from "@/lib/schedulingRequestUtils";
 import { REQUEST_TYPE_LABELS } from "@/lib/schedulingRequestUtils";
+import LogDealModal from "@/components/deals/LogDealModal";
 
 function normalizeList(payload: unknown, keys: string[] = []): any[] {
   if (Array.isArray(payload)) return payload;
@@ -64,6 +65,7 @@ const LeadDetail = () => {
   const [schedReqRefreshKey, setSchedReqRefreshKey] = useState(0);
   const [apptPrefillOverride, setApptPrefillOverride] = useState<Partial<AppointmentFormData> | null>(null);
   const [convertingRequestId, setConvertingRequestId] = useState<string | null>(null);
+  const [dealModalOpen, setDealModalOpen] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchLead = useCallback(() => {
@@ -198,6 +200,9 @@ const LeadDetail = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={() => setDealModalOpen(true)} className="dark-btn text-sm bg-primary text-primary-foreground hover:bg-primary/90">
+            💵 Log Deal
+          </button>
           <button onClick={() => setApptModalOpen(true)} className="dark-btn-primary text-sm">
             <CalendarPlus size={14} /> Add to Calendar
           </button>
@@ -330,6 +335,15 @@ const LeadDetail = () => {
         prefill={apptPrefill}
         lockLead
         schedulingRequestInfo={convertingRequestId ? "Created from scheduling request" : undefined}
+      />
+
+      {/* Deal Modal */}
+      <LogDealModal
+        open={dealModalOpen}
+        onClose={() => setDealModalOpen(false)}
+        leadId={leadId!}
+        leadName={leadName}
+        onSuccess={() => fetchLead()}
       />
     </div>
   );

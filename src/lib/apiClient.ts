@@ -631,4 +631,36 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(data),
     }),
+
+  // --- Deals ---
+  createDeal: (data: {
+    lead_id: string;
+    amount: number;
+    currency?: string;
+    setter_name?: string;
+    closer_name?: string;
+    source_content?: string;
+    campaign?: string;
+    notes?: string;
+  }) =>
+    request<any>("/api/deals", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  getDealStats: () =>
+    request<any>("/api/deals/stats"),
+
+  getDeals: (params?: { from?: string; to?: string; setter?: string; limit?: number; offset?: number }) => {
+    const search = new URLSearchParams();
+    if (params?.from) search.set("from", params.from);
+    if (params?.to) search.set("to", params.to);
+    if (params?.setter) search.set("setter", params.setter);
+    if (params?.limit !== undefined) search.set("limit", String(params.limit));
+    if (params?.offset !== undefined) search.set("offset", String(params.offset));
+    return request<any>(`/api/deals?${search.toString()}`);
+  },
+
+  getAnalyticsOverview: () =>
+    request<any>("/api/analytics/overview"),
 };
