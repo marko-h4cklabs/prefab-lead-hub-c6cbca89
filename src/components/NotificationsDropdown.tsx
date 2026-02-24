@@ -1,9 +1,19 @@
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, CalendarDays } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { useNotifications, type AppNotification } from "@/hooks/useNotifications";
-import { useState } from "react";
+import { api } from "@/lib/apiClient";
+
+interface HotLeadAlert {
+  id: string;
+  lead_id: string;
+  lead_name?: string;
+  intent_score?: number;
+  trigger_reason?: string;
+  created_at: string;
+}
 
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -15,7 +25,6 @@ function timeAgo(dateStr: string) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-/** Detect if notification is appointment or scheduling-request related */
 function isAppointmentNotification(n: AppNotification): boolean {
   const t = (n.title || "").toLowerCase();
   const b = (n.body || "").toLowerCase();
@@ -28,10 +37,32 @@ const NotificationsDropdown = () => {
   const { items, unreadCount, markRead, markAllRead } = useNotifications();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [hotAlerts, setHotAlerts] = useState<HotLeadAlert[]>([]);
+  const hotPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchHotLeads = useCallback(async () => {
+    try {
+      const res = await api.getHotLeads();
+      const alerts: HotLeadAlert[] = Array.isArray(res?.alerts) ? res.alerts : Array.isArray(res) ? res : [];
+      setHotAlerts(alerts);
+    } catch { /* silent */ }
+  }, []);
+
+  useEffect(() => {
+    fetchHotLeads();
+    hotPollRef.current = setInterval(fetchHotLeads, 60_000);
+    return () => { if (hotPollRef.current) clearInterval(hotPollRef.current); };
+  }, [fetchHotLeads]);
+
+  const dismissAlert = async (alertId: string) => {
+    try {
+      await api.dismissHotLead(alertId);
+      setHotAlerts((prev) => prev.filter((a) => a.id !== alertId));
+    } catch { /* silent */ }
+  };
 
   const handleClick = async (n: AppNotification) => {
     if (!n.read) await markRead(n.id);
-    // Deep-link: appointment/scheduling notifications go to calendar or lead
     if (isAppointmentNotification(n)) {
       const payload = n as any;
       if (payload.leadId || payload.lead_id) {
@@ -45,15 +76,21 @@ const NotificationsDropdown = () => {
     setOpen(false);
   };
 
+  const hasHotAlerts = hotAlerts.length > 0;
+  const totalBadge = unreadCount + hotAlerts.length;
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button className="relative p-2 rounded-sm hover:bg-muted transition-colors" aria-label="Notifications">
           <Bell size={18} className="text-muted-foreground" />
-          {unreadCount > 0 && (
+          {totalBadge > 0 && (
             <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-accent text-accent-foreground text-[10px] font-bold px-1">
-              {unreadCount > 99 ? "99+" : unreadCount}
+              {totalBadge > 99 ? "99+" : totalBadge}
             </span>
+          )}
+          {hasHotAlerts && (
+            <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-destructive animate-pulse" />
           )}
         </button>
       </PopoverTrigger>
@@ -67,7 +104,48 @@ const NotificationsDropdown = () => {
           )}
         </div>
         <div className="flex-1 overflow-y-auto">
-          {items.length === 0 ? (
+          {/* Hot Lead Alerts */}
+          {hasHotAlerts && (
+            <>
+              <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/30">
+                Hot Lead Alerts
+              </div>
+              {hotAlerts.map((alert) => (
+                <div key={alert.id} className="px-4 py-3 border-b border-border bg-card border-l-[3px] border-l-primary">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-bold">
+                      🔥 Hot Lead
+                    </span>
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">{alert.lead_name || "Unknown"}</p>
+                  {alert.intent_score !== undefined && (
+                    <p className="text-xs text-muted-foreground">Score: {alert.intent_score}/100</p>
+                  )}
+                  {alert.trigger_reason && (
+                    <p className="text-xs text-muted-foreground mt-0.5">{alert.trigger_reason}</p>
+                  )}
+                  <p className="text-[10px] text-muted-foreground font-mono mt-1">{timeAgo(alert.created_at)}</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <button
+                      onClick={() => { navigate(`/leads/${alert.lead_id}`); setOpen(false); }}
+                      className="text-xs font-semibold px-2.5 py-1 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                    >
+                      View Lead
+                    </button>
+                    <button
+                      onClick={() => dismissAlert(alert.id)}
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
+          {/* Regular Notifications */}
+          {items.length === 0 && !hasHotAlerts ? (
             <div className="py-8 text-center text-sm text-muted-foreground">No notifications</div>
           ) : (
             items.map((n) => {

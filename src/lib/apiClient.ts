@@ -553,4 +553,38 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+
+  // --- Operating Mode ---
+  getOperatingMode: () =>
+    request<any>("/api/settings/mode"),
+
+  setOperatingMode: (mode: string) =>
+    request<any>("/api/settings/mode", {
+      method: "PUT",
+      body: JSON.stringify({ operating_mode: mode }),
+    }),
+
+  // --- Lead Intelligence ---
+  getLeadIntelligence: (leadId: string) =>
+    request<any>(`/api/leads/${leadId}/intelligence`),
+
+  // --- Suggestions ---
+  getLatestSuggestions: (leadId: string) =>
+    request<any>(`/api/leads/${leadId}/suggestions/latest`),
+
+  generateSuggestions: (conversationId: string) =>
+    request<any>(`/api/conversations/${conversationId}/suggestions`, { method: "POST" }),
+
+  sendSuggestion: (conversationId: string, suggestionId: string, suggestionIndex: number) =>
+    request<any>(`/api/conversations/${conversationId}/suggestions/${suggestionId}/send`, {
+      method: "POST",
+      body: JSON.stringify({ suggestion_index: suggestionIndex }),
+    }),
+
+  // --- Hot Leads ---
+  getHotLeads: () =>
+    request<any>("/api/hot-leads/my"),
+
+  dismissHotLead: (alertId: string) =>
+    request<any>(`/api/hot-leads/${alertId}/dismiss`, { method: "POST" }),
 };

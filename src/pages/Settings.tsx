@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { api, requireCompanyId } from "@/lib/apiClient";
-import { Activity, Loader2, Save, Wand2, MessageSquare, Eye, EyeOff, Check } from "lucide-react";
+import { Activity, Loader2, Save, Wand2, MessageSquare, Eye, EyeOff, Check, Bot, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
@@ -42,6 +42,13 @@ const Settings = () => {
   const [mcSaveError, setMcSaveError] = useState("");
   const mcSuccessTimer = useRef<ReturnType<typeof setTimeout>>();
 
+  // Operating mode
+  const [currentMode, setCurrentMode] = useState<string>("");
+  const [modeLoading, setModeLoading] = useState(true);
+  const [modeSaving, setModeSaving] = useState(false);
+  const [modeSaved, setModeSaved] = useState(false);
+  const modeTimer = useRef<ReturnType<typeof setTimeout>>();
+
   useEffect(() => {
     Promise.all([
       api.getCompany(companyId),
@@ -72,6 +79,12 @@ const Settings = () => {
       })
       .catch(() => {})
       .finally(() => setMcLoading(false));
+
+    // Load operating mode
+    api.getOperatingMode()
+      .then((res) => setCurrentMode(res?.operating_mode || ""))
+      .catch(() => {})
+      .finally(() => setModeLoading(false));
   }, []);
 
   const handleEmailUpdate = async (e: React.FormEvent) => {
@@ -150,6 +163,51 @@ const Settings = () => {
         <SchedulingSettings />
       ) : (
         <>
+          {/* Operating Mode */}
+          <div className="rounded-lg border border-border bg-card border-l-4 border-l-primary p-6 space-y-4 mb-6">
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-wider">Operating Mode</h2>
+              <p className="text-xs text-muted-foreground mt-1">Choose how your AI handles incoming Instagram DMs.</p>
+            </div>
+            {modeLoading ? (
+              <div className="flex items-center gap-2 text-muted-foreground text-sm"><Loader2 size={14} className="animate-spin" /> Loading…</div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex gap-3">
+                  {[
+                    { value: "autopilot", label: "🤖 AI Autopilot", icon: Bot },
+                    { value: "copilot", label: "🧠 AI Co-Pilot", icon: Sparkles },
+                  ].map(({ value, label }) => (
+                    <button
+                      key={value}
+                      onClick={async () => {
+                        if (value === currentMode || modeSaving) return;
+                        setModeSaving(true);
+                        try {
+                          await api.setOperatingMode(value);
+                          setCurrentMode(value);
+                          setModeSaved(true);
+                          if (modeTimer.current) clearTimeout(modeTimer.current);
+                          modeTimer.current = setTimeout(() => setModeSaved(false), 2000);
+                        } catch { /* toast handled by api client */ }
+                        finally { setModeSaving(false); }
+                      }}
+                      disabled={modeSaving}
+                      className={`flex-1 rounded-lg py-2.5 px-4 text-sm font-semibold transition-colors ${
+                        currentMode === value
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-foreground hover:bg-secondary/80"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {modeSaved && <p className="text-xs text-success flex items-center gap-1"><Check size={12} /> Saved</p>}
+              </div>
+            )}
+          </div>
+
           {/* Company Info */}
           <div className="industrial-card p-6 space-y-4">
             <h2 className="text-sm font-bold uppercase tracking-wider">Company</h2>
