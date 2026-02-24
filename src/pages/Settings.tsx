@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, requireCompanyId } from "@/lib/apiClient";
-import { Activity, Loader2, Save, Wand2, Instagram } from "lucide-react";
+import { Activity, Loader2, Save, Wand2, MessageSquare } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
@@ -30,11 +30,11 @@ const Settings = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
 
-  // Instagram settings
-  const [igAccountId, setIgAccountId] = useState("");
-  const [igPageToken, setIgPageToken] = useState("");
-  const [igLoading, setIgLoading] = useState(false);
-  const [savingIg, setSavingIg] = useState(false);
+  // ManyChat settings
+  const [mcApiKey, setMcApiKey] = useState("");
+  const [mcPageId, setMcPageId] = useState("");
+  const [mcLoading, setMcLoading] = useState(false);
+  const [savingMc, setSavingMc] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -53,15 +53,15 @@ const Settings = () => {
       .catch((err: Error) => setFetchError(err.message || "Failed to load settings"))
       .finally(() => setLoading(false));
 
-    // Load Instagram settings
-    setIgLoading(true);
-    api.getInstagramSettings()
+    // Load ManyChat settings
+    setMcLoading(true);
+    api.getManychatSettings()
       .then((res) => {
-        setIgAccountId(res?.instagram_account_id || "");
-        setIgPageToken(res?.meta_page_access_token || "");
+        setMcApiKey(res?.manychat_api_key || "");
+        setMcPageId(res?.manychat_page_id || "");
       })
       .catch(() => {})
-      .finally(() => setIgLoading(false));
+      .finally(() => setMcLoading(false));
   }, []);
 
   const handleEmailUpdate = async (e: React.FormEvent) => {
@@ -228,60 +228,60 @@ const Settings = () => {
             </Link>
           </div>
 
-          {/* Instagram Connection */}
+          {/* ManyChat Connection */}
           <div className="industrial-card p-6 mt-6 space-y-4">
             <div className="flex items-center gap-2">
-              <Instagram size={16} className="text-muted-foreground" />
-              <h2 className="text-sm font-bold uppercase tracking-wider">Instagram Connection</h2>
+              <MessageSquare size={16} className="text-muted-foreground" />
+              <h2 className="text-sm font-bold uppercase tracking-wider">ManyChat Connection</h2>
             </div>
-            {igLoading ? (
+            {mcLoading ? (
               <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <Loader2 size={14} className="animate-spin" /> Loading…
               </div>
             ) : (
               <div className="space-y-3">
                 <div>
-                  <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">Instagram Account ID</label>
+                  <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">ManyChat API Key</label>
                   <input
-                    value={igAccountId}
-                    onChange={(e) => setIgAccountId(e.target.value)}
+                    type="password"
+                    value={mcApiKey}
+                    onChange={(e) => setMcApiKey(e.target.value)}
                     className="industrial-input w-full"
-                    placeholder="e.g. 17841400123456789"
+                    placeholder="Your ManyChat API key"
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">Page Access Token</label>
+                  <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">ManyChat Page ID</label>
                   <input
-                    type="password"
-                    value={igPageToken}
-                    onChange={(e) => setIgPageToken(e.target.value)}
+                    value={mcPageId}
+                    onChange={(e) => setMcPageId(e.target.value)}
                     className="industrial-input w-full"
-                    placeholder="Long-lived page access token"
+                    placeholder="e.g. 123456789"
                   />
                 </div>
                 <button
                   onClick={async () => {
-                    if (!igAccountId.trim()) {
-                      toast({ title: "Account ID is required", variant: "destructive" });
+                    if (!mcApiKey.trim()) {
+                      toast({ title: "API Key is required", variant: "destructive" });
                       return;
                     }
-                    setSavingIg(true);
+                    setSavingMc(true);
                     try {
-                      await api.saveInstagramSettings({
-                        instagram_account_id: igAccountId.trim(),
-                        meta_page_access_token: igPageToken.trim(),
+                      await api.saveManychatSettings({
+                        manychat_api_key: mcApiKey.trim(),
+                        manychat_page_id: mcPageId.trim(),
                       });
-                      toast({ title: "Instagram settings saved" });
+                      toast({ title: "ManyChat settings saved" });
                     } catch (err: unknown) {
                       toast({ title: "Failed to save", description: getErrorMessage(err), variant: "destructive" });
                     } finally {
-                      setSavingIg(false);
+                      setSavingMc(false);
                     }
                   }}
-                  disabled={savingIg}
+                  disabled={savingMc}
                   className="industrial-btn-primary"
                 >
-                  {savingIg ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  {savingMc ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                   <span className="ml-1">Save</span>
                 </button>
               </div>

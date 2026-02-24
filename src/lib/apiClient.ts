@@ -488,9 +488,9 @@ export const api = {
     }
   },
 
-  // --- Instagram Settings ---
-  saveInstagramSettings: (data: { instagram_account_id: string; meta_page_access_token: string }) =>
-    request<any>("/api/settings/instagram", {
+  // --- ManyChat Settings ---
+  saveManychatSettings: (data: { manychat_api_key: string; manychat_page_id: string }) =>
+    request<any>("/api/settings/manychat", {
       method: "PUT",
       body: JSON.stringify(data),
     }),
@@ -516,9 +516,9 @@ export const api = {
   adminImpersonate: (companyId: string) =>
     request<any>(`/api/admin/workspaces/${companyId}/impersonate`, { method: "POST" }),
 
-  // --- Instagram Settings (read) ---
-  getInstagramSettings: () =>
-    request<any>("/api/settings/instagram"),
+  // --- ManyChat Settings (read) ---
+  getManychatSettings: () =>
+    request<any>("/api/settings/manychat"),
 
   // --- Voice Messages ---
   sendVoiceMessage: (conversationId: string, audioBlob: Blob) => {
