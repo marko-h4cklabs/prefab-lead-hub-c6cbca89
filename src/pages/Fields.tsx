@@ -8,6 +8,7 @@ import QuoteFieldsSection from "@/components/chatbot/QuoteFieldsSection";
 import PersonasSection from "@/components/chatbot/PersonasSection";
 import TemplatesSection from "@/components/chatbot/TemplatesSection";
 import AutoresponderSection from "@/components/chatbot/AutoresponderSection";
+import VoiceSettingsSection from "@/components/voice/VoiceSettingsSection";
 
 const Fields = () => {
   const navigate = useNavigate();
@@ -121,6 +122,11 @@ const Fields = () => {
       {/* Autoresponder Rules */}
       <div className="dark-card border-l-4 border-l-primary">
         <AutoresponderSection />
+      </div>
+
+      {/* Voice Settings */}
+      <div className="border-t border-border pt-6">
+        <VoiceSettingsSection />
       </div>
     </div>
   );
