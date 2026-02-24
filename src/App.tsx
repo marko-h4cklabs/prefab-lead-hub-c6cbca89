@@ -45,7 +45,7 @@ const ModeGate = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   if (checking) return null;
-  if (needsMode) return <ModeSelectionScreen />;
+  if (needsMode) return <ModeSelectionScreen onModeSet={() => setNeedsMode(false)} />;
   return <>{children}</>;
 };
 
