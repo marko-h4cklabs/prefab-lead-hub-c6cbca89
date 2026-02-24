@@ -71,7 +71,7 @@ const Dashboard = () => {
       list.sort((a: any, b: any) => (b.intent_score ?? b.score ?? 0) - (a.intent_score ?? a.score ?? 0));
       setTopLeads(list.slice(0, 5));
     }).catch(() => {});
-    api.getAppointments({ status: "confirmed" }).then((r) => {
+    api.getAppointments({ status: "scheduled" }).then((r) => {
       const list = normalizeList(r, ["appointments", "data", "items"]);
       list.sort((a: any, b: any) => new Date(a.start_at || a.date).getTime() - new Date(b.start_at || b.date).getTime());
       setAppointments(list.slice(0, 5));
@@ -365,7 +365,7 @@ const Dashboard = () => {
                   const minsUntil = Math.floor((dt.getTime() - Date.now()) / 60000);
                   const isSoon = minsUntil > 0 && minsUntil <= 60;
                   const status = appt.status || "pending";
-                  const statusColor = status === "confirmed" ? "text-success bg-success/15" : status === "cancelled" ? "text-destructive bg-destructive/15" : "text-primary bg-primary/15";
+                  const statusColor = status === "scheduled" || status === "confirmed" ? "text-success bg-success/15" : status === "cancelled" ? "text-destructive bg-destructive/15" : "text-primary bg-primary/15";
                   return (
                     <div key={i} className={`rounded-lg bg-secondary p-3 ${isToday ? "border-l-2 border-l-primary" : ""}`}>
                       <div className="flex items-center justify-between mb-1">

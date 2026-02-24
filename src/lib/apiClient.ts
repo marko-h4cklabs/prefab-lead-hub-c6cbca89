@@ -869,6 +869,16 @@ export const api = {
   putSocialProof: (data: any) =>
     request<any>("/api/chatbot/social-proof", { method: "PUT", body: JSON.stringify(data) }),
 
+  // --- Custom Quote Fields ---
+  createCustomQuoteField: (data: { label: string; field_type: string }) =>
+    request<any>("/api/quote-fields/custom", { method: "POST", body: JSON.stringify(data) }),
+
+  deleteQuoteField: (id: string) =>
+    request<any>(`/api/quote-fields/${id}`, { method: "DELETE" }),
+
+  saveOperatingMode: (mode: string) =>
+    request<any>("/api/settings/mode", { method: "PUT", body: JSON.stringify({ mode }) }),
+
   // --- Onboarding ---
   getOnboardingStatus: () =>
     request<any>("/api/onboarding/status"),
