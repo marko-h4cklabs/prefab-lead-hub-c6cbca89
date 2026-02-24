@@ -9,6 +9,7 @@ import AgentIdentitySection from "@/components/chatbot/AgentIdentitySection";
 import CommunicationStyleSection from "@/components/chatbot/CommunicationStyleSection";
 import ConversationStrategySection from "@/components/chatbot/ConversationStrategySection";
 import GuardrailsSection from "@/components/chatbot/GuardrailsSection";
+import BookingTriggerSection from "@/components/chatbot/BookingTriggerSection";
 import SocialProofSection from "@/components/chatbot/SocialProofSection";
 import QuoteFieldsSection from "@/components/chatbot/QuoteFieldsSection";
 import PersonasSection from "@/components/chatbot/PersonasSection";
@@ -100,7 +101,12 @@ const Fields = () => {
         <GuardrailsSection onSaved={refreshPreview} />
       </div>
 
-      {/* Section 5 — Social Proof */}
+      {/* Section 5 — Smart Booking Trigger */}
+      <div className="dark-card border-l-4 border-l-primary">
+        <BookingTriggerSection onSaved={refreshPreview} />
+      </div>
+
+      {/* Section 6 — Social Proof */}
       <div className="dark-card border-l-4 border-l-primary">
         <SocialProofSection onSaved={refreshPreview} />
       </div>

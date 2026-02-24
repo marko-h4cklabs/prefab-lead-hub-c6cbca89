@@ -869,6 +869,13 @@ export const api = {
   putSocialProof: (data: any) =>
     request<any>("/api/chatbot/social-proof", { method: "PUT", body: JSON.stringify(data) }),
 
+  // --- Booking Trigger ---
+  getBookingSettings: () =>
+    request<any>("/api/chatbot/booking-settings"),
+
+  putBookingSettings: (data: any) =>
+    request<any>("/api/chatbot/booking-settings", { method: "PUT", body: JSON.stringify(data) }),
+
   // --- Custom Quote Fields ---
   createCustomQuoteField: (data: { label: string; field_type: string }) =>
     request<any>("/api/quote-fields/custom", { method: "POST", body: JSON.stringify(data) }),
