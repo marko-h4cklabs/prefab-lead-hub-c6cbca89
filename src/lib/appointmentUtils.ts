@@ -22,6 +22,9 @@ export interface NormalizedAppointment {
   };
   createdAt: string;
   updatedAt: string;
+  google_meet_link?: string | null;
+  synced_to_google?: boolean;
+  sync_error?: string | null;
 }
 
 /** Pick first truthy value from an object for a set of candidate keys */
@@ -59,6 +62,9 @@ export function normalizeAppointment(raw: any): NormalizedAppointment {
     lead,
     createdAt: pick(raw, "createdAt", "created_at") || "",
     updatedAt: pick(raw, "updatedAt", "updated_at") || "",
+    google_meet_link: pick(raw, "google_meet_link", "googleMeetLink") ?? null,
+    synced_to_google: pick(raw, "synced_to_google", "syncedToGoogle") ?? false,
+    sync_error: pick(raw, "sync_error", "syncError") ?? null,
   };
 }
 

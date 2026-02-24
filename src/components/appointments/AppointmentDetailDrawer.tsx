@@ -16,7 +16,13 @@ import {
   extractDate,
   computeDuration,
 } from "@/lib/appointmentUtils";
-import { Calendar, Clock, MapPin, Bell, FileText, User, ExternalLink, CheckCircle, XCircle, Pencil } from "lucide-react";
+import { Calendar, Clock, MapPin, Bell, FileText, User, ExternalLink, CheckCircle, XCircle, Pencil, Video } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface Props {
   appointment: NormalizedAppointment | null;
@@ -137,6 +143,49 @@ export default function AppointmentDetailDrawer({
                   {appt.reminderMinutesBefore >= 60
                     ? `${Math.round(appt.reminderMinutesBefore / 60)}h before`
                     : `${appt.reminderMinutesBefore}m before`}
+                </dd>
+              </div>
+            )}
+
+            {/* Google Meet Link */}
+            {appt.google_meet_link && (
+              <div className="flex items-center gap-2">
+                <Video size={14} className="text-success shrink-0" />
+                <dt className="text-muted-foreground w-20 shrink-0">Meeting</dt>
+                <dd>
+                  <a
+                    href={appt.google_meet_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-success/15 text-success px-2.5 py-1 text-xs font-semibold hover:bg-success/25 transition-colors"
+                  >
+                    <Video size={12} /> Join Google Meet
+                  </a>
+                </dd>
+              </div>
+            )}
+
+            {/* Google Calendar Sync Status */}
+            {(appt.synced_to_google || appt.sync_error) && (
+              <div className="flex items-center gap-2">
+                <Calendar size={14} className="text-muted-foreground shrink-0" />
+                <dt className="text-muted-foreground w-20 shrink-0">Sync</dt>
+                <dd>
+                  {appt.synced_to_google && !appt.sync_error && (
+                    <span className="text-xs text-success">Synced to Google Calendar ✓</span>
+                  )}
+                  {appt.sync_error && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-xs text-warning cursor-help">⚠️ Sync failed</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-xs max-w-[200px]">{appt.sync_error}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                 </dd>
               </div>
             )}
