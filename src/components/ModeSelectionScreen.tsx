@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/apiClient";
 import { Bot, Sparkles, Loader2 } from "lucide-react";
 
-const ModeSelectionScreen = () => {
+const ModeSelectionScreen = ({ onModeSet }: { onModeSet?: () => void }) => {
   const navigate = useNavigate();
   const [loadingMode, setLoadingMode] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -13,6 +13,7 @@ const ModeSelectionScreen = () => {
     setError("");
     try {
       await api.setOperatingMode(mode);
+      onModeSet?.();
       navigate("/leads", { replace: true });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to set mode. Please try again.");
