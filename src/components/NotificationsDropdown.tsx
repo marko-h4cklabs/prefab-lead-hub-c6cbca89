@@ -62,14 +62,14 @@ const NotificationsDropdown = () => {
   };
 
   const handleClick = async (n: AppNotification) => {
-    if (!n.read) await markRead(n.id);
-    if (isAppointmentNotification(n)) {
-      const payload = n as any;
-      if (payload.leadId || payload.lead_id) {
-        navigate(`/leads/${payload.leadId || payload.lead_id}`);
-      } else {
-        navigate("/calendar");
-      }
+    if (!n.read) {
+      await markRead(n.id);
+    }
+    const payload = n as any;
+    if (payload.lead_id || payload.leadId) {
+      navigate(`/leads/${payload.lead_id || payload.leadId}`);
+    } else if (isAppointmentNotification(n)) {
+      navigate("/calendar");
     } else if (n.url) {
       navigate(n.url);
     }

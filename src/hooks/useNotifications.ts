@@ -18,7 +18,7 @@ interface NotificationsState {
   loading: boolean;
 }
 
-const POLL_INTERVAL = 20_000; // 20s
+const POLL_INTERVAL = 30_000; // 30s
 
 export function useNotifications() {
   const [state, setState] = useState<NotificationsState>({
@@ -27,6 +27,14 @@ export function useNotifications() {
     loading: false,
   });
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const res = await api.getUnreadCount();
+      const count = typeof res?.count === "number" ? res.count : typeof res?.unread_count === "number" ? res.unread_count : 0;
+      setState((s) => ({ ...s, unreadCount: count }));
+    } catch { /* silent */ }
+  }, []);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -39,7 +47,6 @@ export function useNotifications() {
         : items.filter((n) => !n.read).length;
       setState({ items, unreadCount, loading: false });
     } catch {
-      // silent – don't spam toasts on poll failures
       setState((s) => ({ ...s, loading: false }));
     }
   }, []);
@@ -47,11 +54,12 @@ export function useNotifications() {
   useEffect(() => {
     setState((s) => ({ ...s, loading: true }));
     fetchNotifications();
-    intervalRef.current = setInterval(fetchNotifications, POLL_INTERVAL);
+    fetchUnreadCount();
+    intervalRef.current = setInterval(fetchUnreadCount, POLL_INTERVAL);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [fetchNotifications]);
+  }, [fetchNotifications, fetchUnreadCount]);
 
   const markRead = useCallback(async (id: string) => {
     try {
@@ -79,5 +87,5 @@ export function useNotifications() {
     }
   }, []);
 
-  return { ...state, fetchNotifications, markRead, markAllRead };
+  return { ...state, fetchNotifications, fetchUnreadCount, markRead, markAllRead };
 }

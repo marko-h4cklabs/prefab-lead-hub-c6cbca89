@@ -5,6 +5,9 @@ import { useNavigate } from "react-router-dom";
 import CompanyInfoSection from "@/components/chatbot/CompanyInfoSection";
 import ChatbotBehaviorSection from "@/components/chatbot/ChatbotBehaviorSection";
 import QuoteFieldsSection from "@/components/chatbot/QuoteFieldsSection";
+import PersonasSection from "@/components/chatbot/PersonasSection";
+import TemplatesSection from "@/components/chatbot/TemplatesSection";
+import AutoresponderSection from "@/components/chatbot/AutoresponderSection";
 
 const Fields = () => {
   const navigate = useNavigate();
@@ -103,6 +106,21 @@ const Fields = () => {
             )}
           </div>
         )}
+      </div>
+
+      {/* Personas */}
+      <div className="dark-card border-l-4 border-l-primary">
+        <PersonasSection />
+      </div>
+
+      {/* Message Templates */}
+      <div className="dark-card border-l-4 border-l-primary">
+        <TemplatesSection />
+      </div>
+
+      {/* Autoresponder Rules */}
+      <div className="dark-card border-l-4 border-l-primary">
+        <AutoresponderSection />
       </div>
     </div>
   );

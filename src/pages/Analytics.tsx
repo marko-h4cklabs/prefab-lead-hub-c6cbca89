@@ -258,6 +258,12 @@ const Analytics = () => {
         <h2 className="text-sm font-semibold text-primary mb-4">Setter Performance</h2>
         {loading ? <Skeleton className="h-48 w-full" /> : <SetterTable data={s.setter_performance} />}
       </div>
+
+      {/* Row 6 — AI Usage Stats */}
+      <div className="dark-card p-6">
+        <h2 className="text-sm font-semibold text-primary mb-4">AI Usage This Month</h2>
+        <AiUsageCard />
+      </div>
     </div>
   );
 };
@@ -393,6 +399,29 @@ function SetterTable({ data }: { data?: DealStats["setter_performance"] }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function AiUsageCard() {
+  const [status, setStatus] = useState<any>(null);
+  useEffect(() => {
+    api.getBillingStatus().then(setStatus).catch(() => {});
+  }, []);
+  const used = status?.messages_used ?? 0;
+  const limit = status?.messages_limit ?? 2000;
+  const pct = limit > 0 ? Math.round((used / limit) * 100) : 0;
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>Messages sent</span>
+        <span className="font-mono">{used.toLocaleString()} / {limit.toLocaleString()}</span>
+      </div>
+      <div className="w-full h-2 rounded-full bg-secondary overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${pct > 80 ? "bg-warning" : "bg-primary"}`} style={{ width: `${Math.min(100, pct)}%` }} />
+      </div>
+      {pct > 80 && <p className="text-xs text-warning">⚠️ Over 80% of your monthly limit</p>}
+      <p className="text-xs text-muted-foreground">{pct}% used</p>
     </div>
   );
 }
