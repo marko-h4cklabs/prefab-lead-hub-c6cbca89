@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, requireCompanyId } from "@/lib/apiClient";
 import { toDisplayText, safeArray, getErrorMessage } from "@/lib/errorUtils";
-import { ArrowLeft, Send, Loader2, Bot, Timer, ImagePlus, CalendarDays, Bug, ChevronDown, ChevronRight } from "lucide-react";
+import { ArrowLeft, Send, Loader2, Bot, Timer, ImagePlus, CalendarDays, Bug, ChevronDown, ChevronRight, Mic } from "lucide-react";
 import AudioPlayer from "@/components/conversation/AudioPlayer";
 import VoiceRecorder from "@/components/conversation/VoiceRecorder";
 import { toast } from "@/hooks/use-toast";
@@ -13,7 +13,7 @@ import LeadIntelligence from "@/components/LeadIntelligence";
 import ReplySuggestions from "@/components/conversation/ReplySuggestions";
 
 interface QuickReply { label: string; value: string; }
-interface Message { role: string; content: string; timestamp?: string; quick_replies?: QuickReply[]; booking?: BookingPayload; type?: string; audio_url?: string; }
+interface Message { role: string; content: string; timestamp?: string; quick_replies?: QuickReply[]; booking?: BookingPayload; type?: string; audio_url?: string; is_voice?: boolean; duration?: string; voice_url?: string; }
 interface ConversationData { lead_id: string; messages: Message[]; parsed_fields: Record<string, any>; current_step: number; }
 interface RequiredInfo { name: string; type?: string; units?: string; }
 interface CollectedInfo { field_name?: string; name?: string; value: any; units?: string; }
@@ -264,15 +264,51 @@ const Conversation = () => {
                 return (
                   <div key={i}>
                     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-                      <div className={`max-w-[75%] rounded-lg px-4 py-3 text-sm ${isUser ? "bg-primary text-primary-foreground" : "bg-card border border-border"}`}>
+                      <div className={`max-w-[75%] rounded-lg px-4 py-3 text-sm ${
+                        (msg as any).is_voice && isUser
+                          ? "bg-card border-l-2 border-l-purple-500 border border-border text-foreground"
+                          : (msg as any).is_voice && !isUser
+                            ? "bg-primary/15 border border-primary/30 text-foreground"
+                            : isUser ? "bg-primary text-primary-foreground" : "bg-card border border-border"
+                      }`}>
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-[10px] uppercase tracking-wider opacity-60">{msg.role}</span>
                           {msg.timestamp && <span className="text-[10px] opacity-40">{new Date(msg.timestamp).toLocaleString()}</span>}
                         </div>
-                        {(msg.type === "audio" || msg.audio_url) && msg.audio_url ? (
+                        {/* Voice message handling */}
+                        {((msg as any).is_voice || msg.type === "audio" || msg.audio_url) ? (
                           <div className="space-y-2">
-                            <AudioPlayer src={msg.audio_url} />
-                            {msg.content && <div><span className="text-[10px] uppercase tracking-wider opacity-50">Transcription</span><p className="whitespace-pre-wrap italic opacity-80">{msg.content}</p></div>}
+                            {/* Waveform / Audio Player */}
+                            {msg.audio_url ? (
+                              <AudioPlayer src={msg.audio_url} />
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <Mic size={14} className={isUser ? "text-primary-foreground/60" : "text-purple-400"} />
+                                <div className="flex items-center gap-0.5">
+                                  {Array.from({ length: 20 }).map((_, bi) => (
+                                    <div key={bi} className={`w-0.5 rounded-full ${isUser ? "bg-primary-foreground/40" : "bg-purple-400/40"}`} style={{ height: `${4 + Math.random() * 12}px` }} />
+                                  ))}
+                                </div>
+                                {(msg as any).duration && <span className="text-[10px] opacity-60 ml-1">{(msg as any).duration}</span>}
+                              </div>
+                            )}
+                            {/* Transcription */}
+                            {isUser && msg.content && (
+                              <div>
+                                <span className="text-[10px] uppercase tracking-wider opacity-50">Transcription</span>
+                                <p className="whitespace-pre-wrap italic opacity-80 text-xs">{msg.content}</p>
+                              </div>
+                            )}
+                            {isUser && !msg.content && (
+                              <p className="text-[10px] italic text-destructive/70">[Voice message — could not transcribe]</p>
+                            )}
+                            {/* Outbound voice label + text */}
+                            {!isUser && (
+                              <>
+                                {msg.content && <p className="whitespace-pre-wrap text-xs opacity-70">{msg.content}</p>}
+                                <p className="text-[10px] text-primary/70">🎙️ Sent as voice message</p>
+                              </>
+                            )}
                           </div>
                         ) : <p className="whitespace-pre-wrap">{msg.content}</p>}
                         {showBookingHere && <BookingPanel booking={msg.booking!} leadId={leadId || ""} conversationId={conversationId} onBookingUpdate={(updated) => handleBookingUpdate(i, updated)} onSendMessage={(content) => { setDraft(content); setTimeout(() => handleSend(), 0); }} onDismiss={handleBookingDismiss} />}

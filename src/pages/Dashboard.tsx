@@ -58,6 +58,7 @@ const Dashboard = () => {
   const [dealModalOpen, setDealModalOpen] = useState(false);
   const [gcalStatus, setGcalStatus] = useState<any>(null);
   const [gcalEvents, setGcalEvents] = useState<any[]>([]);
+  const [voiceSettings, setVoiceSettings] = useState<any>(null);
 
   const fetchAll = useCallback(() => {
     api.getCompany(companyId).then((c) => setCompanyName(c.company_name || c.name || "")).catch(() => {});
@@ -88,6 +89,7 @@ const Dashboard = () => {
         }).catch(() => {});
       }
     }).catch(() => setGcalStatus(null));
+    api.getVoiceSettings().then(setVoiceSettings).catch(() => setVoiceSettings(null));
   }, [companyId]);
 
   useEffect(() => {
@@ -168,7 +170,23 @@ const Dashboard = () => {
             </>
           )}
         </div>
-        <div className="text-xs text-muted-foreground">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          {/* Voice Status */}
+          <div className="flex items-center gap-1.5">
+            {voiceSettings?.voice_enabled ? (
+              <>
+                <span className="h-2.5 w-2.5 rounded-full bg-purple-500" />
+                <span>Voice Replies: {voiceSettings.voice_mode === "always" ? "Always" : voiceSettings.voice_mode === "match" ? "Match Mode" : "Text Only"}</span>
+              </>
+            ) : (
+              <>
+                <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground" />
+                <span>Voice Replies: Off</span>
+                <button onClick={() => navigate("/fields")} className="text-primary hover:underline ml-1">Enable</button>
+              </>
+            )}
+          </div>
+          <span className="text-border">|</span>
           {minutesSinceOutbound !== null && minutesSinceOutbound <= 120 && (
             <span>Last message handled: {minutesSinceOutbound < 1 ? "just now" : `${minutesSinceOutbound}m ago`}</span>
           )}
@@ -476,6 +494,12 @@ const Dashboard = () => {
               <button onClick={() => navigate("/fields")} className="w-full flex items-center justify-between rounded-lg bg-secondary p-3 hover:border-l-2 hover:border-l-primary transition-all group">
                 <div>
                   <div className="text-sm text-foreground">📋 Quote Fields: <span className="font-medium">{activeQuoteFields} active</span></div>
+                </div>
+                <ChevronRight size={14} className="text-muted-foreground group-hover:text-primary" />
+              </button>
+              <button onClick={() => navigate("/fields")} className="w-full flex items-center justify-between rounded-lg bg-secondary p-3 hover:border-l-2 hover:border-l-primary transition-all group">
+                <div>
+                  <div className="text-sm text-foreground">🎙️ Voice: <span className="font-medium">{voiceSettings?.selected_voice_name || "Not configured"}</span></div>
                 </div>
                 <ChevronRight size={14} className="text-muted-foreground group-hover:text-primary" />
               </button>

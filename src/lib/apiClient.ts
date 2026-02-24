@@ -792,4 +792,45 @@ export const api = {
 
   resetChatbotSettings: () =>
     request<any>("/api/chatbot/reset", { method: "POST" }),
+
+  // --- Voice ---
+  getVoiceSettings: () =>
+    request<any>("/api/voice/settings"),
+
+  updateVoiceSettings: (data: any) =>
+    request<any>("/api/voice/settings", { method: "PUT", body: JSON.stringify(data) }),
+
+  getVoices: () =>
+    request<any>("/api/voice/voices"),
+
+  getVoiceUsage: () =>
+    request<any>("/api/voice/usage"),
+
+  getVoiceClones: () =>
+    request<any>("/api/voice/clones"),
+
+  previewVoice: (data: { voice_id: string; text: string }) =>
+    request<any>("/api/voice/preview", { method: "POST", body: JSON.stringify(data) }),
+
+  testVoice: (data: { text: string }) =>
+    request<any>("/api/voice/test", { method: "POST", body: JSON.stringify(data) }),
+
+  cloneVoice: (name: string, description: string, files: File[]) => {
+    const token = getAuthToken();
+    const companyId = getCompanyId();
+    const formData = new FormData();
+    formData.append("name", name);
+    if (description) formData.append("description", description);
+    files.forEach((f) => formData.append("samples", f));
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    if (companyId) headers["x-company-id"] = companyId;
+    return fetch(`${API_BASE}/api/voice/clone`, { method: "POST", headers, body: formData }).then(async (res) => {
+      if (!res.ok) { const json = await res.json().catch(() => ({})); throw new Error(json?.error || `Clone failed (${res.status})`); }
+      return res.json();
+    });
+  },
+
+  deleteVoiceClone: (voiceId: string) =>
+    request<any>(`/api/voice/clone/${voiceId}`, { method: "DELETE" }),
 };
