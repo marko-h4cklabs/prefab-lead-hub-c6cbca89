@@ -36,6 +36,12 @@ export default function BookingTriggerSection({ onSaved }: Props) {
   const [quoteFields, setQuoteFields] = useState<{ key: string; label: string; enabled: boolean }[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout>>();
 
+  const CORE_BOOKING_FIELDS = ['full_name', 'email_address', 'phone_number', 'budget', 'location'];
+  const CORE_LABELS: Record<string, string> = {
+    full_name: 'Full Name', email_address: 'Email', phone_number: 'Phone',
+    budget: 'Budget', location: 'Location',
+  };
+
   useEffect(() => {
     Promise.all([
       api.getBookingSettings().catch(() => null),
@@ -53,13 +59,14 @@ export default function BookingTriggerSection({ onSaved }: Props) {
         });
       }
       setGcConnected(Boolean(gc?.connected || gc?.is_connected));
-      // Parse quote fields
+      // Parse quote fields — only show core qualifying fields
       const fields = Array.isArray(qf) ? qf : qf?.fields || qf?.presets || [];
-      setQuoteFields(
-        fields
-          .filter((f: any) => f.enabled !== false)
-          .map((f: any) => ({ key: f.key || f.id || f.label, label: f.label || f.name || f.key, enabled: true }))
-      );
+      const allParsed = fields
+        .filter((f: any) => f.enabled !== false)
+        .map((f: any) => ({ key: f.key || f.variable_name || f.id || f.label, label: f.label || f.name || f.key, enabled: true }));
+      const coreFiltered = allParsed.filter((f: any) => CORE_BOOKING_FIELDS.includes(f.key));
+      const finalFields = coreFiltered.length > 0 ? coreFiltered : allParsed.slice(0, 5);
+      setQuoteFields(finalFields);
     }).finally(() => setLoading(false));
   }, []);
 

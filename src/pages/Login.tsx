@@ -27,6 +27,16 @@ const Login = () => {
       if (companyId) localStorage.setItem("company_id", companyId);
       if (res.role) localStorage.setItem("user_role", res.role);
       console.log("[auth] stored token key=auth_token tokenLen=" + token.length);
+      // Check onboarding status before redirecting
+      try {
+        const onboarding = await api.getOnboardingStatus();
+        if (!onboarding?.completed) {
+          navigate("/onboarding", { replace: true });
+          return;
+        }
+      } catch {
+        // If check fails, go to dashboard anyway
+      }
       navigate("/dashboard", { replace: true });
     } catch (err: unknown) {
       if (err instanceof TypeError) {
