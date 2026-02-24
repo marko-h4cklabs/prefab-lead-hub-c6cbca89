@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, requireCompanyId } from "@/lib/apiClient";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Check, Copy, ArrowRight, ArrowLeft } from "lucide-react";
+import { Loader2, Check, Copy, ArrowRight, ArrowLeft, CheckCircle2 } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
 const TOTAL_STEPS = 5;
@@ -17,12 +17,27 @@ const QUOTE_PRESETS = [
   { key: 'notes', label: 'Additional Notes' },
 ];
 
-function StepProgress({ step }: { step: number }) {
+const STEP_LABELS = ["Business Info", "AI Style", "Data Collection", "ManyChat", "AI Mode"];
+
+function StepProgress({ step, completedSteps }: { step: number; completedSteps: Set<number> }) {
   return (
     <div className="mb-8">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium text-muted-foreground">Step {step} of {TOTAL_STEPS}</span>
-        <span className="text-xs text-muted-foreground">{Math.round((step / TOTAL_STEPS) * 100)}%</span>
+      <div className="flex items-center justify-between mb-3">
+        {STEP_LABELS.map((label, i) => {
+          const stepNum = i + 1;
+          const isCompleted = completedSteps.has(stepNum);
+          const isCurrent = step === stepNum;
+          return (
+            <div key={i} className="flex flex-col items-center flex-1">
+              <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                isCompleted ? "bg-success text-success-foreground" : isCurrent ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"
+              }`}>
+                {isCompleted ? <Check size={14} /> : stepNum}
+              </div>
+              <span className={`text-[10px] mt-1 ${isCurrent ? "text-foreground font-medium" : "text-muted-foreground"}`}>{label}</span>
+            </div>
+          );
+        })}
       </div>
       <div className="w-full h-2 rounded-full bg-secondary overflow-hidden">
         <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${(step / TOTAL_STEPS) * 100}%` }} />
@@ -78,6 +93,38 @@ function Step3({ enabled, onToggle, onNext, onBack, saving }: { enabled: Record<
 }
 
 function Step4({ data, onChange, onNext, onSkip, onBack, saving }: { data: { apiKey: string; pageId: string }; onChange: (d: Partial<typeof data>) => void; onNext: () => void; onSkip: () => void; onBack: () => void; saving: boolean }) {
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [webhookLoading, setWebhookLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<"connected" | "not_connected" | null>(null);
+
+  useEffect(() => {
+    api.getWebhookUrl()
+      .then((res) => setWebhookUrl(res?.webhook_url || res?.url || ""))
+      .catch(() => setWebhookUrl(""))
+      .finally(() => setWebhookLoading(false));
+  }, []);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(webhookUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleVerify = async () => {
+    setVerifying(true);
+    setVerifyResult(null);
+    try {
+      const res = await api.getManychatSettings();
+      setVerifyResult(res?.manychat_api_key && res?.manychat_page_id ? "connected" : "not_connected");
+    } catch {
+      setVerifyResult("not_connected");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div><h2 className="text-lg font-bold mb-1">Connect Instagram via ManyChat</h2><p className="text-sm text-muted-foreground">Connect your ManyChat account for automated messaging.</p></div>
@@ -92,6 +139,48 @@ function Step4({ data, onChange, onNext, onSkip, onBack, saving }: { data: { api
       </div>
       <div><label className="mb-1.5 block text-xs font-medium text-muted-foreground">ManyChat API Key</label><input value={data.apiKey} onChange={(e) => onChange({ apiKey: e.target.value })} type="password" className="dark-input w-full" placeholder="Your ManyChat API key" /></div>
       <div><label className="mb-1.5 block text-xs font-medium text-muted-foreground">ManyChat Page ID</label><input value={data.pageId} onChange={(e) => onChange({ pageId: e.target.value })} className="dark-input w-full" placeholder="e.g. 123456789" /></div>
+
+      {/* Webhook URL Section */}
+      <div className="border-t border-border pt-4 space-y-3">
+        <h3 className="text-sm font-semibold text-foreground">Your Webhook URL</h3>
+        <p className="text-xs text-muted-foreground">Copy this URL into ManyChat to receive Instagram DMs.</p>
+        {webhookLoading ? (
+          <div className="h-10 bg-secondary animate-pulse rounded-md" />
+        ) : webhookUrl ? (
+          <div className="flex items-center gap-2">
+            <code className="flex-1 bg-muted rounded-md px-3 py-2 text-xs text-foreground font-mono break-all select-all">{webhookUrl}</code>
+            <button onClick={handleCopy} className="dark-btn-ghost p-2 shrink-0">
+              {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+            </button>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">Webhook URL will be available after saving your ManyChat settings.</p>
+        )}
+
+        <div className="dark-card p-4 space-y-2 text-xs text-muted-foreground border-l-2 border-l-primary">
+          <p className="font-medium text-foreground">ManyChat Webhook Setup:</p>
+          <ol className="list-decimal list-inside space-y-1">
+            <li>Go to ManyChat → Automation → New Flow</li>
+            <li>Add an "External Request" action</li>
+            <li>Paste the webhook URL above</li>
+            <li>Set method to <strong className="text-foreground">POST</strong></li>
+            <li>Add header: <code className="text-foreground">Content-Type: application/json</code></li>
+            <li>In the request body, map the subscriber fields</li>
+          </ol>
+        </div>
+
+        <button onClick={handleVerify} disabled={verifying} className="dark-btn-secondary text-xs w-full">
+          {verifying ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+          <span className="ml-1">{verifying ? "Verifying…" : "Verify Connection"}</span>
+        </button>
+        {verifyResult === "connected" && (
+          <div className="flex items-center gap-2 text-xs text-success"><span className="h-2 w-2 rounded-full bg-success" /> Connected successfully</div>
+        )}
+        {verifyResult === "not_connected" && (
+          <div className="flex items-center gap-2 text-xs text-destructive"><span className="h-2 w-2 rounded-full bg-destructive" /> Not connected — check your credentials above</div>
+        )}
+      </div>
+
       <div className="flex items-center justify-between">
         <button onClick={onBack} className="dark-btn-ghost"><ArrowLeft size={14} /> Back</button>
         <div className="flex items-center gap-3"><button onClick={onSkip} className="text-sm text-muted-foreground hover:text-foreground transition-colors">Skip for now</button><button onClick={onNext} disabled={saving} className="dark-btn-primary">{saving ? <Loader2 size={14} className="animate-spin" /> : null} Save & Continue <ArrowRight size={14} /></button></div>
@@ -127,16 +216,70 @@ const Onboarding = () => {
   const companyId = requireCompanyId();
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState(true);
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [bizInfo, setBizInfo] = useState({ businessName: localStorage.getItem("plcs_company_name") || "", description: "", notes: "" });
   const [persona, setPersona] = useState({ tone: "professional", responseLength: "medium", personaStyle: "busy", emojis: false });
   const [quoteEnabled, setQuoteEnabled] = useState<Record<string, boolean>>({ full_name: true, email_address: true, phone_number: true });
   const [manychat, setManychat] = useState({ apiKey: "", pageId: "" });
 
-  const saveStep1 = async () => { setSaving(true); try { await api.putCompanyInfo({ business_description: bizInfo.description, additional_notes: bizInfo.notes }); if (bizInfo.businessName.trim()) { await api.patchCompany(companyId, { company_name: bizInfo.businessName.trim() }).catch(() => {}); } setStep(2); } catch (e: any) { toast({ title: "Failed to save", description: e?.message, variant: "destructive" }); } finally { setSaving(false); } };
-  const saveStep2 = async () => { setSaving(true); try { await api.putChatbotBehavior({ tone: persona.tone, response_length: persona.responseLength, persona_style: persona.personaStyle, emojis_enabled: persona.emojis }); setStep(3); } catch (e: any) { toast({ title: "Failed to save", description: e?.message, variant: "destructive" }); } finally { setSaving(false); } };
-  const saveStep3 = async () => { setSaving(true); try { const presets = QUOTE_PRESETS.map((p, i) => ({ name: p.key, label: p.label, is_enabled: !!quoteEnabled[p.key], priority: i + 1 })); await api.putQuoteFields({ presets }); setStep(4); } catch (e: any) { toast({ title: "Failed to save", description: e?.message, variant: "destructive" }); } finally { setSaving(false); } };
-  const saveStep4 = async (skipManychat = false) => { setSaving(true); try { if (!skipManychat && manychat.apiKey.trim()) { await api.saveManychatSettings({ manychat_api_key: manychat.apiKey.trim(), manychat_page_id: manychat.pageId.trim() }); } setStep(5); } catch (e: any) { toast({ title: "Failed to save ManyChat settings", description: e?.message, variant: "destructive" }); } finally { setSaving(false); } };
-  const finishSetup = async (mode: "autopilot" | "copilot") => { setSaving(true); try { await api.setOperatingMode(mode); toast({ title: "Setup complete!", description: "Your workspace is ready." }); navigate("/dashboard", { replace: true }); } catch (e: any) { toast({ title: "Failed to set mode", description: e?.message, variant: "destructive" }); } finally { setSaving(false); } };
+  // Fetch onboarding status to restore progress
+  useEffect(() => {
+    api.getOnboardingStatus()
+      .then((res) => {
+        const completed = new Set<number>();
+        const steps = res?.completed_steps || res?.steps || [];
+        if (Array.isArray(steps)) {
+          steps.forEach((s: any) => {
+            const num = typeof s === "number" ? s : s?.step;
+            if (num) completed.add(num);
+          });
+        }
+        setCompletedSteps(completed);
+        // Restore to first incomplete step
+        const currentStep = res?.current_step;
+        if (currentStep && currentStep >= 1 && currentStep <= TOTAL_STEPS) {
+          setStep(currentStep);
+        } else {
+          // Find first incomplete step
+          for (let i = 1; i <= TOTAL_STEPS; i++) {
+            if (!completed.has(i)) { setStep(i); break; }
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingStatus(false));
+  }, []);
+
+  const markComplete = (stepNum: number) => {
+    setCompletedSteps((prev) => new Set([...prev, stepNum]));
+  };
+
+  const saveStep1 = async () => { setSaving(true); try { await api.putCompanyInfo({ business_description: bizInfo.description, additional_notes: bizInfo.notes }); if (bizInfo.businessName.trim()) { await api.patchCompany(companyId, { company_name: bizInfo.businessName.trim() }).catch(() => {}); } markComplete(1); setStep(2); } catch (e: any) { toast({ title: "Failed to save", description: e?.message, variant: "destructive" }); } finally { setSaving(false); } };
+  const saveStep2 = async () => { setSaving(true); try { await api.putChatbotBehavior({ tone: persona.tone, response_length: persona.responseLength, persona_style: persona.personaStyle, emojis_enabled: persona.emojis }); markComplete(2); setStep(3); } catch (e: any) { toast({ title: "Failed to save", description: e?.message, variant: "destructive" }); } finally { setSaving(false); } };
+  const saveStep3 = async () => { setSaving(true); try { const presets = QUOTE_PRESETS.map((p, i) => ({ name: p.key, label: p.label, is_enabled: !!quoteEnabled[p.key], priority: i + 1 })); await api.putQuoteFields({ presets }); markComplete(3); setStep(4); } catch (e: any) { toast({ title: "Failed to save", description: e?.message, variant: "destructive" }); } finally { setSaving(false); } };
+  const saveStep4 = async (skipManychat = false) => { setSaving(true); try { if (!skipManychat && manychat.apiKey.trim()) { await api.saveManychatSettings({ manychat_api_key: manychat.apiKey.trim(), manychat_page_id: manychat.pageId.trim() }); } markComplete(4); setStep(5); } catch (e: any) { toast({ title: "Failed to save ManyChat settings", description: e?.message, variant: "destructive" }); } finally { setSaving(false); } };
+  const finishSetup = async (mode: "autopilot" | "copilot") => {
+    setSaving(true);
+    try {
+      await api.setOperatingMode(mode);
+      markComplete(5);
+      // Call onboarding complete
+      await api.completeOnboarding().catch(() => {});
+      toast({ title: "Setup complete!", description: "Your workspace is ready." });
+      navigate("/dashboard", { replace: true });
+    } catch (e: any) {
+      toast({ title: "Failed to set mode", description: e?.message, variant: "destructive" });
+    } finally { setSaving(false); }
+  };
+
+  if (loadingStatus) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 size={24} className="animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
@@ -147,7 +290,7 @@ const Onboarding = () => {
           </div>
           <div className="font-semibold text-sm text-foreground">Setup Wizard</div>
         </div>
-        <StepProgress step={step} />
+        <StepProgress step={step} completedSteps={completedSteps} />
         <div className="dark-card p-6">
           {step === 1 && <Step1 data={bizInfo} onChange={(d) => setBizInfo((p) => ({ ...p, ...d }))} onNext={saveStep1} saving={saving} />}
           {step === 2 && <Step2 data={persona} onChange={(d) => setPersona((p) => ({ ...p, ...d }))} onNext={saveStep2} onBack={() => setStep(1)} saving={saving} />}

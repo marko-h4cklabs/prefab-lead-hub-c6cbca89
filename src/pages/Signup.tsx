@@ -3,6 +3,19 @@ import { useNavigate, Link } from "react-router-dom";
 import { api } from "@/lib/apiClient";
 import { Eye, EyeOff } from "lucide-react";
 
+function getPasswordStrength(password: string): { label: string; color: string; width: string } {
+  if (!password) return { label: "", color: "", width: "0%" };
+  let score = 0;
+  if (password.length >= 6) score++;
+  if (password.length >= 10) score++;
+  if (/[A-Z]/.test(password)) score++;
+  if (/[0-9]/.test(password)) score++;
+  if (/[^A-Za-z0-9]/.test(password)) score++;
+  if (score <= 1) return { label: "Weak", color: "bg-destructive", width: "25%" };
+  if (score <= 3) return { label: "Medium", color: "bg-warning", width: "60%" };
+  return { label: "Strong", color: "bg-success", width: "100%" };
+}
+
 const Signup = () => {
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
@@ -15,6 +28,7 @@ const Signup = () => {
   const navigate = useNavigate();
 
   const passwordsMatch = password === confirmPassword;
+  const strength = getPasswordStrength(password);
   const canSubmit = companyName.trim() && email.trim() && password && confirmPassword && passwordsMatch && !loading;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -24,18 +38,31 @@ const Signup = () => {
     if (!trimmedCompany) { setError("Company name is required"); return; }
     if (!trimmedEmail) { setError("Email is required"); return; }
     if (!password) { setError("Password is required"); return; }
+    if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
     if (!confirmPassword) { setError("Please confirm your password"); return; }
     if (!passwordsMatch) { setError("Passwords do not match"); return; }
     setLoading(true);
     setError("");
     try {
       const res = await api.signup(trimmedCompany, trimmedEmail, password);
+      // Store JWT + company_id exactly like login
       localStorage.setItem("auth_token", res.token);
-      if (res.companyId) localStorage.setItem("company_id", res.companyId);
-      navigate("/onboarding");
+      if (res.companyId) {
+        localStorage.setItem("company_id", res.companyId);
+        localStorage.setItem("plcs_company_id", res.companyId);
+      }
+      localStorage.setItem("plcs_company_name", trimmedCompany);
+      navigate("/onboarding", { replace: true });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Signup failed";
-      setError(typeof message === "string" ? message : "Signup failed");
+      // Show specific messages for common errors
+      if (typeof message === "string" && message.toLowerCase().includes("already")) {
+        setError("An account with this email already exists. Try logging in instead.");
+      } else if (typeof message === "string" && message.toLowerCase().includes("weak")) {
+        setError("Password is too weak. Use at least 6 characters with a mix of letters and numbers.");
+      } else {
+        setError(typeof message === "string" ? message : "Signup failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -70,6 +97,17 @@ const Signup = () => {
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+              {/* Password strength indicator */}
+              {password && (
+                <div className="mt-2 space-y-1">
+                  <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+                    <div className={`h-full rounded-full transition-all duration-300 ${strength.color}`} style={{ width: strength.width }} />
+                  </div>
+                  <p className={`text-[10px] font-medium ${strength.label === "Weak" ? "text-destructive" : strength.label === "Medium" ? "text-warning" : "text-success"}`}>
+                    {strength.label}
+                  </p>
+                </div>
+              )}
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Confirm Password</label>

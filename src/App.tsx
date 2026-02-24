@@ -28,6 +28,7 @@ import Pipeline from "./pages/Pipeline";
 import Dashboard from "./pages/Dashboard";
 import Billing from "./pages/Billing";
 import Team from "./pages/Team";
+import Account from "./pages/Account";
 
 const queryClient = new QueryClient();
 
@@ -94,6 +95,7 @@ const App = () => {
             <Route path="/settings" element={<Settings />} />
             <Route path="/billing" element={<Billing />} />
             <Route path="/team" element={<Team />} />
+            <Route path="/account" element={<Account />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

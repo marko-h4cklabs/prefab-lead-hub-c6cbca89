@@ -128,6 +128,9 @@ const Dashboard = () => {
 
   const pipelineSummary = pipelineStats?.stages ?? pipelineStats?.summary ?? null;
 
+  // Empty state check: no leads, no conversations, no deals
+  const isEmpty = !hotLeads.length && !topLeads.length && !appointments.length && newLeadsToday === 0 && activeConversations === 0 && revenueThisMonth === 0;
+
   return (
     <div className="p-6 max-w-[1400px] mx-auto space-y-6">
       {/* Section 1 — Welcome Bar */}
@@ -144,6 +147,26 @@ const Dashboard = () => {
           </button>
         </div>
       </div>
+
+      {/* Empty state for brand new clients */}
+      {isEmpty && overview && (
+        <div className="dark-card p-12 text-center space-y-4">
+          <div className="text-5xl mb-2">👋</div>
+          <h2 className="text-lg font-bold text-foreground">Welcome to your workspace!</h2>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            You're all set up. Now connect ManyChat to start receiving leads from Instagram.
+          </p>
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <button onClick={() => navigate("/settings")} className="dark-btn-primary text-sm">Connect ManyChat →</button>
+            <button onClick={() => {
+              navigate("/leads");
+              setTimeout(() => navigate("/pipeline"), 1500);
+              setTimeout(() => navigate("/analytics"), 3000);
+              setTimeout(() => navigate("/dashboard"), 4500);
+            }} className="dark-btn-secondary text-sm">Take the tour →</button>
+          </div>
+        </div>
+      )}
 
       {/* AI Status */}
       <div className="dark-card p-4 flex items-center justify-between">

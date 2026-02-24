@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { api, requireCompanyId, clearAuth } from "@/lib/apiClient";
-import { LayoutList, FlaskConical, Bot, BarChart3, CalendarDays, Settings, LogOut, Columns3, Home, Users } from "lucide-react";
+import { LayoutList, Bot, BarChart3, CalendarDays, Settings, LogOut, Columns3, Home, Users, User } from "lucide-react";
 import NotificationsDropdown from "@/components/NotificationsDropdown";
 import ImpersonationBanner from "@/components/admin/ImpersonationBanner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -19,6 +19,7 @@ const navItems = [
 
 const AppLayout = () => {
   const [companyName, setCompanyName] = useState("");
+  const [billingStatus, setBillingStatus] = useState<any>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -27,6 +28,9 @@ const AppLayout = () => {
     api.getCompany(companyId).then((c) => {
       setCompanyName(c.company_name || c.name || "Company");
     }).catch(() => {});
+
+    // Fetch billing status for trial banner
+    api.getBillingStatus().then(setBillingStatus).catch(() => {});
   }, []);
 
   const handleLogout = () => {
@@ -34,12 +38,48 @@ const AppLayout = () => {
     navigate("/login");
   };
 
-  // Check if current route is an inbox route (needs special layout)
   const isInboxRoute = location.pathname.startsWith("/leads");
   const isDashboardRoute = location.pathname === "/dashboard";
 
+  // Trial/billing banner logic
+  const subStatus = billingStatus?.subscription_status || billingStatus?.status;
+  const trialDaysLeft = billingStatus?.trial_days_remaining ?? billingStatus?.days_remaining ?? null;
+  const showTrialBanner = subStatus === "trial" && trialDaysLeft !== null;
+  const showPastDueBanner = subStatus === "past_due";
+  const showExpiredBanner = subStatus === "expired";
+  const isUrgent = showTrialBanner && trialDaysLeft <= 3;
+
   return (
     <div className="flex min-h-screen w-full flex-col">
+      {/* Trial / billing banners */}
+      {showTrialBanner && (
+        <div className={`flex items-center justify-center gap-2 px-4 py-1.5 text-xs font-medium ${
+          isUrgent ? "bg-[hsl(24_95%_53%)] text-[hsl(0_0%_4%)]" : "bg-primary text-primary-foreground"
+        }`}>
+          {isUrgent && (
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[hsl(0_0%_4%)]/50" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-[hsl(0_0%_4%)]" />
+            </span>
+          )}
+          <span>Free Trial — {trialDaysLeft} day{trialDaysLeft !== 1 ? "s" : ""} remaining</span>
+          <span>·</span>
+          <button onClick={() => navigate("/billing")} className="underline hover:no-underline font-semibold">Upgrade to Pro →</button>
+        </div>
+      )}
+      {showExpiredBanner && (
+        <div className="flex items-center justify-center gap-2 px-4 py-1.5 text-xs font-medium bg-destructive text-destructive-foreground">
+          <span>Trial expired — upgrade to continue using the platform</span>
+          <button onClick={() => navigate("/billing")} className="underline hover:no-underline font-semibold">Upgrade →</button>
+        </div>
+      )}
+      {showPastDueBanner && (
+        <div className="flex items-center justify-center gap-2 px-4 py-1.5 text-xs font-medium bg-destructive text-destructive-foreground">
+          <span>Payment failed — update your billing to avoid service interruption</span>
+          <button onClick={() => navigate("/billing")} className="underline hover:no-underline font-semibold">Update billing →</button>
+        </div>
+      )}
+
       <ImpersonationBanner />
       <div className="flex flex-1 min-h-0">
       {/* Zone 1 — Icon Rail */}
@@ -80,9 +120,26 @@ const AppLayout = () => {
           })}
         </nav>
 
-        {/* Bottom: notifications + user avatar + logout */}
+        {/* Bottom: notifications + account + logout */}
         <div className="flex flex-col items-center gap-2 py-3 border-t border-border">
           <NotificationsDropdown />
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <NavLink
+                to="/account"
+                className={`flex items-center justify-center w-10 h-10 rounded-lg transition-all ${
+                  location.pathname === "/account"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                }`}
+              >
+                <User size={18} />
+              </NavLink>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="bg-card text-foreground border-border">
+              Account
+            </TooltipContent>
+          </Tooltip>
           <Tooltip delayDuration={0}>
             <TooltipTrigger asChild>
               <button
