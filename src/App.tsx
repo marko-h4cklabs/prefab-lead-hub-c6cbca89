@@ -24,6 +24,7 @@ import NotFound from "./pages/NotFound";
 import AdminPanel from "./pages/AdminPanel";
 import Onboarding from "./pages/Onboarding";
 import ModeSelectionScreen from "./components/ModeSelectionScreen";
+import Pipeline from "./pages/Pipeline";
 
 const queryClient = new QueryClient();
 
@@ -81,6 +82,7 @@ const App = () => {
               <Route path="/leads/:leadId" element={<LeadDetail />} />
               <Route path="/leads/:leadId/conversation" element={<Conversation />} />
             </Route>
+            <Route path="/pipeline" element={<Pipeline />} />
             <Route path="/simulation" element={<Simulation />} />
             <Route path="/fields" element={<Fields />} />
             <Route path="/analytics" element={<Analytics />} />
