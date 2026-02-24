@@ -34,6 +34,7 @@ const Fields = () => {
   const [previewKey, setPreviewKey] = useState(0);
   const [savingAll, setSavingAll] = useState(false);
   const [unsavedSections, setUnsavedSections] = useState<Set<string>>(new Set());
+  const [quoteFieldsVersion, setQuoteFieldsVersion] = useState(0);
 
   const markDirty = useCallback((section: string) => {
     setUnsavedSections(prev => new Set([...prev, section]));
@@ -41,6 +42,10 @@ const Fields = () => {
 
   const markClean = useCallback((section: string) => {
     setUnsavedSections(prev => { const n = new Set(prev); n.delete(section); return n; });
+  }, []);
+
+  const refreshQuoteFields = useCallback(() => {
+    setQuoteFieldsVersion(v => v + 1);
   }, []);
 
   // Warn before leaving with unsaved changes
@@ -144,7 +149,7 @@ const Fields = () => {
 
       {/* Section 5 — Smart Booking Trigger */}
       <div className="dark-card border-l-4 border-l-primary">
-        <BookingTriggerSection onDirty={() => markDirty('booking')} onSaved={() => { markClean('booking'); refreshPreview(); }} />
+        <BookingTriggerSection onDirty={() => markDirty('booking')} onSaved={() => { markClean('booking'); refreshPreview(); }} quoteFieldsVersion={quoteFieldsVersion} />
       </div>
 
       {/* Section 6 — Social Proof */}
@@ -154,7 +159,7 @@ const Fields = () => {
 
       {/* Section 7 — Data Collection */}
       <div className="dark-card border-l-4 border-l-primary">
-        <QuoteFieldsSection />
+        <QuoteFieldsSection onFieldsChanged={refreshQuoteFields} />
       </div>
 
       {/* Section 8 — Personas */}

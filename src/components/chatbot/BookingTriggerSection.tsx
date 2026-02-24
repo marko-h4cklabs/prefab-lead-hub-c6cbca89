@@ -6,6 +6,7 @@ import { Slider } from "@/components/ui/slider";
 interface Props {
   onSaved?: () => void;
   onDirty?: () => void;
+  quoteFieldsVersion?: number;
 }
 
 interface BookingConfig {
@@ -17,6 +18,12 @@ interface BookingConfig {
   intent_threshold: number;
 }
 
+interface AvailableField {
+  name: string;
+  label: string;
+  is_custom?: boolean;
+}
+
 const DEFAULT: BookingConfig = {
   enabled: false,
   platform: "google_calendar",
@@ -26,23 +33,24 @@ const DEFAULT: BookingConfig = {
   intent_threshold: 60,
 };
 
-const CORE_BOOKING_FIELDS = ['full_name', 'email_address', 'phone_number', 'budget', 'location'];
+const STORAGE_KEY = "chatbot_booking_draft";
 
-export default function BookingTriggerSection({ onSaved, onDirty }: Props) {
+export default function BookingTriggerSection({ onSaved, onDirty, quoteFieldsVersion }: Props) {
   const [config, setConfig] = useState<BookingConfig>(DEFAULT);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveError, setSaveError] = useState('');
   const [gcConnected, setGcConnected] = useState<boolean | null>(null);
-  const [quoteFields, setQuoteFields] = useState<{ key: string; label: string }[]>([]);
+  const [availableFields, setAvailableFields] = useState<AvailableField[]>([]);
   const initialRef = useRef(JSON.stringify(DEFAULT));
+  const loadedOnce = useRef(false);
 
+  // Load booking settings + GC status
   useEffect(() => {
     Promise.all([
       api.getBookingSettings().catch(() => null),
       api.getGoogleCalendarStatus().catch(() => null),
-      api.getQuoteFields().catch(() => null),
-    ]).then(([bs, gc, qf]) => {
+    ]).then(([bs, gc]) => {
       if (bs) {
         const loaded: BookingConfig = {
           enabled: Boolean(bs.enabled ?? bs.booking_trigger_enabled),
@@ -54,17 +62,40 @@ export default function BookingTriggerSection({ onSaved, onDirty }: Props) {
         };
         setConfig(loaded);
         initialRef.current = JSON.stringify(loaded);
+        sessionStorage.removeItem(STORAGE_KEY);
+        // Set available fields from API response
+        const fields = bs.available_fields || [];
+        if (fields.length > 0) setAvailableFields(fields);
+      } else {
+        // Fallback: try sessionStorage draft
+        const draft = sessionStorage.getItem(STORAGE_KEY);
+        if (draft) {
+          try { setConfig(JSON.parse(draft)); } catch {}
+        }
       }
       setGcConnected(Boolean(gc?.connected || gc?.is_connected));
-      // Parse quote fields — only show core qualifying fields
-      const fields = Array.isArray(qf) ? qf : qf?.fields || qf?.presets || [];
-      const allParsed = fields
-        .filter((f: any) => f.enabled !== false)
-        .map((f: any) => ({ key: f.key || f.variable_name || f.id || f.label, label: f.label || f.name || f.key }));
-      const coreFiltered = allParsed.filter((f: any) => CORE_BOOKING_FIELDS.includes(f.key));
-      setQuoteFields(coreFiltered.length > 0 ? coreFiltered : allParsed.slice(0, 5));
+      loadedOnce.current = true;
     }).finally(() => setLoading(false));
   }, []);
+
+  // Re-fetch available fields when quote fields change
+  useEffect(() => {
+    if (!loadedOnce.current) return;
+    if (quoteFieldsVersion === undefined) return;
+    api.getBookingSettings().then(res => {
+      if (res?.available_fields) {
+        setAvailableFields(res.available_fields);
+      }
+      // Don't overwrite current config selection
+    }).catch(() => {});
+  }, [quoteFieldsVersion]);
+
+  // SessionStorage backup
+  useEffect(() => {
+    if (!loading) {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+    }
+  }, [config, loading]);
 
   const set = <K extends keyof BookingConfig>(key: K, val: BookingConfig[K]) => {
     setConfig((prev) => {
@@ -107,6 +138,7 @@ export default function BookingTriggerSection({ onSaved, onDirty }: Props) {
       });
       initialRef.current = JSON.stringify(config);
       setSaveStatus('saved');
+      sessionStorage.removeItem(STORAGE_KEY);
       onSaved?.();
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (err: any) {
@@ -181,23 +213,32 @@ export default function BookingTriggerSection({ onSaved, onDirty }: Props) {
             )}
           </div>
 
-          {/* Required fields */}
+          {/* Required fields — from available_fields API */}
           <div>
             <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Required info before offering booking</label>
             <div className="space-y-2">
-              <label className="flex items-center gap-2.5 opacity-60 cursor-not-allowed">
-                <input type="checkbox" checked disabled className="rounded border-border accent-primary" />
-                <span className="text-sm">Name</span>
-                <span className="text-[10px] text-muted-foreground">(always required)</span>
-              </label>
-              {quoteFields
-                .filter((f) => f.key !== "name" && f.key !== "full_name")
-                .map((f) => (
-                  <label key={f.key} className="flex items-center gap-2.5 cursor-pointer">
-                    <input type="checkbox" checked={config.required_fields.includes(f.key)} onChange={() => toggleRequired(f.key)} className="rounded border-border accent-primary" />
-                    <span className="text-sm">{f.label}</span>
+              {availableFields.length > 0 ? (
+                availableFields.map((field) => (
+                  <label key={field.name} className="flex items-center gap-3 py-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={config.required_fields.includes(field.name) || field.name === 'full_name'}
+                      disabled={field.name === 'full_name'}
+                      onChange={() => toggleRequired(field.name)}
+                      className="h-4 w-4 rounded accent-primary"
+                    />
+                    <span className="text-sm">{field.label}</span>
+                    {field.is_custom && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary">Custom</span>
+                    )}
+                    {field.name === 'full_name' && (
+                      <span className="text-[10px] text-muted-foreground">(always required)</span>
+                    )}
                   </label>
-                ))}
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground">No fields available. Add fields in Data Collection first.</p>
+              )}
             </div>
           </div>
 

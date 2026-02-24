@@ -18,6 +18,8 @@ const EMPTY: IdentityState = {
   additional_context: "",
 };
 
+const STORAGE_KEY = "chatbot_identity_draft";
+
 const AgentIdentitySection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirty?: () => void }) => {
   const [data, setData] = useState<IdentityState>(EMPTY);
   const [loading, setLoading] = useState(true);
@@ -31,17 +33,33 @@ const AgentIdentitySection = ({ onSaved, onDirty }: { onSaved?: () => void; onDi
       api.getAgentIdentity().catch(() => null),
       api.getCompanyInfo().catch(() => null),
     ]).then(([identity, company]) => {
-      const merged: IdentityState = {
-        agent_name: identity?.agent_name || "",
-        agent_backstory: identity?.agent_backstory || "",
-        business_name: identity?.business_name || company?.business_name || "",
-        business_description: identity?.business_description || company?.business_description || "",
-        additional_context: identity?.additional_context || company?.additional_notes || "",
-      };
-      setData(merged);
-      initialRef.current = JSON.stringify(merged);
+      const hasRealData = identity?.agent_name || identity?.business_description;
+      if (hasRealData || identity) {
+        const merged: IdentityState = {
+          agent_name: identity?.agent_name || "",
+          agent_backstory: identity?.agent_backstory || "",
+          business_name: identity?.business_name || company?.business_name || "",
+          business_description: identity?.business_description || company?.business_description || "",
+          additional_context: identity?.additional_context || company?.additional_notes || "",
+        };
+        setData(merged);
+        initialRef.current = JSON.stringify(merged);
+        sessionStorage.removeItem(STORAGE_KEY);
+      } else {
+        const draft = sessionStorage.getItem(STORAGE_KEY);
+        if (draft) {
+          try { setData(JSON.parse(draft)); } catch {}
+        }
+      }
     }).finally(() => setLoading(false));
   }, []);
+
+  // SessionStorage backup
+  useEffect(() => {
+    if (!loading) {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+  }, [data, loading]);
 
   const update = (patch: Partial<IdentityState>) => {
     setData((prev) => {
@@ -61,6 +79,7 @@ const AgentIdentitySection = ({ onSaved, onDirty }: { onSaved?: () => void; onDi
       initialRef.current = JSON.stringify(data);
       setIsDirty(false);
       setSaveStatus('saved');
+      sessionStorage.removeItem(STORAGE_KEY);
       onSaved?.();
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (err: any) {
