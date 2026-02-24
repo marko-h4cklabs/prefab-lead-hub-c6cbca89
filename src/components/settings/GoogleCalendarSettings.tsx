@@ -64,14 +64,18 @@ export default function GoogleCalendarSettings() {
   const handleConnect = async () => {
     setConnecting(true);
     try {
-      const res = await api.getGoogleAuthUrl();
-      const url = res?.auth_url || res?.url;
-      if (url) {
-        window.location.href = url;
+      const token = localStorage.getItem("plcs_token");
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const response = await fetch("/api/integrations/google/auth", { headers });
+      const data = await response.json();
+      if (data.auth_url) {
+        window.location.href = data.auth_url;
       } else {
         toast({ title: "Could not get auth URL", variant: "destructive" });
       }
     } catch (err: unknown) {
+      console.error("Google auth error:", err);
       toast({ title: "Connection failed", description: getErrorMessage(err), variant: "destructive" });
     } finally {
       setConnecting(false);
