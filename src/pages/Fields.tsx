@@ -1,21 +1,28 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/apiClient";
-import { ChevronDown, Loader2, CalendarCheck, Settings, ExternalLink } from "lucide-react";
+import { Loader2, CalendarCheck, Settings, ExternalLink, Save } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import CompanyInfoSection from "@/components/chatbot/CompanyInfoSection";
-import ChatbotBehaviorSection from "@/components/chatbot/ChatbotBehaviorSection";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { toast } from "@/hooks/use-toast";
+
+import AgentIdentitySection from "@/components/chatbot/AgentIdentitySection";
+import CommunicationStyleSection from "@/components/chatbot/CommunicationStyleSection";
+import ConversationStrategySection from "@/components/chatbot/ConversationStrategySection";
+import GuardrailsSection from "@/components/chatbot/GuardrailsSection";
+import SocialProofSection from "@/components/chatbot/SocialProofSection";
 import QuoteFieldsSection from "@/components/chatbot/QuoteFieldsSection";
 import PersonasSection from "@/components/chatbot/PersonasSection";
 import TemplatesSection from "@/components/chatbot/TemplatesSection";
 import AutoresponderSection from "@/components/chatbot/AutoresponderSection";
 import VoiceSettingsSection from "@/components/voice/VoiceSettingsSection";
+import PreviewPanel from "@/components/chatbot/PreviewPanel";
 
 const Fields = () => {
   const navigate = useNavigate();
-  const [systemContext, setSystemContext] = useState<string | null>(null);
-  const [contextOpen, setContextOpen] = useState(false);
-  const [contextLoading, setContextLoading] = useState(false);
+  const isMobile = useIsMobile();
   const [bookingStatus, setBookingStatus] = useState<{ loaded: boolean; enabled: boolean; mode: string }>({ loaded: false, enabled: false, mode: "off" });
+  const [previewKey, setPreviewKey] = useState(0);
+  const [savingAll, setSavingAll] = useState(false);
 
   useEffect(() => {
     api.getSchedulingSettings()
@@ -26,36 +33,32 @@ const Fields = () => {
       .catch(() => setBookingStatus({ loaded: true, enabled: false, mode: "off" }));
   }, []);
 
-  const fetchSystemContext = () => {
-    setContextLoading(true);
-    api.getSystemContext()
-      .then((res) => {
-        let ctx = "";
-        if (typeof res === "string") ctx = res;
-        else if (res && typeof res === "object") {
-          const r = res as Record<string, unknown>;
-          if (typeof r.systemContext === "string") ctx = r.systemContext;
-          else if (typeof r.system_context === "string") ctx = r.system_context;
-          else ctx = JSON.stringify(res, null, 2);
-        }
-        setSystemContext(ctx);
-      })
-      .catch(() => setSystemContext(""))
-      .finally(() => setContextLoading(false));
+  const refreshPreview = useCallback(() => {
+    setPreviewKey((k) => k + 1);
+  }, []);
+
+  const handleSaveAll = () => {
+    setSavingAll(true);
+    // Trigger a global refresh — individual sections handle their own saves
+    toast({ title: "Refreshing preview...", description: "Save each section individually for best results." });
+    refreshPreview();
+    setTimeout(() => setSavingAll(false), 1000);
   };
 
-  const loadSystemContext = () => {
-    if (systemContext !== null) {
-      setContextOpen(!contextOpen);
-      if (contextOpen) return;
-    }
-    setContextOpen(true);
-    fetchSystemContext();
-  };
-
-  return (
-    <div className="max-w-3xl space-y-6">
-      <h1 className="text-xl font-bold">AI Agent</h1>
+  const leftColumn = (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold text-foreground">AI Agent</h1>
+        <button
+          onClick={handleSaveAll}
+          disabled={savingAll}
+          className="dark-btn bg-primary text-primary-foreground hover:bg-primary/90 h-8 text-xs"
+        >
+          {savingAll ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+          Save All
+        </button>
+      </div>
 
       {/* Booking Status */}
       <div className="dark-card px-5 py-3 flex items-center justify-between border-l-4 border-l-primary">
@@ -77,56 +80,79 @@ const Fields = () => {
         </button>
       </div>
 
-      {/* Agent Identity */}
+      {/* Section 1 — Agent Identity */}
       <div className="dark-card border-l-4 border-l-primary">
-        <CompanyInfoSection />
+        <AgentIdentitySection onSaved={refreshPreview} />
       </div>
 
-      {/* Behavior Rules */}
+      {/* Section 2 — Communication Style */}
       <div className="dark-card border-l-4 border-l-primary">
-        <ChatbotBehaviorSection />
+        <CommunicationStyleSection onSaved={refreshPreview} />
       </div>
 
-      {/* Data Collection */}
+      {/* Section 3 — Conversation Strategy */}
+      <div className="dark-card border-l-4 border-l-primary">
+        <ConversationStrategySection onSaved={refreshPreview} />
+      </div>
+
+      {/* Section 4 — Guardrails */}
+      <div className="dark-card border-l-4 border-l-primary">
+        <GuardrailsSection onSaved={refreshPreview} />
+      </div>
+
+      {/* Section 5 — Social Proof */}
+      <div className="dark-card border-l-4 border-l-primary">
+        <SocialProofSection onSaved={refreshPreview} />
+      </div>
+
+      {/* Section 6 — Data Collection */}
       <div className="dark-card border-l-4 border-l-primary">
         <QuoteFieldsSection />
       </div>
 
-      {/* System Context Preview */}
-      <div className="dark-card">
-        <button onClick={loadSystemContext} className="flex w-full items-center justify-between px-6 py-4 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors">
-          System Context Preview
-          {contextLoading ? <Loader2 size={14} className="animate-spin" /> : <ChevronDown size={14} className={`transition-transform ${contextOpen ? "rotate-180" : ""}`} />}
-        </button>
-        {contextOpen && (
-          <div className="px-6 pb-4">
-            {systemContext ? (
-              <pre className="overflow-auto max-h-64 rounded-md bg-secondary p-4 text-xs font-mono whitespace-pre-wrap">{systemContext}</pre>
-            ) : (
-              <p className="text-sm text-muted-foreground py-4">No context yet — fill Agent Identity / Behavior / Data Collection and Save.</p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Personas */}
+      {/* Section 7 — Personas */}
       <div className="dark-card border-l-4 border-l-primary">
         <PersonasSection />
       </div>
 
-      {/* Message Templates */}
+      {/* Section 8 — Message Templates */}
       <div className="dark-card border-l-4 border-l-primary">
         <TemplatesSection />
       </div>
 
-      {/* Autoresponder Rules */}
+      {/* Section 9 — Autoresponder Rules */}
       <div className="dark-card border-l-4 border-l-primary">
         <AutoresponderSection />
       </div>
 
-      {/* Voice Settings */}
+      {/* Section 10 — Voice Settings */}
       <div className="border-t border-border pt-6">
         <VoiceSettingsSection />
+      </div>
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+      <div className="max-w-3xl space-y-6 pb-6">
+        {leftColumn}
+        <div className="h-[500px]">
+          <PreviewPanel refreshKey={previewKey} />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex gap-6 h-full min-h-0">
+      {/* Left Column — 60% */}
+      <div className="w-[60%] overflow-auto pr-2 pb-6">
+        {leftColumn}
+      </div>
+
+      {/* Right Column — 40% sticky preview */}
+      <div className="w-[40%] sticky top-0 h-[calc(100vh-4rem)]">
+        <PreviewPanel refreshKey={previewKey} />
       </div>
     </div>
   );
