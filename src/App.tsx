@@ -26,6 +26,8 @@ import Onboarding from "./pages/Onboarding";
 import ModeSelectionScreen from "./components/ModeSelectionScreen";
 import Pipeline from "./pages/Pipeline";
 import Dashboard from "./pages/Dashboard";
+import Billing from "./pages/Billing";
+import Team from "./pages/Team";
 
 const queryClient = new QueryClient();
 
@@ -90,6 +92,8 @@ const App = () => {
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/billing" element={<Billing />} />
+            <Route path="/team" element={<Team />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

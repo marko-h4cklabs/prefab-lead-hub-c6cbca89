@@ -5,7 +5,7 @@ import { toast } from "@/hooks/use-toast";
 import { Loader2, Check, Copy, ArrowRight, ArrowLeft } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 
 const QUOTE_PRESETS = [
   { key: 'full_name', label: 'Full Name' },
@@ -77,16 +77,47 @@ function Step3({ enabled, onToggle, onNext, onBack, saving }: { enabled: Record<
   );
 }
 
-function Step4({ data, onChange, onFinish, onSkip, onBack, saving }: { data: { apiKey: string; pageId: string }; onChange: (d: Partial<typeof data>) => void; onFinish: () => void; onSkip: () => void; onBack: () => void; saving: boolean }) {
+function Step4({ data, onChange, onNext, onSkip, onBack, saving }: { data: { apiKey: string; pageId: string }; onChange: (d: Partial<typeof data>) => void; onNext: () => void; onSkip: () => void; onBack: () => void; saving: boolean }) {
   return (
     <div className="space-y-5">
-      <div><h2 className="text-lg font-bold mb-1">Connect ManyChat</h2><p className="text-sm text-muted-foreground">Connect your ManyChat account for automated messaging.</p></div>
+      <div><h2 className="text-lg font-bold mb-1">Connect Instagram via ManyChat</h2><p className="text-sm text-muted-foreground">Connect your ManyChat account for automated messaging.</p></div>
+      <div className="dark-card p-4 space-y-2 text-sm text-muted-foreground">
+        <p className="font-medium text-foreground">How to connect:</p>
+        <ol className="list-decimal list-inside space-y-1">
+          <li>Go to ManyChat → Settings → API</li>
+          <li>Copy your API Key</li>
+          <li>Find your Page ID from the ManyChat dashboard URL</li>
+          <li>Paste both values below</li>
+        </ol>
+      </div>
       <div><label className="mb-1.5 block text-xs font-medium text-muted-foreground">ManyChat API Key</label><input value={data.apiKey} onChange={(e) => onChange({ apiKey: e.target.value })} type="password" className="dark-input w-full" placeholder="Your ManyChat API key" /></div>
       <div><label className="mb-1.5 block text-xs font-medium text-muted-foreground">ManyChat Page ID</label><input value={data.pageId} onChange={(e) => onChange({ pageId: e.target.value })} className="dark-input w-full" placeholder="e.g. 123456789" /></div>
       <div className="flex items-center justify-between">
         <button onClick={onBack} className="dark-btn-ghost"><ArrowLeft size={14} /> Back</button>
-        <div className="flex items-center gap-3"><button onClick={onSkip} className="text-sm text-muted-foreground hover:text-foreground transition-colors">Skip for now</button><button onClick={onFinish} disabled={saving} className="dark-btn-primary">{saving ? <Loader2 size={14} className="animate-spin" /> : null} Finish Setup</button></div>
+        <div className="flex items-center gap-3"><button onClick={onSkip} className="text-sm text-muted-foreground hover:text-foreground transition-colors">Skip for now</button><button onClick={onNext} disabled={saving} className="dark-btn-primary">{saving ? <Loader2 size={14} className="animate-spin" /> : null} Save & Continue <ArrowRight size={14} /></button></div>
       </div>
+    </div>
+  );
+}
+
+function Step5({ onSelect, onBack, saving }: { onSelect: (mode: "autopilot" | "copilot") => void; onBack: () => void; saving: boolean }) {
+  const [loadingMode, setLoadingMode] = useState<string | null>(null);
+  return (
+    <div className="space-y-5">
+      <div><h2 className="text-lg font-bold mb-1">Choose Your AI Mode</h2><p className="text-sm text-muted-foreground">How do you want your AI to work? You can change this anytime in Settings.</p></div>
+      <div className="grid grid-cols-2 gap-4">
+        <button onClick={() => { setLoadingMode("autopilot"); onSelect("autopilot"); }} disabled={saving || loadingMode !== null} className="dark-card p-4 text-left hover:border-primary transition-all space-y-2">
+          <p className="text-sm font-bold">🤖 AI Autopilot</p>
+          <p className="text-xs text-muted-foreground">Fully automated DM handling 24/7</p>
+          {loadingMode === "autopilot" && <Loader2 size={14} className="animate-spin text-primary" />}
+        </button>
+        <button onClick={() => { setLoadingMode("copilot"); onSelect("copilot"); }} disabled={saving || loadingMode !== null} className="dark-card p-4 text-left hover:border-primary transition-all space-y-2">
+          <p className="text-sm font-bold">🧠 AI Co-Pilot</p>
+          <p className="text-xs text-muted-foreground">AI suggests replies, you send them</p>
+          {loadingMode === "copilot" && <Loader2 size={14} className="animate-spin text-primary" />}
+        </button>
+      </div>
+      <button onClick={onBack} className="dark-btn-ghost"><ArrowLeft size={14} /> Back</button>
     </div>
   );
 }
@@ -104,7 +135,8 @@ const Onboarding = () => {
   const saveStep1 = async () => { setSaving(true); try { await api.putCompanyInfo({ business_description: bizInfo.description, additional_notes: bizInfo.notes }); if (bizInfo.businessName.trim()) { await api.patchCompany(companyId, { company_name: bizInfo.businessName.trim() }).catch(() => {}); } setStep(2); } catch (e: any) { toast({ title: "Failed to save", description: e?.message, variant: "destructive" }); } finally { setSaving(false); } };
   const saveStep2 = async () => { setSaving(true); try { await api.putChatbotBehavior({ tone: persona.tone, response_length: persona.responseLength, persona_style: persona.personaStyle, emojis_enabled: persona.emojis }); setStep(3); } catch (e: any) { toast({ title: "Failed to save", description: e?.message, variant: "destructive" }); } finally { setSaving(false); } };
   const saveStep3 = async () => { setSaving(true); try { const presets = QUOTE_PRESETS.map((p, i) => ({ name: p.key, label: p.label, is_enabled: !!quoteEnabled[p.key], priority: i + 1 })); await api.putQuoteFields({ presets }); setStep(4); } catch (e: any) { toast({ title: "Failed to save", description: e?.message, variant: "destructive" }); } finally { setSaving(false); } };
-  const finishSetup = async (skipManychat = false) => { setSaving(true); try { if (!skipManychat && manychat.apiKey.trim()) { await api.saveManychatSettings({ manychat_api_key: manychat.apiKey.trim(), manychat_page_id: manychat.pageId.trim() }); } toast({ title: "Setup complete!", description: "Your workspace is ready." }); navigate("/leads"); } catch (e: any) { toast({ title: "Failed to save ManyChat settings", description: e?.message, variant: "destructive" }); } finally { setSaving(false); } };
+  const saveStep4 = async (skipManychat = false) => { setSaving(true); try { if (!skipManychat && manychat.apiKey.trim()) { await api.saveManychatSettings({ manychat_api_key: manychat.apiKey.trim(), manychat_page_id: manychat.pageId.trim() }); } setStep(5); } catch (e: any) { toast({ title: "Failed to save ManyChat settings", description: e?.message, variant: "destructive" }); } finally { setSaving(false); } };
+  const finishSetup = async (mode: "autopilot" | "copilot") => { setSaving(true); try { await api.setOperatingMode(mode); toast({ title: "Setup complete!", description: "Your workspace is ready." }); navigate("/dashboard", { replace: true }); } catch (e: any) { toast({ title: "Failed to set mode", description: e?.message, variant: "destructive" }); } finally { setSaving(false); } };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
@@ -120,7 +152,8 @@ const Onboarding = () => {
           {step === 1 && <Step1 data={bizInfo} onChange={(d) => setBizInfo((p) => ({ ...p, ...d }))} onNext={saveStep1} saving={saving} />}
           {step === 2 && <Step2 data={persona} onChange={(d) => setPersona((p) => ({ ...p, ...d }))} onNext={saveStep2} onBack={() => setStep(1)} saving={saving} />}
           {step === 3 && <Step3 enabled={quoteEnabled} onToggle={(key) => setQuoteEnabled((p) => ({ ...p, [key]: !p[key] }))} onNext={saveStep3} onBack={() => setStep(2)} saving={saving} />}
-          {step === 4 && <Step4 data={manychat} onChange={(d) => setManychat((p) => ({ ...p, ...d }))} onFinish={() => finishSetup(false)} onSkip={() => finishSetup(true)} onBack={() => setStep(3)} saving={saving} />}
+          {step === 4 && <Step4 data={manychat} onChange={(d) => setManychat((p) => ({ ...p, ...d }))} onNext={() => saveStep4(false)} onSkip={() => saveStep4(true)} onBack={() => setStep(3)} saving={saving} />}
+          {step === 5 && <Step5 onSelect={finishSetup} onBack={() => setStep(4)} saving={saving} />}
         </div>
       </div>
     </div>

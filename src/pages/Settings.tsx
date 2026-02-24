@@ -1,12 +1,13 @@
 import { useEffect, useState, useRef } from "react";
 import { api, requireCompanyId } from "@/lib/apiClient";
-import { Activity, Loader2, Save, Wand2, MessageSquare, Eye, EyeOff, Check, Bot, Sparkles } from "lucide-react";
+import { Activity, Loader2, Save, Wand2, MessageSquare, Eye, EyeOff, Check, Bot, Sparkles, Upload, Download, AlertTriangle, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import NotificationSettings from "@/components/settings/NotificationSettings";
 import SchedulingSettings from "@/components/settings/SchedulingSettings";
 import GoogleCalendarSettings from "@/components/settings/GoogleCalendarSettings";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const TABS = ["General", "Scheduling", "Notifications"] as const;
 type SettingsTab = (typeof TABS)[number];
@@ -412,6 +413,9 @@ const Settings = () => {
           {/* Google Calendar */}
           <GoogleCalendarSettings />
 
+          {/* Lead Import/Export */}
+          <LeadManagementSection />
+
           {/* Admin Snapshot */}
           {(companyRole === "owner" || companyRole === "admin") && (
             <div className="industrial-card p-6 mt-6 space-y-4">
@@ -448,10 +452,161 @@ const Settings = () => {
               )}
             </div>
           )}
+
+          {/* Danger Zone */}
+          <DangerZoneSection />
         </>
       )}
     </div>
   );
 };
+
+function LeadManagementSection() {
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importTab, setImportTab] = useState<"csv" | "manual">("csv");
+  const [manualData, setManualData] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCsvImport = async (file: File) => {
+    setImporting(true);
+    try {
+      const res = await api.importLeadsCsv(file);
+      toast({ title: "Import complete", description: `${res?.count ?? res?.imported ?? 0} leads imported` });
+      setImportModalOpen(false);
+    } catch (err) {
+      toast({ title: "Import failed", description: getErrorMessage(err), variant: "destructive" });
+    } finally { setImporting(false); }
+  };
+
+  const handleManualImport = async () => {
+    if (!manualData.trim()) return;
+    setImporting(true);
+    try {
+      const res = await api.importLeadsManual(manualData.trim());
+      toast({ title: "Import complete", description: `${res?.count ?? res?.imported ?? 0} leads imported` });
+      setImportModalOpen(false);
+      setManualData("");
+    } catch (err) {
+      toast({ title: "Import failed", description: getErrorMessage(err), variant: "destructive" });
+    } finally { setImporting(false); }
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const res = await api.exportLeadsCsv();
+      const csv = typeof res === "string" ? res : res?.csv || res?.data || JSON.stringify(res);
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `leads_export_${new Date().toISOString().split("T")[0]}.csv`;
+      a.click(); URL.revokeObjectURL(url);
+      toast({ title: "Export downloaded" });
+    } catch (err) {
+      toast({ title: "Export failed", description: getErrorMessage(err), variant: "destructive" });
+    } finally { setExporting(false); }
+  };
+
+  return (
+    <div className="industrial-card p-6 mt-6 space-y-4">
+      <h2 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
+        <Upload size={14} className="text-primary" /> Lead Management
+      </h2>
+      <div className="flex gap-3">
+        <button onClick={() => setImportModalOpen(true)} className="dark-btn-primary text-sm"><Upload size={14} /> Import Leads</button>
+        <button onClick={handleExport} disabled={exporting} className="dark-btn-secondary text-sm">
+          {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Export All Leads
+        </button>
+      </div>
+
+      <Dialog open={importModalOpen} onOpenChange={setImportModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Import Leads</DialogTitle></DialogHeader>
+          <div className="flex gap-1 mb-4">
+            <button onClick={() => setImportTab("csv")} className={`px-3 py-1.5 rounded-md text-xs font-medium ${importTab === "csv" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>CSV Upload</button>
+            <button onClick={() => setImportTab("manual")} className={`px-3 py-1.5 rounded-md text-xs font-medium ${importTab === "manual" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>Manual</button>
+          </div>
+          {importTab === "csv" ? (
+            <div className="space-y-3">
+              <div className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors" onClick={() => fileInputRef.current?.click()}>
+                <Upload size={24} className="mx-auto text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">Click to upload CSV file</p>
+                <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={(e) => e.target.files?.[0] && handleCsvImport(e.target.files[0])} />
+              </div>
+              {importing && <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 size={12} className="animate-spin" /> Importing…</div>}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <textarea value={manualData} onChange={(e) => setManualData(e.target.value)} className="dark-input w-full min-h-[120px] resize-y" placeholder="Paste comma-separated names/emails:&#10;John Doe, john@example.com&#10;Jane Smith, jane@example.com" />
+              <button onClick={handleManualImport} disabled={importing || !manualData.trim()} className="w-full dark-btn-primary">
+                {importing ? <Loader2 size={14} className="animate-spin" /> : null} Import
+              </button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function DangerZoneSection() {
+  const [confirmText, setConfirmText] = useState("");
+  const [clearModalOpen, setClearModalOpen] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  const handleClearLeads = async () => {
+    if (confirmText !== "DELETE") return;
+    setClearing(true);
+    try {
+      await api.clearAllLeads();
+      toast({ title: "All leads cleared" });
+      setClearModalOpen(false);
+      setConfirmText("");
+    } catch (err) {
+      toast({ title: "Failed", description: getErrorMessage(err), variant: "destructive" });
+    } finally { setClearing(false); }
+  };
+
+  const handleResetChatbot = async () => {
+    if (!confirm("Reset all chatbot settings to defaults? This cannot be undone.")) return;
+    setResetting(true);
+    try {
+      await api.resetChatbotSettings();
+      toast({ title: "Chatbot settings reset to defaults" });
+    } catch (err) {
+      toast({ title: "Failed", description: getErrorMessage(err), variant: "destructive" });
+    } finally { setResetting(false); }
+  };
+
+  return (
+    <div className="mt-6 rounded-lg border border-destructive/30 bg-destructive/5 p-6 space-y-4">
+      <h2 className="text-sm font-bold uppercase tracking-wider text-destructive flex items-center gap-2">
+        <AlertTriangle size={14} /> Danger Zone
+      </h2>
+      <div className="flex flex-wrap gap-3">
+        <button onClick={() => setClearModalOpen(true)} className="dark-btn border border-destructive text-destructive hover:bg-destructive/10 text-sm">
+          <Trash2 size={14} /> Clear All Leads
+        </button>
+        <button onClick={handleResetChatbot} disabled={resetting} className="dark-btn border border-destructive/50 text-destructive/70 hover:bg-destructive/10 text-sm">
+          {resetting ? <Loader2 size={14} className="animate-spin" /> : null} Reset Chatbot Settings
+        </button>
+      </div>
+
+      <Dialog open={clearModalOpen} onOpenChange={setClearModalOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle className="text-destructive">Clear All Leads</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">This will permanently delete all leads and their conversations. Type <strong>DELETE</strong> to confirm.</p>
+          <input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} className="dark-input w-full" placeholder='Type "DELETE"' />
+          <button onClick={handleClearLeads} disabled={clearing || confirmText !== "DELETE"} className="w-full dark-btn-destructive">
+            {clearing ? <Loader2 size={14} className="animate-spin" /> : null} Confirm Delete All Leads
+          </button>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
 
 export default Settings;

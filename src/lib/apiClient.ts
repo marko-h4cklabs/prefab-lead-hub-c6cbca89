@@ -676,4 +676,120 @@ export const api = {
 
   getGoogleUpcomingEvents: () =>
     request<any>("/api/integrations/google/upcoming"),
+
+  // --- Billing ---
+  getBillingStatus: () =>
+    request<any>("/api/billing/status"),
+
+  createCheckout: (plan: string) =>
+    request<any>("/api/billing/checkout", { method: "POST", body: JSON.stringify({ plan }) }),
+
+  createBillingPortal: () =>
+    request<any>("/api/billing/portal", { method: "POST" }),
+
+  cancelSubscription: () =>
+    request<any>("/api/billing/cancel", { method: "POST" }),
+
+  // --- Team ---
+  getTeam: () =>
+    request<any>("/api/team"),
+
+  addTeamMember: (data: { name: string; email?: string; role: string }) =>
+    request<any>("/api/team", { method: "POST", body: JSON.stringify(data) }),
+
+  updateTeamMember: (id: string, data: any) =>
+    request<any>(`/api/team/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+
+  removeTeamMember: (id: string) =>
+    request<any>(`/api/team/${id}`, { method: "DELETE" }),
+
+  getTeamPerformance: (params?: { from?: string; to?: string }) => {
+    const search = new URLSearchParams();
+    if (params?.from) search.set("from", params.from);
+    if (params?.to) search.set("to", params.to);
+    return request<any>(`/api/team/performance?${search.toString()}`);
+  },
+
+  // --- Lead Actions ---
+  assignLead: (leadId: string, assigneeId: string) =>
+    request<any>(`/api/leads/${leadId}/assign`, { method: "PUT", body: JSON.stringify({ assignee_id: assigneeId }) }),
+
+  blockLead: (leadId: string) =>
+    request<any>(`/api/leads/${leadId}/block`, { method: "POST" }),
+
+  exportLeadsCsv: () =>
+    request<any>("/api/leads/export/csv"),
+
+  importLeadsCsv: (file: File) => {
+    const token = getAuthToken();
+    const companyId = getCompanyId();
+    const formData = new FormData();
+    formData.append("file", file);
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    if (companyId) headers["x-company-id"] = companyId;
+    return fetch(`${API_BASE}/api/leads/import/csv`, { method: "POST", headers, body: formData }).then(async (res) => {
+      if (!res.ok) { const json = await res.json().catch(() => ({})); throw new Error(json?.error || `Import failed (${res.status})`); }
+      return res.json();
+    });
+  },
+
+  importLeadsManual: (data: string) =>
+    request<any>("/api/leads/import/manual", { method: "POST", body: JSON.stringify({ data }) }),
+
+  // --- Personas ---
+  getPersonas: () =>
+    request<any>("/api/chatbot/personas"),
+
+  createPersona: (data: any) =>
+    request<any>("/api/chatbot/personas", { method: "POST", body: JSON.stringify(data) }),
+
+  updatePersona: (id: string, data: any) =>
+    request<any>(`/api/chatbot/personas/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+
+  deletePersona: (id: string) =>
+    request<any>(`/api/chatbot/personas/${id}`, { method: "DELETE" }),
+
+  activatePersona: (id: string) =>
+    request<any>(`/api/chatbot/personas/${id}/activate`, { method: "PUT" }),
+
+  // --- Message Templates ---
+  getTemplates: () =>
+    request<any>("/api/chatbot/templates"),
+
+  createTemplate: (data: any) =>
+    request<any>("/api/chatbot/templates", { method: "POST", body: JSON.stringify(data) }),
+
+  updateTemplate: (id: string, data: any) =>
+    request<any>(`/api/chatbot/templates/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+
+  deleteTemplate: (id: string) =>
+    request<any>(`/api/chatbot/templates/${id}`, { method: "DELETE" }),
+
+  // --- Autoresponder Rules ---
+  getAutoresponderRules: () =>
+    request<any>("/api/autoresponder/rules"),
+
+  createAutoresponderRule: (data: any) =>
+    request<any>("/api/autoresponder/rules", { method: "POST", body: JSON.stringify(data) }),
+
+  updateAutoresponderRule: (id: string, data: any) =>
+    request<any>(`/api/autoresponder/rules/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+
+  deleteAutoresponderRule: (id: string) =>
+    request<any>(`/api/autoresponder/rules/${id}`, { method: "DELETE" }),
+
+  toggleAutoresponder: (enabled: boolean) =>
+    request<any>("/api/autoresponder/toggle", { method: "PUT", body: JSON.stringify({ enabled }) }),
+
+  // --- Unread count ---
+  getUnreadCount: () =>
+    request<any>("/api/notifications/unread-count"),
+
+  // --- Clear all leads ---
+  clearAllLeads: () =>
+    request<any>("/api/leads/clear", { method: "DELETE" }),
+
+  resetChatbotSettings: () =>
+    request<any>("/api/chatbot/reset", { method: "POST" }),
 };
