@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { api, requireCompanyId } from "@/lib/apiClient";
-import { Activity, Loader2, Save, Wand2, MessageSquare, Eye, EyeOff, Check, Bot, Sparkles, Upload, Download, AlertTriangle, Trash2 } from "lucide-react";
+import { Activity, Loader2, Save, Wand2, MessageSquare, Eye, EyeOff, Check, Bot, Sparkles, Upload, Download, AlertTriangle, Trash2, Copy, RefreshCw, Link2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
@@ -410,6 +410,9 @@ const Settings = () => {
             )}
           </div>
 
+          {/* ManyChat Webhook URL */}
+          <WebhookUrlSection />
+
           {/* Google Calendar */}
           <GoogleCalendarSettings />
 
@@ -547,6 +550,81 @@ function LeadManagementSection() {
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function WebhookUrlSection() {
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [mcStatus, setMcStatus] = useState<"connected" | "not_connected" | "loading">("loading");
+
+  useEffect(() => {
+    api.getWebhookUrl()
+      .then((res) => setWebhookUrl(res?.webhook_url || res?.url || ""))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+    api.getManychatSettings()
+      .then((res) => setMcStatus(res?.manychat_api_key && res?.manychat_page_id ? "connected" : "not_connected"))
+      .catch(() => setMcStatus("not_connected"));
+  }, []);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(webhookUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleRegenerate = async () => {
+    if (!confirm("Are you sure? The old webhook URL will stop working immediately. You'll need to update it in ManyChat.")) return;
+    setRegenerating(true);
+    try {
+      const res = await api.regenerateWebhookUrl();
+      setWebhookUrl(res?.webhook_url || res?.url || "");
+      toast({ title: "Webhook URL regenerated" });
+    } catch (err) {
+      toast({ title: "Failed to regenerate", description: getErrorMessage(err), variant: "destructive" });
+    } finally { setRegenerating(false); }
+  };
+
+  return (
+    <div className="mt-6 rounded-lg border border-border bg-card border-l-4 border-l-primary space-y-4 p-6">
+      <div className="flex items-center gap-2">
+        <Link2 size={16} className="text-primary" />
+        <h2 className="text-sm font-bold uppercase tracking-wider">ManyChat Webhook</h2>
+      </div>
+      <p className="text-xs text-muted-foreground">Copy this URL into ManyChat to receive Instagram DMs.</p>
+
+      {/* Status */}
+      <div className="flex items-center gap-2">
+        {mcStatus === "loading" ? (
+          <Loader2 size={12} className="animate-spin text-muted-foreground" />
+        ) : mcStatus === "connected" ? (
+          <><span className="h-2 w-2 rounded-full bg-success" /><span className="text-xs font-medium text-success">Active</span></>
+        ) : (
+          <><span className="h-2 w-2 rounded-full bg-destructive" /><span className="text-xs font-medium text-destructive">Inactive</span></>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="h-10 bg-secondary animate-pulse rounded-md" />
+      ) : webhookUrl ? (
+        <div className="flex items-center gap-2">
+          <code className="flex-1 bg-muted rounded-md px-3 py-2.5 text-xs text-foreground font-mono break-all select-all">{webhookUrl}</code>
+          <button onClick={handleCopy} className="dark-btn-ghost p-2 shrink-0">
+            {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+          </button>
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">No webhook URL available. Complete onboarding to generate one.</p>
+      )}
+
+      <button onClick={handleRegenerate} disabled={regenerating} className="dark-btn-secondary text-xs">
+        {regenerating ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+        <span className="ml-1">Regenerate URL</span>
+      </button>
     </div>
   );
 }

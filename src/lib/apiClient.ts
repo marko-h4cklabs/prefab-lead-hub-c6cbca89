@@ -833,4 +833,25 @@ export const api = {
 
   deleteVoiceClone: (voiceId: string) =>
     request<any>(`/api/voice/clone/${voiceId}`, { method: "DELETE" }),
+
+  // --- Onboarding ---
+  getOnboardingStatus: () =>
+    request<any>("/api/onboarding/status"),
+
+  completeOnboarding: () =>
+    request<any>("/api/onboarding/complete", { method: "POST" }),
+
+  // --- Webhook URL ---
+  getWebhookUrl: () =>
+    request<any>("/api/settings/webhook-url"),
+
+  regenerateWebhookUrl: () =>
+    request<any>("/api/settings/webhook-url/regenerate", { method: "POST" }),
+
+  // --- Account ---
+  updateProfile: (data: { name: string }) =>
+    request<any>("/api/auth/profile", { method: "PUT", body: JSON.stringify(data) }),
+
+  deleteAccount: () =>
+    request<any>("/api/auth/account", { method: "DELETE" }),
 };
