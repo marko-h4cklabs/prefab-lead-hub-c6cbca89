@@ -121,10 +121,10 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
 
-  signup: (companyName: string, email: string, password: string) =>
+  signup: (companyName: string, email: string, password: string, extra?: { phone_number?: string; country_code?: string }) =>
     request<{ token: string; companyId: string }>("/api/auth/signup", {
       method: "POST",
-      body: JSON.stringify({ companyName, email, password }),
+      body: JSON.stringify({ companyName, email, password, ...extra }),
     }),
 
   me: () =>
@@ -928,4 +928,14 @@ export const api = {
 
   deleteAccount: () =>
     request<any>("/api/auth/account", { method: "DELETE" }),
+
+  // --- Verification ---
+  resendVerification: () =>
+    request<any>("/api/auth/resend-verification", { method: "POST" }),
+
+  sendPhoneCode: (phone_number: string) =>
+    request<any>("/api/auth/send-phone-code", { method: "POST", body: JSON.stringify({ phone_number }) }),
+
+  verifyPhone: (code: string) =>
+    request<any>("/api/auth/verify-phone", { method: "POST", body: JSON.stringify({ code }) }),
 };
