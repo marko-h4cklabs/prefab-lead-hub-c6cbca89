@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { api } from "@/lib/apiClient";
+import { api, getAuthToken } from "@/lib/apiClient";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import { CalendarDays, Loader2, ExternalLink } from "lucide-react";
@@ -64,11 +64,7 @@ export default function GoogleCalendarSettings() {
   const handleConnect = async () => {
     setConnecting(true);
     try {
-      const token = localStorage.getItem("plcs_token");
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-      const response = await fetch("/api/integrations/google/auth", { headers });
-      const data = await response.json();
+      const data = await api.getGoogleAuthUrl();
       if (data.auth_url) {
         window.location.href = data.auth_url;
       } else {
