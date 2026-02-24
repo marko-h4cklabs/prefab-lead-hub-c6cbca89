@@ -118,6 +118,9 @@ const VoiceSettingsSection = () => {
     }
   };
 
+  // Track which voices have 503 (ElevenLabs not configured)
+  const [preview503, setPreview503] = useState<Set<string>>(new Set());
+
   const handlePreview = async (voice: Voice) => {
     if (playingId === voice.voice_id) {
       audioRef.current?.pause();
@@ -136,7 +139,12 @@ const VoiceSettingsSection = () => {
       await audio.play();
       setPlayingId(voice.voice_id);
     } catch (err: any) {
-      toast({ title: "Preview failed", description: err?.message || "Could not play preview", variant: "destructive" });
+      const is503 = err?.message?.includes("503") || err?.message?.toLowerCase()?.includes("service unavailable");
+      if (is503) {
+        setPreview503((prev) => new Set(prev).add(voice.voice_id));
+      } else {
+        toast({ title: "Preview failed", description: err?.message || "Could not play preview", variant: "destructive" });
+      }
     } finally {
       setPreviewingId(null);
     }
@@ -295,9 +303,14 @@ const VoiceSettingsSection = () => {
         )}
       </div>
 
-      {/* Sub-section 2 — Voice Selection */}
-      <div className={`dark-card border-l-4 border-l-primary p-6 space-y-4 ${disabled ? "opacity-40 pointer-events-none" : ""}`}>
+      {/* Sub-section 2 — Voice Selection — always visible so users can browse */}
+      <div className="dark-card border-l-4 border-l-primary p-6 space-y-4">
         <h2 className="text-base font-bold text-foreground">Select a Voice</h2>
+        {disabled && (
+          <div className="rounded-lg bg-muted border border-border px-4 py-2.5 text-xs text-muted-foreground">
+            ℹ️ Add your <span className="font-mono text-foreground">ELEVENLABS_API_KEY</span> in Railway to enable voice previews and cloning
+          </div>
+        )}
         {settings?.selected_voice_name && (
           <p className="text-xs text-muted-foreground">Currently active: <span className="text-primary font-medium">{settings.selected_voice_name}</span></p>
         )}
@@ -362,10 +375,13 @@ const VoiceSettingsSection = () => {
                         ))}
                       </div>
                     )}
+                    {preview503.has(voice.voice_id) && (
+                      <p className="text-[10px] text-warning">Preview available once ElevenLabs is configured</p>
+                    )}
                     <div className="flex items-center gap-2 pt-1">
                       <button
                         onClick={() => handlePreview(voice)}
-                        disabled={isPreviewing}
+                        disabled={isPreviewing || preview503.has(voice.voice_id)}
                         className="dark-btn-ghost h-7 px-3 text-xs border border-border"
                       >
                         {isPreviewing ? <Loader2 size={12} className="animate-spin" /> : isPlaying ? <><Pause size={12} /> Stop</> : <><Play size={12} /> Preview</>}

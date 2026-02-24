@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/apiClient";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
-import { Plus, Pencil, Trash2, Loader2, Zap, GripVertical } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Zap, GripVertical, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 function normalizeList(payload: unknown, keys: string[] = []): any[] {
   if (Array.isArray(payload)) return payload;
@@ -30,10 +31,12 @@ const ACTION_TYPES = [
 ];
 
 const AutoresponderSection = () => {
+  const isMobile = useIsMobile();
   const [rules, setRules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [globalEnabled, setGlobalEnabled] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [infoDismissed, setInfoDismissed] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -93,6 +96,23 @@ const AutoresponderSection = () => {
 
   return (
     <div className="p-5 space-y-4">
+      {/* Explanation card */}
+      {!infoDismissed && (!isMobile || false) && (
+        <div className="relative rounded-lg border-l-4 border-l-primary bg-muted p-4 text-xs text-muted-foreground space-y-2">
+          <button onClick={() => setInfoDismissed(true)} className="absolute top-2 right-2 text-muted-foreground hover:text-foreground"><X size={14} /></button>
+          <p className="font-bold text-foreground text-sm">🤖 What are Autoresponder Rules?</p>
+          <p>Rules let you automate specific actions based on what leads say or do — without waiting for the AI.</p>
+          <p className="font-medium text-foreground mt-1">Examples:</p>
+          <ul className="space-y-0.5 ml-1">
+            <li>• If a lead says "price" → automatically send your pricing message</li>
+            <li>• If it's their first message → move them to the "Contacted" pipeline stage</li>
+            <li>• If their intent score is above 70 → notify your team immediately</li>
+            <li>• If no reply in 24 hours → send a follow-up message automatically</li>
+          </ul>
+          <p className="mt-1">Rules run <span className="text-foreground font-medium">BEFORE</span> the AI replies, so they take priority.</p>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-bold flex items-center gap-2"><Zap size={16} className="text-primary" /> Autoresponder Rules</h2>
         <div className="flex items-center gap-3">

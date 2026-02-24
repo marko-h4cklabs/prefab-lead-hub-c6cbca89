@@ -869,6 +869,28 @@ export const api = {
   putSocialProof: (data: any) =>
     request<any>("/api/chatbot/social-proof", { method: "PUT", body: JSON.stringify(data) }),
 
+  getSocialProofImages: () =>
+    request<any>("/api/chatbot/social-proof-images"),
+
+  deleteSocialProofImage: (id: string) =>
+    request<any>(`/api/chatbot/social-proof-images/${id}`, { method: "DELETE" }),
+
+  uploadSocialProofImage: (file: File, caption: string) => {
+    const token = getAuthToken();
+    const companyId = getCompanyId();
+    const formData = new FormData();
+    formData.append("image", file);
+    if (caption) formData.append("caption", caption);
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    if (companyId) headers["x-company-id"] = companyId;
+    return fetch(`${API_BASE}/api/chatbot/social-proof-images`, { method: "POST", headers, body: formData })
+      .then(async (res) => {
+        if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j?.error || "Upload failed"); }
+        return res.json();
+      });
+  },
+
   // --- Booking Trigger ---
   getBookingSettings: () =>
     request<any>("/api/chatbot/booking-settings"),
