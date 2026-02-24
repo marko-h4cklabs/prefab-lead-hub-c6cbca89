@@ -175,36 +175,63 @@ const Settings = () => {
               <div className="flex items-center gap-2 text-muted-foreground text-sm"><Loader2 size={14} className="animate-spin" /> Loading…</div>
             ) : (
               <div className="space-y-3">
-                <div className="flex gap-3">
-                  {[
-                    { value: "autopilot", label: "🤖 AI Autopilot", icon: Bot },
-                    { value: "copilot", label: "🧠 AI Co-Pilot", icon: Sparkles },
-                  ].map(({ value, label }) => (
-                    <button
-                      key={value}
-                      onClick={async () => {
-                        if (value === currentMode || modeSaving) return;
-                        setModeSaving(true);
-                        try {
-                          await api.setOperatingMode(value);
-                          setCurrentMode(value);
-                          setModeSaved(true);
-                          if (modeTimer.current) clearTimeout(modeTimer.current);
-                          modeTimer.current = setTimeout(() => setModeSaved(false), 2000);
-                        } catch { /* toast handled by api client */ }
-                        finally { setModeSaving(false); }
-                      }}
-                      disabled={modeSaving}
-                      className={`flex-1 rounded-lg py-2.5 px-4 text-sm font-semibold transition-colors ${
-                        currentMode === value
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-secondary text-foreground hover:bg-secondary/80"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Autopilot */}
+                  <button
+                    onClick={() => { if (currentMode !== "autopilot") setCurrentMode("autopilot"); }}
+                    className={`text-left rounded-lg p-4 border-2 transition-all ${
+                      currentMode === "autopilot"
+                        ? "border-primary bg-primary/5"
+                        : "border-border bg-secondary/30 hover:border-muted-foreground"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg">🤖</span>
+                      <span className="text-sm font-bold text-foreground">AI Autopilot</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary font-medium">Recommended</span>
+                      {currentMode === "autopilot" && <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/15 text-success font-medium ml-auto">Active</span>}
+                    </div>
+                    <p className="text-xs font-medium text-foreground/80 mb-1">Fully automated — AI handles everything</p>
+                    <p className="text-[11px] text-muted-foreground">Every Instagram DM is automatically read, processed, and replied to by the AI without any human involvement. Perfect for high-volume businesses or when you're not available 24/7.</p>
+                  </button>
+
+                  {/* Co-Pilot */}
+                  <button
+                    onClick={() => { if (currentMode !== "copilot") setCurrentMode("copilot"); }}
+                    className={`text-left rounded-lg p-4 border-2 transition-all ${
+                      currentMode === "copilot"
+                        ? "border-primary bg-primary/5"
+                        : "border-border bg-secondary/30 hover:border-muted-foreground"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg">🧠</span>
+                      <span className="text-sm font-bold text-foreground">AI Co-Pilot</span>
+                      {currentMode === "copilot" && <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/15 text-success font-medium ml-auto">Active</span>}
+                    </div>
+                    <p className="text-xs font-medium text-foreground/80 mb-1">AI assists, you decide</p>
+                    <p className="text-[11px] text-muted-foreground">The AI reads each DM and prepares a suggested reply, but YOU review and send it manually from the Inbox. Full control over every message sent.</p>
+                    <p className="text-[10px] text-primary mt-1.5">⚠️ Requires you to actively monitor the Inbox to respond to leads</p>
+                  </button>
                 </div>
+
+                <button
+                  onClick={async () => {
+                    setModeSaving(true);
+                    try {
+                      await api.setOperatingMode(currentMode);
+                      setModeSaved(true);
+                      if (modeTimer.current) clearTimeout(modeTimer.current);
+                      modeTimer.current = setTimeout(() => setModeSaved(false), 2000);
+                    } catch { /* toast handled */ }
+                    finally { setModeSaving(false); }
+                  }}
+                  disabled={modeSaving}
+                  className="dark-btn bg-primary text-primary-foreground hover:bg-primary/90 text-sm"
+                >
+                  {modeSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  {modeSaving ? "Saving…" : "Save Mode"}
+                </button>
                 {modeSaved && <p className="text-xs text-success flex items-center gap-1"><Check size={12} /> Saved</p>}
               </div>
             )}

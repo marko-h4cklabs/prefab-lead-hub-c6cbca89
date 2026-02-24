@@ -97,7 +97,7 @@ const App = () => {
             <Route path="/team" element={<Team />} />
             <Route path="/account" element={<Account />} />
           </Route>
-          <Route path="*" element={<NotFound />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>

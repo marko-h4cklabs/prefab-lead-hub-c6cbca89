@@ -55,8 +55,8 @@ const PreviewPanel = ({ refreshKey }: { refreshKey: number }) => {
     setSending(true);
     try {
       const res = await api.testBehavior({ message: userMsg });
-      const content = (res as any)?.response || (res as any)?.message || (res as any)?.content || JSON.stringify(res);
-      const provider = (res as any)?.provider || (res as any)?.model || "";
+      const content = (res as any)?.reply || (res as any)?.response || (res as any)?.message || (res as any)?.content || String(res);
+      const provider = (res as any)?.provider || "";
       setMessages((prev) => [...prev, { role: "assistant", content, provider }]);
     } catch (err: any) {
       setMessages((prev) => [...prev, { role: "assistant", content: `Error: ${err?.message || "Failed to get response"}` }]);
