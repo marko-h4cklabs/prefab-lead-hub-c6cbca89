@@ -1,0 +1,124 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Plug, Clock, BarChart3, CreditCard } from "lucide-react";
+import { api } from "@/lib/apiClient";
+import { StaggerContainer, StaggerItem } from "@/components/catalog/PageTransition";
+import { motion } from "framer-motion";
+
+const SettingsSection = () => {
+  const navigate = useNavigate();
+  const [manychat, setManychat] = useState<any>(null);
+  const [gcalStatus, setGcalStatus] = useState<any>(null);
+  const [schedulingOn, setSchedulingOn] = useState(false);
+  const [billingStatus, setBillingStatus] = useState<any>(null);
+  const [overview, setOverview] = useState<any>(null);
+
+  useEffect(() => {
+    api.getManychatSettings().then(setManychat).catch(() => {});
+    api.getGoogleCalendarStatus().then(setGcalStatus).catch(() => {});
+    api.getSchedulingSettings().then((res) => {
+      const enabled = res?.scheduling_enabled ?? res?.chatbot_booking?.chatbot_booking_enabled ?? false;
+      setSchedulingOn(Boolean(enabled));
+    }).catch(() => {});
+    api.getBillingStatus().then(setBillingStatus).catch(() => {});
+    api.getAnalyticsOverview().then(setOverview).catch(() => {});
+  }, []);
+
+  const manychatConnected = !!(manychat?.manychat_api_key || manychat?.connected);
+  const gcalConnected = gcalStatus?.connected;
+  const planName = billingStatus?.plan || billingStatus?.plan_name || "Free";
+
+  const cards = [
+    {
+      title: "Integrations",
+      description: "ManyChat, Google Calendar, voice, and webhooks",
+      icon: Plug,
+      iconBg: "bg-primary/20",
+      iconColor: "text-primary",
+      route: "/dashboard/settings/integrations",
+      preview: (
+        <div className="space-y-2 text-xs">
+          <div className="flex items-center gap-2">
+            <span className={`h-2 w-2 rounded-full ${manychatConnected ? "bg-success" : "bg-muted-foreground"}`} />
+            <span className="text-muted-foreground">ManyChat</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`h-2 w-2 rounded-full ${gcalConnected ? "bg-success" : "bg-muted-foreground"}`} />
+            <span className="text-muted-foreground">Google Calendar</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: "Scheduling",
+      description: "Working hours, slots, and booking configuration",
+      icon: Clock,
+      iconBg: "bg-success/20",
+      iconColor: "text-success",
+      route: "/dashboard/settings/scheduling",
+      preview: (
+        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${schedulingOn ? "bg-success/15 text-success" : "bg-secondary text-muted-foreground"}`}>
+          Scheduling: {schedulingOn ? "ON" : "OFF"}
+        </span>
+      ),
+    },
+    {
+      title: "Analytics",
+      description: "Performance metrics, trends, and insights",
+      icon: BarChart3,
+      iconBg: "bg-info/20",
+      iconColor: "text-info",
+      route: "/dashboard/settings/analytics",
+      preview: (
+        <span className="text-sm text-muted-foreground">
+          {overview?.total_leads ?? 0} total leads
+        </span>
+      ),
+    },
+    {
+      title: "Account & Billing",
+      description: "Subscription, notifications, and company settings",
+      icon: CreditCard,
+      iconBg: "bg-primary/20",
+      iconColor: "text-primary",
+      route: "/dashboard/settings/account",
+      preview: (
+        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary/15 text-primary capitalize">
+          {planName} Plan
+        </span>
+      ),
+    },
+  ];
+
+  return (
+    <div className="h-full flex items-center justify-center px-6">
+      <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-[1100px] w-full">
+        {cards.map((card) => (
+          <StaggerItem key={card.route}>
+            <motion.button
+              onClick={() => navigate(card.route)}
+              whileHover={{ scale: 1.02 }}
+              className="w-full text-left rounded-xl border border-[hsl(0_0%_13%)] bg-[hsl(0_0%_7%)] p-6 transition-all duration-200 hover:border-primary hover:shadow-[0_0_20px_hsl(48_92%_53%/0.15)] flex gap-5 h-[240px] md:h-[260px]"
+            >
+              <div className="flex flex-col justify-between flex-[0_0_40%]">
+                <div>
+                  <div className={`w-12 h-12 rounded-xl ${card.iconBg} flex items-center justify-center mb-3`}>
+                    <card.icon size={24} className={card.iconColor} />
+                  </div>
+                  <h3 className="text-base font-bold text-foreground mb-1">{card.title}</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{card.description}</p>
+                </div>
+                <span className="text-xs text-primary font-medium">Open →</span>
+              </div>
+              <div className="flex-1 flex items-center justify-center rounded-lg bg-[hsl(0_0%_5%)] border border-[hsl(0_0%_13%)] p-4">
+                {card.preview}
+              </div>
+            </motion.button>
+          </StaggerItem>
+        ))}
+      </StaggerContainer>
+    </div>
+  );
+};
+
+export default SettingsSection;
