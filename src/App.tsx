@@ -10,27 +10,31 @@ import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
-import AppLayout from "./components/AppLayout";
-import InboxLayout from "./components/InboxLayout";
-import Leads from "./pages/Leads";
-import Simulation from "./pages/Simulation";
-import Calendar from "./pages/Calendar";
-import LeadDetail from "./pages/LeadDetail";
-import Conversation from "./pages/Conversation";
-import Fields from "./pages/Fields";
-import Analytics from "./pages/Analytics";
-import Settings from "./pages/Settings";
-import NotFound from "./pages/NotFound";
-import AdminPanel from "./pages/AdminPanel";
-import Onboarding from "./pages/Onboarding";
 import VerifyEmailPending from "./pages/VerifyEmailPending";
 import AuthCallback from "./pages/AuthCallback";
+import AdminPanel from "./pages/AdminPanel";
+import Onboarding from "./pages/Onboarding";
 import ModeSelectionScreen from "./components/ModeSelectionScreen";
-import Pipeline from "./pages/Pipeline";
-import Dashboard from "./pages/Dashboard";
-import Billing from "./pages/Billing";
-import Team from "./pages/Team";
-import Account from "./pages/Account";
+import CatalogLayout from "./components/catalog/CatalogLayout";
+import MainHub from "./pages/MainHub";
+import LeadsSection from "./pages/sections/LeadsSection";
+import AgentSection from "./pages/sections/AgentSection";
+import SettingsSection from "./pages/sections/SettingsSection";
+import LeadBoardPage from "./pages/subtopics/LeadBoardPage";
+import InboxPage from "./pages/subtopics/InboxPage";
+import PipelinePage from "./pages/subtopics/PipelinePage";
+import CalendarPage from "./pages/subtopics/CalendarPage";
+import IdentityPage from "./pages/subtopics/IdentityPage";
+import BehaviorPage from "./pages/subtopics/BehaviorPage";
+import QuotePage from "./pages/subtopics/QuotePage";
+import TestChatPage from "./pages/subtopics/TestChatPage";
+import IntegrationsPage from "./pages/subtopics/IntegrationsPage";
+import SchedulingPage from "./pages/subtopics/SchedulingPage";
+import AnalyticsPage from "./pages/subtopics/AnalyticsPage";
+import AccountBillingPage from "./pages/subtopics/AccountBillingPage";
+import LeadDetail from "./pages/LeadDetail";
+import Conversation from "./pages/Conversation";
+import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
@@ -57,7 +61,6 @@ const ModeGate = ({ children }: { children: React.ReactNode }) => {
 };
 
 const App = () => {
-  // Global safety net
   useEffect(() => {
     const handler = (event: PromiseRejectionEvent) => {
       console.error("Unhandled rejection:", event.reason);
@@ -76,31 +79,53 @@ const App = () => {
       <Sonner />
       <BrowserRouter>
         <Routes>
+          {/* Public routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/verify-email-pending" element={<VerifyEmailPending />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/admin" element={<AdminPanel />} />
           <Route path="/onboarding" element={<Onboarding />} />
-          <Route element={<ModeGate><AppLayout /></ModeGate>}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            {/* Inbox routes wrapped in InboxLayout (Zone 2 lead list) */}
-            <Route element={<InboxLayout />}>
-              <Route path="/leads" element={<Leads />} />
-              <Route path="/leads/:leadId" element={<LeadDetail />} />
-              <Route path="/leads/:leadId/conversation" element={<Conversation />} />
-            </Route>
-            <Route path="/pipeline" element={<Pipeline />} />
-            <Route path="/simulation" element={<Simulation />} />
-            <Route path="/fields" element={<Fields />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/calendar" element={<Calendar />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/billing" element={<Billing />} />
-            <Route path="/team" element={<Team />} />
-            <Route path="/account" element={<Account />} />
+
+          {/* Redirects */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/leads" element={<Navigate to="/dashboard/leads/inbox" replace />} />
+          <Route path="/pipeline" element={<Navigate to="/dashboard/leads/pipeline" replace />} />
+          <Route path="/analytics" element={<Navigate to="/dashboard/settings/analytics" replace />} />
+          <Route path="/calendar" element={<Navigate to="/dashboard/leads/calendar" replace />} />
+          <Route path="/fields" element={<Navigate to="/dashboard/agent" replace />} />
+          <Route path="/settings" element={<Navigate to="/dashboard/settings" replace />} />
+          <Route path="/billing" element={<Navigate to="/dashboard/settings/account" replace />} />
+          <Route path="/account" element={<Navigate to="/dashboard/settings/account" replace />} />
+
+          {/* Catalog layout */}
+          <Route element={<ModeGate><CatalogLayout /></ModeGate>}>
+            <Route path="/dashboard" element={<MainHub />} />
+
+            {/* Leads & CRM */}
+            <Route path="/dashboard/leads" element={<LeadsSection />} />
+            <Route path="/dashboard/leads/board" element={<LeadBoardPage />} />
+            <Route path="/dashboard/leads/inbox" element={<InboxPage />} />
+            <Route path="/dashboard/leads/inbox/:leadId" element={<InboxPage />} />
+            <Route path="/dashboard/leads/inbox/:leadId/conversation" element={<InboxPage />} />
+            <Route path="/dashboard/leads/pipeline" element={<PipelinePage />} />
+            <Route path="/dashboard/leads/calendar" element={<CalendarPage />} />
+
+            {/* AI Agent */}
+            <Route path="/dashboard/agent" element={<AgentSection />} />
+            <Route path="/dashboard/agent/identity" element={<IdentityPage />} />
+            <Route path="/dashboard/agent/behavior" element={<BehaviorPage />} />
+            <Route path="/dashboard/agent/quote" element={<QuotePage />} />
+            <Route path="/dashboard/agent/test" element={<TestChatPage />} />
+
+            {/* Settings & Tools */}
+            <Route path="/dashboard/settings" element={<SettingsSection />} />
+            <Route path="/dashboard/settings/integrations" element={<IntegrationsPage />} />
+            <Route path="/dashboard/settings/scheduling" element={<SchedulingPage />} />
+            <Route path="/dashboard/settings/analytics" element={<AnalyticsPage />} />
+            <Route path="/dashboard/settings/account" element={<AccountBillingPage />} />
           </Route>
+
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
