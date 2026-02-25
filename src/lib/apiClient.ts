@@ -1,5 +1,41 @@
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
+// --- SWR-style cache & request deduplication ---
+
+interface CacheEntry {
+  data: any;
+  timestamp: number;
+}
+
+const requestCache = new Map<string, CacheEntry>();
+const pendingRequests = new Map<string, Promise<any>>();
+const CACHE_TTL = 30_000; // 30 seconds
+
+function getCacheKey(path: string, options: RequestInit): string | null {
+  // Only cache GET requests (no method or GET)
+  const method = (options.method || "GET").toUpperCase();
+  if (method !== "GET") return null;
+  return path;
+}
+
+function getCached(key: string): any | undefined {
+  const entry = requestCache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() - entry.timestamp > CACHE_TTL) {
+    requestCache.delete(key);
+    return undefined;
+  }
+  return entry.data;
+}
+
+/** Invalidate cache entries matching a path prefix. */
+export function invalidateCache(pathPrefix?: string) {
+  if (!pathPrefix) { requestCache.clear(); return; }
+  for (const key of requestCache.keys()) {
+    if (key.startsWith(pathPrefix)) requestCache.delete(key);
+  }
+}
+
 // --- Token management ---
 
 export function getAuthToken(): string | null {
@@ -46,12 +82,11 @@ export function clearCompanyId() {
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 
-async function request<T>(
+async function rawRequest<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
   const token = getAuthToken();
-
   const companyId = getCompanyId();
 
   const headers: Record<string, string> = {
@@ -59,17 +94,10 @@ async function request<T>(
     ...(options.headers as Record<string, string>),
   };
 
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-  if (companyId) {
-    headers["x-company-id"] = companyId;
-  }
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (companyId) headers["x-company-id"] = companyId;
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-  });
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
 
   if (res.status === 401) {
     clearAuth();
@@ -79,10 +107,7 @@ async function request<T>(
 
   if (res.status === 403) {
     let message = "Not authorized";
-    try {
-      const json = await res.json();
-      message = json.error || json.message || message;
-    } catch { /* ignore */ }
+    try { const json = await res.json(); message = json.error || json.message || message; } catch {}
     clearAuth();
     window.location.href = "/login";
     toast({ title: "Access denied", description: message, variant: "destructive" });
@@ -98,10 +123,7 @@ async function request<T>(
       const raw = json?.error?.message || json?.error || json?.message || json;
       message = typeof raw === "string" ? raw : JSON.stringify(raw);
     } catch {
-      try {
-        const text = await res.text();
-        if (text) message = text;
-      } catch { /* ignore */ }
+      try { const text = await res.text(); if (text) message = text; } catch {}
     }
     toast({ title: `Error ${res.status}`, description: message, variant: "destructive" });
     throw Object.assign(new Error(message), details ? { details } : {});
@@ -109,6 +131,43 @@ async function request<T>(
 
   if (res.status === 204) return undefined as T;
   return res.json();
+}
+
+async function request<T>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const cacheKey = getCacheKey(path, options);
+
+  // For GET requests: check cache, then dedup
+  if (cacheKey) {
+    const cached = getCached(cacheKey);
+    if (cached !== undefined) return cached as T;
+
+    // Dedup: reuse in-flight request for same path
+    const pending = pendingRequests.get(cacheKey);
+    if (pending) return pending as Promise<T>;
+
+    const promise = rawRequest<T>(path, options).then((data) => {
+      requestCache.set(cacheKey, { data, timestamp: Date.now() });
+      pendingRequests.delete(cacheKey);
+      return data;
+    }).catch((err) => {
+      pendingRequests.delete(cacheKey);
+      throw err;
+    });
+
+    pendingRequests.set(cacheKey, promise);
+    return promise;
+  }
+
+  // For mutations: execute and invalidate related cache
+  const result = await rawRequest<T>(path, options);
+  // Invalidate cache for the resource path (strip last segment for PUT/PATCH)
+  const basePath = path.replace(/\/[^/]*$/, '');
+  invalidateCache(basePath);
+  invalidateCache(path);
+  return result;
 }
 
 export const api = {
