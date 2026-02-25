@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { api } from "@/lib/apiClient";
-import { Save, Loader2, Check, X } from "lucide-react";
+import { Save, Loader2, Check, X, Info } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const TONES = [
   { value: "professional", icon: "🎯", label: "Professional", desc: "Polished and credible" },
@@ -45,6 +46,7 @@ interface StyleState {
   opener_style: string;
   emojis_enabled: boolean;
   language: string;
+  response_delay_seconds: number;
 }
 
 const DEFAULTS: StyleState = {
@@ -53,6 +55,7 @@ const DEFAULTS: StyleState = {
   opener_style: "casual",
   emojis_enabled: false,
   language: "en",
+  response_delay_seconds: 0,
 };
 
 const STORAGE_KEY = "chatbot_style_draft";
@@ -70,12 +73,13 @@ const CommunicationStyleSection = ({ onSaved, onDirty }: { onSaved?: () => void;
       .then((res) => {
         const hasRealData = res.tone || res.response_length;
         if (hasRealData) {
-          const merged: StyleState = {
+        const merged: StyleState = {
             tone: res.tone || "professional",
             response_length: res.response_length || "medium",
             opener_style: res.opener_style || "casual",
             emojis_enabled: res.emojis_enabled ?? false,
             language: res.language_code || res.language || "en",
+            response_delay_seconds: res.response_delay_seconds ?? 0,
           };
           setData(merged);
           initialRef.current = JSON.stringify(merged);
@@ -123,6 +127,7 @@ const CommunicationStyleSection = ({ onSaved, onDirty }: { onSaved?: () => void;
         opener_style: data.opener_style,
         emojis_enabled: data.emojis_enabled,
         language_code: data.language,
+        response_delay_seconds: data.response_delay_seconds,
       } as any);
       initialRef.current = JSON.stringify(data);
       setIsDirty(false);
@@ -198,6 +203,34 @@ const CommunicationStyleSection = ({ onSaved, onDirty }: { onSaved?: () => void;
           <p className="text-[11px] text-muted-foreground">Use 1-2 emojis per message when natural</p>
         </div>
         <Switch checked={data.emojis_enabled} onCheckedChange={(v) => update({ emojis_enabled: v })} />
+      </div>
+
+      {/* Smart Reply Delay */}
+      <div>
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Smart Reply Delay</label>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info size={12} className="text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[260px] text-xs">
+                How long the bot waits before replying. If the user sends another message during this time, the timer resets. Set to 0 for instant replies.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+        <div className="flex items-center gap-3">
+          <input
+            type="number"
+            min={0}
+            max={30}
+            value={data.response_delay_seconds}
+            onChange={(e) => update({ response_delay_seconds: Math.max(0, Math.min(30, parseInt(e.target.value) || 0)) })}
+            className="dark-input w-20 text-center"
+          />
+          <span className="text-xs text-muted-foreground">seconds {data.response_delay_seconds === 0 && "(instant)"}</span>
+        </div>
       </div>
 
       {/* Language */}

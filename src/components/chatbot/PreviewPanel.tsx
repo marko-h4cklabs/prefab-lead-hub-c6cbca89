@@ -23,6 +23,7 @@ const PreviewPanel = ({ refreshKey }: { refreshKey: number }) => {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   const fetchPrompt = useCallback(() => {
     setPromptLoading(true);
@@ -38,8 +39,10 @@ const PreviewPanel = ({ refreshKey }: { refreshKey: number }) => {
   useEffect(() => { fetchPrompt(); }, [fetchPrompt, refreshKey]);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [messages, sending]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(prompt);
@@ -47,7 +50,8 @@ const PreviewPanel = ({ refreshKey }: { refreshKey: number }) => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSend = async () => {
+  const handleSend = async (e?: React.FormEvent | React.MouseEvent) => {
+    e?.preventDefault();
     if (!input.trim() || sending) return;
     const userMsg = input.trim();
     setInput("");
@@ -114,7 +118,7 @@ const PreviewPanel = ({ refreshKey }: { refreshKey: number }) => {
             )}
           </div>
 
-          <div className="flex-1 overflow-auto rounded-lg bg-secondary p-3 space-y-3 min-h-0">
+          <div ref={chatContainerRef} className="flex-1 overflow-auto rounded-lg bg-secondary p-3 space-y-3 min-h-0">
             {messages.length === 0 && (
               <p className="text-xs text-muted-foreground italic text-center py-8">Send a message to test your AI agent</p>
             )}
@@ -154,26 +158,25 @@ const PreviewPanel = ({ refreshKey }: { refreshKey: number }) => {
                 </div>
               </div>
             )}
-            <div ref={chatEndRef} />
+            
           </div>
 
-          <div className="flex gap-2 mt-2">
+          <form onSubmit={handleSend} className="flex gap-2 mt-2">
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
               placeholder="Test a message..."
               className="dark-input flex-1"
               disabled={sending}
             />
             <button
-              onClick={handleSend}
+              type="submit"
               disabled={sending || !input.trim()}
               className="dark-btn bg-primary text-primary-foreground hover:bg-primary/90 h-10 w-10 p-0 flex items-center justify-center"
             >
               {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
             </button>
-          </div>
+          </form>
         </TabsContent>
       </Tabs>
     </div>
