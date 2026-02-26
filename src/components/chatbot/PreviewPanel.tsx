@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { api } from "@/lib/apiClient";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Copy, RefreshCw, Send, Loader2, Trash2 } from "lucide-react";
+import { Copy, RefreshCw, Send, Loader2, Trash2, Shield } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import HandoffPanel from "@/components/handoff/HandoffPanel";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -81,6 +82,7 @@ const PreviewPanel = ({ refreshKey }: { refreshKey: number }) => {
         <TabsList className="mx-4 mt-2 bg-secondary">
           <TabsTrigger value="prompt" className="text-xs">System Prompt</TabsTrigger>
           <TabsTrigger value="chat" className="text-xs">Test Chat</TabsTrigger>
+          <TabsTrigger value="handoff" className="text-xs flex items-center gap-1"><Shield size={10} />Human-Break</TabsTrigger>
         </TabsList>
 
         <TabsContent value="prompt" className="flex-1 flex flex-col min-h-0 px-4 pb-4 mt-3">
@@ -177,6 +179,10 @@ const PreviewPanel = ({ refreshKey }: { refreshKey: number }) => {
               {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
             </button>
           </form>
+        </TabsContent>
+
+        <TabsContent value="handoff" className="flex-1 flex flex-col min-h-0 mt-1 overflow-auto">
+          <HandoffPanel />
         </TabsContent>
       </Tabs>
     </div>

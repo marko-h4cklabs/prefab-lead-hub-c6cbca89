@@ -18,6 +18,10 @@ const DEFAULTS: GuardrailsState = {
   max_messages_before_handoff: 20,
 };
 
+// Note: handoff_trigger, human_fallback_message, max_messages_before_handoff
+// are still sent to the API for backward compat, but the UI for advanced
+// handoff rules is now in the Human-Break panel (right side).
+
 const STORAGE_KEY = "chatbot_guardrails_draft";
 
 const GuardrailsSection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirty?: () => void }) => {
@@ -110,20 +114,8 @@ const GuardrailsSection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirty
         <p className="text-[11px] text-muted-foreground mt-1">The AI will avoid these topics entirely</p>
       </div>
 
-      <div>
-        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Transfer to human when lead says:</label>
-        <input value={data.handoff_trigger} onChange={(e) => update({ handoff_trigger: e.target.value })} className="dark-input w-full" placeholder="e.g. I want to speak to a real person, call me, urgent..." />
-      </div>
-
-      <div>
-        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Message to send when handing off:</label>
-        <textarea value={data.human_fallback_message} onChange={(e) => update({ human_fallback_message: e.target.value })} className="dark-input w-full h-16 resize-y" placeholder="Got it! Let me connect you with my colleague who can help. They'll be with you shortly." />
-      </div>
-
-      <div>
-        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Max messages before handoff</label>
-        <input type="number" min={1} max={50} value={data.max_messages_before_handoff} onChange={(e) => update({ max_messages_before_handoff: parseInt(e.target.value) || 20 })} className="dark-input w-24" />
-        <p className="text-[11px] text-muted-foreground mt-1">After this many messages without booking, suggest human follow-up</p>
+      <div className="bg-secondary/30 rounded-lg px-3 py-2">
+        <p className="text-[10px] text-muted-foreground">Advanced handoff rules (keyword triggers, auto-pause, bridging messages) are configured in the <b className="text-foreground">Human-Break</b> tab on the right panel.</p>
       </div>
 
       <div>

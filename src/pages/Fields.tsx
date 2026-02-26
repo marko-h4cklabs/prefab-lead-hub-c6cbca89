@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/apiClient";
-import { Loader2, CalendarCheck, Settings, ExternalLink, Save, AlertTriangle } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import {
+  Loader2, Save, AlertTriangle, ChevronDown,
+  User, MessageSquare, Settings2, Mic, RotateCcw, Database,
+} from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "@/hooks/use-toast";
 
@@ -16,6 +18,7 @@ import PersonasSection from "@/components/chatbot/PersonasSection";
 import TemplatesSection from "@/components/chatbot/TemplatesSection";
 import AutoresponderSection from "@/components/chatbot/AutoresponderSection";
 import VoiceSettingsSection from "@/components/voice/VoiceSettingsSection";
+import AdvancedFollowUpSection from "@/components/followups/AdvancedFollowUpSection";
 import PreviewPanel from "@/components/chatbot/PreviewPanel";
 
 const SECTION_LABELS: Record<string, string> = {
@@ -27,14 +30,59 @@ const SECTION_LABELS: Record<string, string> = {
   social_proof: "Social Proof",
 };
 
+/* ── Collapsible Section ── */
+const Section = ({
+  id,
+  icon,
+  title,
+  open,
+  onToggle,
+  children,
+}: {
+  id: string;
+  icon: React.ReactNode;
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) => (
+  <div className="dark-card border-l-4 border-l-primary overflow-hidden">
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-secondary/30 transition-colors"
+    >
+      <div className="flex items-center gap-2.5">
+        <span className="text-primary">{icon}</span>
+        <span className="text-sm font-semibold text-foreground">{title}</span>
+      </div>
+      <ChevronDown
+        size={16}
+        className={`text-muted-foreground transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+      />
+    </button>
+    {open && <div className="border-t border-border">{children}</div>}
+  </div>
+);
+
+/* ── Main Page ── */
 const Fields = () => {
-  const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const [bookingStatus, setBookingStatus] = useState<{ loaded: boolean; enabled: boolean; mode: string }>({ loaded: false, enabled: false, mode: "off" });
   const [previewKey, setPreviewKey] = useState(0);
   const [savingAll, setSavingAll] = useState(false);
   const [unsavedSections, setUnsavedSections] = useState<Set<string>>(new Set());
   const [quoteFieldsVersion, setQuoteFieldsVersion] = useState(0);
+
+  // Track which accordion sections are open (allow multiple)
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(["identity"]));
+
+  const toggleSection = useCallback((id: string) => {
+    setOpenSections(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   const markDirty = useCallback((section: string) => {
     setUnsavedSections(prev => new Set([...prev, section]));
@@ -60,15 +108,6 @@ const Fields = () => {
     return () => window.removeEventListener('beforeunload', handler);
   }, [unsavedSections]);
 
-  useEffect(() => {
-    api.getSchedulingSettings()
-      .then((res) => {
-        const cb = res?.chatbot_booking && typeof res.chatbot_booking === "object" ? res.chatbot_booking : res;
-        setBookingStatus({ loaded: true, enabled: Boolean(cb?.chatbot_booking_enabled), mode: cb?.booking_mode || "off" });
-      })
-      .catch(() => setBookingStatus({ loaded: true, enabled: false, mode: "off" }));
-  }, []);
-
   const refreshPreview = useCallback(() => {
     setPreviewKey((k) => k + 1);
   }, []);
@@ -83,13 +122,13 @@ const Fields = () => {
   const unsavedNames = Array.from(unsavedSections).map(s => SECTION_LABELS[s] || s);
 
   const leftColumn = (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Unsaved changes warning */}
       {unsavedSections.size > 0 && (
         <div className="sticky top-0 z-10 rounded-lg bg-warning/15 border border-warning/30 px-4 py-2.5 flex items-center gap-2 text-sm">
           <AlertTriangle size={14} className="text-warning shrink-0" />
           <span className="text-warning font-medium text-xs">
-            Unsaved changes in: {unsavedNames.join(", ")}. Click "Save" in each section to keep your changes.
+            Unsaved: {unsavedNames.join(", ")}
           </span>
         </div>
       )}
@@ -107,80 +146,45 @@ const Fields = () => {
         </button>
       </div>
 
-      {/* Booking Status */}
-      <div className="dark-card px-5 py-3 flex items-center justify-between border-l-4 border-l-primary">
-        <div className="flex items-center gap-2.5">
-          <CalendarCheck size={14} className="text-primary" />
-          <span className="text-xs font-medium text-muted-foreground">Booking offers</span>
-          {!bookingStatus.loaded ? (
-            <Loader2 size={12} className="animate-spin text-muted-foreground" />
-          ) : bookingStatus.enabled ? (
-            <span className="status-badge bg-primary/15 text-primary text-[10px]">
-              Enabled · {bookingStatus.mode === "direct_booking" ? "Direct" : "Manual request"}
-            </span>
-          ) : (
-            <span className="status-badge bg-secondary text-muted-foreground text-[10px]">Disabled</span>
-          )}
-        </div>
-        <button onClick={() => navigate("/settings")} className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-primary transition-colors">
-          <Settings size={10} /> Scheduling settings <ExternalLink size={8} />
-        </button>
-      </div>
-
-      {/* Section 1 — Agent Identity */}
-      <div className="dark-card border-l-4 border-l-primary">
+      {/* ── Section 1: Agent Identity ── */}
+      <Section id="identity" icon={<User size={16} />} title="Agent Identity" open={openSections.has("identity")} onToggle={() => toggleSection("identity")}>
         <AgentIdentitySection onDirty={() => markDirty('identity')} onSaved={() => { markClean('identity'); refreshPreview(); }} />
-      </div>
+      </Section>
 
-      {/* Section 2 — Communication Style */}
-      <div className="dark-card border-l-4 border-l-primary">
+      {/* ── Section 2: Communication Style ── */}
+      <Section id="style" icon={<MessageSquare size={16} />} title="Communication Style" open={openSections.has("style")} onToggle={() => toggleSection("style")}>
         <CommunicationStyleSection onDirty={() => markDirty('style')} onSaved={() => { markClean('style'); refreshPreview(); }} />
-      </div>
+      </Section>
 
-      {/* Section 3 — Conversation Strategy */}
-      <div className="dark-card border-l-4 border-l-primary">
-        <ConversationStrategySection onDirty={() => markDirty('strategy')} onSaved={() => { markClean('strategy'); refreshPreview(); }} />
-      </div>
+      {/* ── Section 3: Behavior & Strategy ── */}
+      <Section id="behavior" icon={<Settings2 size={16} />} title="Behavior & Strategy" open={openSections.has("behavior")} onToggle={() => toggleSection("behavior")}>
+        <div className="divide-y divide-border">
+          <ConversationStrategySection onDirty={() => markDirty('strategy')} onSaved={() => { markClean('strategy'); refreshPreview(); }} />
+          <GuardrailsSection onDirty={() => markDirty('guardrails')} onSaved={() => { markClean('guardrails'); refreshPreview(); }} />
+          <BookingTriggerSection onDirty={() => markDirty('booking')} onSaved={() => { markClean('booking'); refreshPreview(); }} quoteFieldsVersion={quoteFieldsVersion} />
+          <SocialProofSection onDirty={() => markDirty('social_proof')} onSaved={() => { markClean('social_proof'); refreshPreview(); }} />
+        </div>
+      </Section>
 
-      {/* Section 4 — Guardrails */}
-      <div className="dark-card border-l-4 border-l-primary">
-        <GuardrailsSection onDirty={() => markDirty('guardrails')} onSaved={() => { markClean('guardrails'); refreshPreview(); }} />
-      </div>
+      {/* ── Section 4: Content & Automation ── */}
+      <Section id="content" icon={<Database size={16} />} title="Content & Automation" open={openSections.has("content")} onToggle={() => toggleSection("content")}>
+        <div className="divide-y divide-border">
+          <QuoteFieldsSection onFieldsChanged={refreshQuoteFields} />
+          <PersonasSection />
+          <TemplatesSection />
+          <AutoresponderSection />
+        </div>
+      </Section>
 
-      {/* Section 5 — Smart Booking Trigger */}
-      <div className="dark-card border-l-4 border-l-primary">
-        <BookingTriggerSection onDirty={() => markDirty('booking')} onSaved={() => { markClean('booking'); refreshPreview(); }} quoteFieldsVersion={quoteFieldsVersion} />
-      </div>
-
-      {/* Section 6 — Social Proof */}
-      <div className="dark-card border-l-4 border-l-primary">
-        <SocialProofSection onDirty={() => markDirty('social_proof')} onSaved={() => { markClean('social_proof'); refreshPreview(); }} />
-      </div>
-
-      {/* Section 7 — Voice Settings */}
-      <div className="dark-card border-l-4 border-l-primary">
+      {/* ── Section 5: Voice Control ── */}
+      <Section id="voice" icon={<Mic size={16} />} title="Voice Control" open={openSections.has("voice")} onToggle={() => toggleSection("voice")}>
         <VoiceSettingsSection />
-      </div>
+      </Section>
 
-      {/* Section 8 — Data Collection */}
-      <div className="dark-card border-l-4 border-l-primary">
-        <QuoteFieldsSection onFieldsChanged={refreshQuoteFields} />
-      </div>
-
-      {/* Section 9 — Personas */}
-      <div className="dark-card border-l-4 border-l-primary">
-        <PersonasSection />
-      </div>
-
-      {/* Section 10 — Message Templates */}
-      <div className="dark-card border-l-4 border-l-primary">
-        <TemplatesSection />
-      </div>
-
-      {/* Section 11 — Autoresponder Rules */}
-      <div className="dark-card border-l-4 border-l-primary">
-        <AutoresponderSection />
-      </div>
+      {/* ── Section 6: Advanced Follow-up ── */}
+      <Section id="followup" icon={<RotateCcw size={16} />} title="Advanced Follow-up" open={openSections.has("followup")} onToggle={() => toggleSection("followup")}>
+        <AdvancedFollowUpSection />
+      </Section>
     </div>
   );
 
