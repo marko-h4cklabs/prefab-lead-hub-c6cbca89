@@ -5,6 +5,7 @@ import CommunicationStyleSection from "@/components/chatbot/CommunicationStyleSe
 import ConversationStrategySection from "@/components/chatbot/ConversationStrategySection";
 import GuardrailsSection from "@/components/chatbot/GuardrailsSection";
 import BookingTriggerSection from "@/components/chatbot/BookingTriggerSection";
+import HandoffPanel from "@/components/handoff/HandoffPanel";
 
 const BehaviorPage = () => {
   const navigate = useNavigate();
@@ -33,6 +34,10 @@ const BehaviorPage = () => {
           <h2 className="text-lg font-bold text-foreground">Guardrails</h2>
           <div className="dark-card border-l-4 border-l-primary">
             <GuardrailsSection onDirty={() => {}} onSaved={refreshPreview} />
+          </div>
+          <h2 className="text-lg font-bold text-foreground mt-2">Human-Break System</h2>
+          <div className="dark-card border-l-4 border-l-primary">
+            <HandoffPanel />
           </div>
         </div>
       </div>

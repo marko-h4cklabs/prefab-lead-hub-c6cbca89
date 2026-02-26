@@ -27,6 +27,8 @@ import IdentityPage from "./pages/subtopics/IdentityPage";
 import BehaviorPage from "./pages/subtopics/BehaviorPage";
 import QuotePage from "./pages/subtopics/QuotePage";
 import TestChatPage from "./pages/subtopics/TestChatPage";
+import VoicePage from "./pages/subtopics/VoicePage";
+import FollowUpPage from "./pages/subtopics/FollowUpPage";
 import IntegrationsPage from "./pages/subtopics/IntegrationsPage";
 import AnalyticsPage from "./pages/subtopics/AnalyticsPage";
 import AccountBillingPage from "./pages/subtopics/AccountBillingPage";
@@ -117,6 +119,8 @@ const App = () => {
             <Route path="/dashboard/agent/behavior" element={<BehaviorPage />} />
             <Route path="/dashboard/agent/quote" element={<QuotePage />} />
             <Route path="/dashboard/agent/test" element={<TestChatPage />} />
+            <Route path="/dashboard/agent/voice" element={<VoicePage />} />
+            <Route path="/dashboard/agent/followup" element={<FollowUpPage />} />
 
             {/* Settings & Tools */}
             <Route path="/dashboard/settings" element={<SettingsSection />} />
