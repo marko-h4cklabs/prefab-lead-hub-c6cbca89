@@ -183,6 +183,25 @@ const TestChatPage = () => {
           <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
             <h3 className="text-sm font-bold text-foreground">Test Chat</h3>
             <div className="flex items-center gap-2">
+              {/* Manual/Auto mode toggle */}
+              <div className="flex items-center gap-0.5 border border-border rounded-md overflow-hidden">
+                <button
+                  onClick={() => setDelaySec(0)}
+                  className={`px-2 py-1 text-[10px] font-medium transition-colors ${
+                    delaySec === 0 ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Manual
+                </button>
+                <button
+                  onClick={() => setDelaySec(delaySec === 0 ? -1 : delaySec)}
+                  className={`px-2 py-1 text-[10px] font-medium transition-colors ${
+                    delaySec !== 0 ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Auto
+                </button>
+              </div>
               {/* Response delay selector */}
               <div className="flex items-center gap-1">
                 <Timer size={11} className="text-muted-foreground" />

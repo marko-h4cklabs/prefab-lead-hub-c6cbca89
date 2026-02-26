@@ -4,7 +4,7 @@ import { api } from "@/lib/apiClient";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import {
-  TrendingUp, TrendingDown, DollarSign, Target, Clock, Award, Users, BarChart3,
+  TrendingUp, TrendingDown, DollarSign, Target, Clock, Award, BarChart3,
   RefreshCw, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,7 +29,6 @@ interface DealStats {
   revenue_over_time?: { month: string; revenue: number; deal_count: number }[];
   revenue_by_source?: { source: string; revenue: number; deal_count: number }[];
   pipeline_funnel?: { stage: string; count: number }[];
-  setter_performance?: { setter: string; deals_closed: number; total_revenue: number; avg_deal_value: number; conversion_rate: number }[];
 }
 
 interface Deal {
@@ -102,7 +101,6 @@ const Analytics = () => {
           revenue: r.revenue ?? 0,
           deal_count: r.deal_count ?? r.deals ?? 0,
         })),
-        setter_performance: ds?.setter_performance ?? [],
       };
       // Build pipeline funnel from pipeline stats
       const byStage = pipelineStats?.by_stage;
@@ -148,11 +146,11 @@ const Analytics = () => {
   const s = stats || {};
   const fmt = (n?: number) => n !== undefined && n !== null ? `€${n.toLocaleString()}` : "€0";
 
-  // Unique setters for filter
+  // Unique setters for filter (from deals data)
   const setterOptions = useMemo(() => {
-    const setters = stats?.setter_performance?.map((sp) => sp.setter) || [];
+    const setters = deals.map((d) => d.setter_name).filter(Boolean) as string[];
     return [...new Set(setters)];
-  }, [stats]);
+  }, [deals]);
 
   return (
     <div className="space-y-6">
@@ -282,13 +280,7 @@ const Analytics = () => {
         )}
       </div>
 
-      {/* Row 5 — Setter Performance */}
-      <div className="dark-card p-6">
-        <h2 className="text-sm font-semibold text-primary mb-4">Setter Performance</h2>
-        {loading ? <Skeleton className="h-48 w-full" /> : <SetterTable data={s.setter_performance} />}
-      </div>
-
-      {/* Row 6 — AI Usage Stats */}
+      {/* Row 5 — AI Usage Stats */}
       <div className="dark-card p-6">
         <h2 className="text-sm font-semibold text-primary mb-4">AI Usage This Month</h2>
         <AiUsageCard />
@@ -401,56 +393,60 @@ function FunnelChart({ data }: { data?: DealStats["pipeline_funnel"] }) {
   );
 }
 
-function SetterTable({ data }: { data?: DealStats["setter_performance"] }) {
-  if (!data || data.length === 0) return <EmptyChart message="No setter performance data yet." />;
-  const sorted = [...data].sort((a, b) => b.total_revenue - a.total_revenue);
-  return (
-    <div className="overflow-auto">
-      <table className="dark-table">
-        <thead>
-          <tr>
-            <th>Setter Name</th>
-            <th>Deals Closed</th>
-            <th>Total Revenue</th>
-            <th>Avg Deal Value</th>
-            <th>Conversion Rate</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((row, i) => (
-            <tr key={row.setter} className={i === 0 ? "border-l-2 border-l-primary" : ""}>
-              <td className="font-medium text-foreground">{row.setter}</td>
-              <td className="font-mono tabular-nums">{row.deals_closed}</td>
-              <td className="font-mono tabular-nums text-primary">€{row.total_revenue.toLocaleString()}</td>
-              <td className="font-mono tabular-nums">€{row.avg_deal_value.toLocaleString()}</td>
-              <td className="font-mono tabular-nums">{Math.round(row.conversion_rate)}%</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 function AiUsageCard() {
   const [status, setStatus] = useState<any>(null);
   useEffect(() => {
     api.getBillingStatus().then(setStatus).catch(() => {});
   }, []);
-  const used = status?.messages_used ?? 0;
-  const limit = status?.messages_limit ?? 2000;
+  const used = status?.monthly_message_count ?? status?.messages_used ?? 0;
+  const plan = status?.plan || "trial";
+  const limit = status?.limits?.monthly_messages ?? status?.messages_limit ?? 2000;
   const pct = limit > 0 ? Math.round((used / limit) * 100) : 0;
+
+  // Provider breakdown — all messages currently go through Claude
+  const providers = [
+    { name: "Claude (Anthropic)", color: "bg-purple-500", messages: used, desc: "AI replies, intent scoring, summaries" },
+    { name: "GPT-4o (OpenAI)", color: "bg-emerald-500", messages: 0, desc: "Not in use" },
+    { name: "ElevenLabs", color: "bg-orange-500", messages: 0, desc: "Voice messages (coming soon)" },
+  ];
+
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>Messages sent</span>
-        <span className="font-mono">{used.toLocaleString()} / {limit.toLocaleString()}</span>
+    <div className="space-y-4">
+      {/* Overall usage bar */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>Total AI Messages</span>
+          <span className="font-mono">{used.toLocaleString()} / {limit.toLocaleString()}</span>
+        </div>
+        <div className="w-full h-2.5 rounded-full bg-secondary overflow-hidden">
+          <div className={`h-full rounded-full transition-all ${pct > 80 ? "bg-warning" : "bg-primary"}`} style={{ width: `${Math.min(100, pct)}%` }} />
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">{pct}% of {plan} plan used</span>
+          {pct > 80 && <span className="text-xs text-warning font-medium">Approaching limit</span>}
+        </div>
       </div>
-      <div className="w-full h-2 rounded-full bg-secondary overflow-hidden">
-        <div className={`h-full rounded-full transition-all ${pct > 80 ? "bg-warning" : "bg-primary"}`} style={{ width: `${Math.min(100, pct)}%` }} />
+
+      {/* Provider breakdown */}
+      <div className="border-t border-border pt-3">
+        <span className="text-xs font-semibold text-muted-foreground mb-2 block">Provider Breakdown</span>
+        <div className="space-y-2.5">
+          {providers.map((p) => (
+            <div key={p.name} className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`w-2.5 h-2.5 rounded-full ${p.color}`} />
+                <div>
+                  <span className="text-xs font-medium text-foreground">{p.name}</span>
+                  <p className="text-[10px] text-muted-foreground">{p.desc}</p>
+                </div>
+              </div>
+              <span className="text-xs font-mono tabular-nums text-muted-foreground">
+                {p.messages > 0 ? p.messages.toLocaleString() : "—"}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
-      {pct > 80 && <p className="text-xs text-warning">⚠️ Over 80% of your monthly limit</p>}
-      <p className="text-xs text-muted-foreground">{pct}% used</p>
     </div>
   );
 }

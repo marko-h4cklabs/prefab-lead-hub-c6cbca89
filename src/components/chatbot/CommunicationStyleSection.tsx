@@ -204,30 +204,49 @@ const CommunicationStyleSection = ({ onSaved, onDirty }: { onSaved?: () => void;
       </div>
 
       {/* Smart Reply Delay */}
-      <div>
-        <div className="flex items-center gap-1.5 mb-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Smart Reply Delay</label>
+      <div className="rounded-lg border border-border bg-card/50 p-4 space-y-3">
+        <div className="flex items-center gap-1.5">
+          <label className="text-sm font-semibold text-foreground">Smart Delay Setup</label>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Info size={12} className="text-muted-foreground cursor-help" />
               </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-[260px] text-xs">
-                How long the bot waits before replying. If the user sends another message during this time, the timer resets. Set to 0 for instant replies.
+              <TooltipContent side="top" className="max-w-[280px] text-xs">
+                Controls how long the chatbot waits before sending a reply in real Instagram DM conversations. If the lead sends another message during the delay, the timer resets — so the bot only replies once the lead stops typing.
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>
-        <div className="flex items-center gap-3">
+        <p className="text-[11px] text-muted-foreground">
+          Set a delay so your bot feels more human in real DM conversations. The timer resets if the lead sends another message.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {[0, 3, 5, 8, 10, 15, 20, 30].map((sec) => (
+            <button
+              key={sec}
+              onClick={() => update({ response_delay_seconds: sec })}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                data.response_delay_seconds === sec
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
+              }`}
+            >
+              {sec === 0 ? "Instant" : `${sec}s`}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-muted-foreground">Custom:</span>
           <input
             type="number"
             min={0}
-            max={30}
+            max={60}
             value={data.response_delay_seconds}
-            onChange={(e) => update({ response_delay_seconds: Math.max(0, Math.min(30, parseInt(e.target.value) || 0)) })}
-            className="dark-input w-20 text-center"
+            onChange={(e) => update({ response_delay_seconds: Math.max(0, Math.min(60, parseInt(e.target.value) || 0)) })}
+            className="dark-input w-16 text-center text-xs"
           />
-          <span className="text-xs text-muted-foreground">seconds {data.response_delay_seconds === 0 && "(instant)"}</span>
+          <span className="text-[11px] text-muted-foreground">seconds</span>
         </div>
       </div>
 

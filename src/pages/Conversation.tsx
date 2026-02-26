@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, requireCompanyId } from "@/lib/apiClient";
 import { toDisplayText, safeArray, getErrorMessage } from "@/lib/errorUtils";
-import { ArrowLeft, Send, Loader2, Bot, Timer, ImagePlus, CalendarDays, Bug, ChevronDown, ChevronRight, Mic } from "lucide-react";
+import { ArrowLeft, Send, Loader2, Bot, ImagePlus, CalendarDays, Bug, ChevronDown, ChevronRight, Mic } from "lucide-react";
 import AudioPlayer from "@/components/conversation/AudioPlayer";
 import VoiceRecorder from "@/components/conversation/VoiceRecorder";
 import { toast } from "@/hooks/use-toast";
@@ -213,7 +213,7 @@ const Conversation = () => {
   );
 
   return (
-    <div className="flex flex-col h-[calc(100vh-0px)]">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0 bg-card">
         <div className="flex items-center gap-3">
@@ -221,18 +221,6 @@ const Conversation = () => {
           <h1 className="text-sm font-semibold">Conversation</h1>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 text-xs">
-            <button onClick={() => { setTestingMode("manual"); clearTimers(); }} className={`px-2 py-1 rounded-md border text-xs ${testingMode === "manual" ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>Manual</button>
-            <button onClick={() => setTestingMode("automated")} className={`px-2 py-1 rounded-md border text-xs ${testingMode === "automated" ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>Auto</button>
-          </div>
-          {testingMode === "automated" && (
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Timer size={12} />
-              <input type="number" min={1} max={120} value={smartDelay} onChange={(e) => setSmartDelay(Math.max(1, Math.min(120, Number(e.target.value) || 8)))} className="dark-input w-12 py-0.5 px-1 text-xs text-center" />
-              <span>s</span>
-            </div>
-          )}
-          {countdown !== null && <span className="text-xs text-primary animate-pulse">AI in {countdown}s</span>}
           <span className="text-xs text-muted-foreground">Step {currentStep}</span>
         </div>
       </div>
@@ -256,7 +244,7 @@ const Conversation = () => {
                 const isSystem = msg.role === "system";
                 const isSchedulingChip = isSystem && (msg.content || "").toLowerCase().includes("scheduling request");
 
-                if (isSchedulingChip) return <div key={i} className="flex justify-center"><div className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 border border-primary/20 px-3 py-1.5 text-xs text-primary"><CalendarDays size={12} />{msg.content}</div></div>;
+                if (isSchedulingChip) return <div key={i} className="flex justify-center"><div className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 border border-primary/20 px-3 py-1.5 text-xs text-primary"><CalendarDays size={12} />Calendly offered to lead</div></div>;
                 if (isSystem) return <div key={i} className="flex justify-center"><div className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-xs text-muted-foreground">{msg.content}</div></div>;
 
                 const showBookingHere = i === lastBookingMsgIdx && msg.booking?.mode && (shouldShowBooking || isConfirmedMode);

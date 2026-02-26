@@ -70,7 +70,7 @@ export default function LeadSchedulingRequests({ leadId, leadName, onConvertToAp
   return (
     <div className="industrial-card p-6 mt-6">
       <h2 className="text-sm font-bold font-mono uppercase tracking-wider text-muted-foreground mb-4">
-        Scheduling Requests
+        Calendly Offered to Lead
       </h2>
 
       {error && (
@@ -82,7 +82,7 @@ export default function LeadSchedulingRequests({ leadId, leadName, onConvertToAp
       {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
 
       {!loading && !error && items.length === 0 && (
-        <p className="text-sm text-muted-foreground py-2 text-center">No scheduling requests yet</p>
+        <p className="text-sm text-muted-foreground py-2 text-center">No Calendly offers yet</p>
       )}
 
       {!loading && items.length > 0 && (

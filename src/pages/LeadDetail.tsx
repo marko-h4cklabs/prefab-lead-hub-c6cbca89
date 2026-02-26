@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, requireCompanyId } from "@/lib/apiClient";
-import { ArrowLeft, MessageSquare, Loader2, CalendarPlus, Copy, Check } from "lucide-react";
+import { MessageSquare, Loader2, CalendarPlus, Copy, Check } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { toDisplayText, safeArray, getErrorMessage } from "@/lib/errorUtils";
 import PicturesThumbnails from "@/components/PicturesThumbnails";
@@ -9,7 +9,6 @@ import CrmSection from "@/components/crm/CrmSection";
 import LeadIntelligence from "@/components/LeadIntelligence";
 import LeadAppointments from "@/components/appointments/LeadAppointments";
 import LeadSchedulingRequests from "@/components/scheduling/LeadSchedulingRequests";
-import LeadDetailAppointments from "@/components/appointments/LeadDetailAppointments";
 import AppointmentModal, { AppointmentFormData } from "@/components/appointments/AppointmentModal";
 import { NormalizedSchedulingRequest } from "@/lib/schedulingRequestUtils";
 import { REQUEST_TYPE_LABELS } from "@/lib/schedulingRequestUtils";
@@ -39,28 +38,38 @@ function sanitizeLead(data: any): any {
   return clean;
 }
 
-interface LeadStatus {
+interface QuoteField {
   id: string;
   name: string;
-  sort_order: number;
-  is_default: boolean;
+  label?: string;
+  type?: string;
+  units?: string;
+  is_enabled?: boolean;
 }
 
-const HIDDEN_FIELDS = new Set([
-  "id", "__v", "company_id", "score", "status_id", "status_obj",
-  "status_name", "assigned_sales", "name", "external_id", "channel",
-  "created_at", "updated_at", "collected_infos", "required_infos_missing",
-]);
+const PIPELINE_STAGE_LABELS: Record<string, string> = {
+  new_inquiry: "New Inquiry",
+  contacted: "Contacted",
+  qualified: "Qualified",
+  proposal_sent: "Proposal Sent",
+  call_booked: "Call Booked",
+  call_done: "Call Done",
+  closed_won: "Closed Won",
+  closed_lost: "Closed Lost",
+};
+
+const PIPELINE_STAGE_CLASSES: Record<string, string> = {
+  new_inquiry: "bg-info/15 text-info",
+  contacted: "bg-info/15 text-info",
+  qualified: "bg-primary/15 text-primary",
+  proposal_sent: "bg-primary/15 text-primary",
+  call_booked: "bg-warning/15 text-warning",
+  call_done: "bg-warning/15 text-warning",
+  closed_won: "bg-success/15 text-success",
+  closed_lost: "bg-destructive/15 text-destructive",
+};
 
 const POLL_INTERVAL = 7_000;
-
-const statusBadgeClass = (name: string) => {
-  const s = name?.toLowerCase();
-  if (s === "new") return "bg-primary/15 text-primary";
-  if (s === "qualified") return "bg-success/15 text-success";
-  if (s === "disqualified") return "bg-secondary text-muted-foreground";
-  return "bg-info/15 text-info";
-};
 
 /** Safely coerce to a renderable string — prevents React error #31 from API objects. */
 const str = (v: unknown): string =>
@@ -72,8 +81,7 @@ const LeadDetail = () => {
   const navigate = useNavigate();
   const [lead, setLead] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [statuses, setStatuses] = useState<LeadStatus[]>([]);
-  const [savingStatus, setSavingStatus] = useState(false);
+  const [quoteFields, setQuoteFields] = useState<QuoteField[]>([]);
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState("");
   const [savingName, setSavingName] = useState(false);
@@ -100,9 +108,13 @@ const LeadDetail = () => {
     fetchLead().finally(() => setLoading(false));
   }, [fetchLead]);
 
+  // Fetch quote fields for "Collected Info" placeholders
   useEffect(() => {
-    api.getLeadStatuses()
-      .then((res) => setStatuses(normalizeList(res, ["statuses", "items", "data"])))
+    api.getQuoteFields()
+      .then((res: any) => {
+        const fields = normalizeList(res, ["fields", "items", "data"]);
+        setQuoteFields(fields.filter((f: any) => f.is_enabled !== false));
+      })
       .catch(() => {});
   }, []);
 
@@ -119,23 +131,6 @@ const LeadDetail = () => {
     }, POLL_INTERVAL);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [companyId, leadId, editingName]);
-
-  const handleStatusChange = async (newStatusId: string) => {
-    if (!leadId) return;
-    const prev = { status_id: lead.status_id, status_name: lead.status_name };
-    const newObj = statuses.find((s) => s.id === newStatusId);
-    if (!newObj) return;
-    setLead((l: any) => ({ ...l, status_id: newObj.id, status_name: newObj.name, updated_at: new Date().toISOString() }));
-    setSavingStatus(true);
-    try {
-      await api.updateLeadStatus(leadId, newStatusId);
-    } catch {
-      setLead((l: any) => ({ ...l, ...prev }));
-      toast({ title: "Failed to update status", variant: "destructive" });
-    } finally {
-      setSavingStatus(false);
-    }
-  };
 
   const handleNameSave = async () => {
     if (!leadId) return;
@@ -165,9 +160,17 @@ const LeadDetail = () => {
   if (!lead) return <div className="p-8 text-destructive">Lead not found</div>;
 
   const leadName = str(lead.name) || str(lead.external_id) || "—";
-  const statusId = str(lead.status_id);
-  const statusName = str(lead.status_name) || "New";
+  const pipelineStage = str(lead.pipeline_stage) || "new_inquiry";
+  const pipelineLabel = PIPELINE_STAGE_LABELS[pipelineStage] || pipelineStage.replace(/_/g, " ");
+  const pipelineClass = PIPELINE_STAGE_CLASSES[pipelineStage] || "bg-info/15 text-info";
   const collectedInfos: any[] = safeArray(lead.collected_infos ?? lead.collected, "collectedInfos");
+
+  // Build collected info map for matching against quote fields
+  const collectedMap = new Map<string, any>();
+  collectedInfos.forEach((info: any) => {
+    const key = (str(info.field_name) || str(info.name) || "").toLowerCase();
+    if (key) collectedMap.set(key, info);
+  });
 
   const defaultApptPrefill: Partial<AppointmentFormData> = {
     lead_id: leadId!,
@@ -212,14 +215,16 @@ const LeadDetail = () => {
               </h1>
             )}
             <div className="flex items-center gap-2 mt-1">
-              <span className={`status-badge text-xs ${statusBadgeClass(statusName)}`}>{statusName}</span>
+              <span className={`status-badge text-xs px-2.5 py-0.5 rounded-full font-semibold ${pipelineClass}`}>
+                {pipelineLabel}
+              </span>
               {str(lead.channel) && <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-md">{str(lead.channel)}</span>}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setDealModalOpen(true)} className="dark-btn text-sm bg-primary text-primary-foreground hover:bg-primary/90">
-            💵 Log Deal
+            Log Deal
           </button>
           <button onClick={() => setApptModalOpen(true)} className="dark-btn-primary text-sm">
             <CalendarPlus size={14} /> Add to Calendar
@@ -244,14 +249,11 @@ const LeadDetail = () => {
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-muted-foreground mb-0.5">Status</dt>
+            <dt className="text-xs text-muted-foreground mb-0.5">Pipeline Stage</dt>
             <dd>
-              <div className="flex items-center gap-1.5">
-                <select value={statusId} onChange={(e) => handleStatusChange(e.target.value)} disabled={savingStatus} className="dark-input py-1 px-2 text-xs w-auto min-w-[100px]">
-                  {statuses.length > 0 ? statuses.map((s) => <option key={s.id} value={s.id}>{s.name}</option>) : <option value="">{statusName}</option>}
-                </select>
-                {savingStatus && <Loader2 size={12} className="animate-spin text-muted-foreground" />}
-              </div>
+              <span className={`inline-flex items-center text-xs px-2.5 py-1 rounded-full font-semibold ${pipelineClass}`}>
+                {pipelineLabel}
+              </span>
             </dd>
           </div>
           <div>
@@ -289,10 +291,68 @@ const LeadDetail = () => {
         );
       })()}
 
-      {/* Collected info */}
+      {/* Collected info — shows quote field placeholders + collected values */}
       <div className="dark-card p-5">
         <h2 className="text-sm font-semibold text-primary mb-3">Collected Info</h2>
-        {collectedInfos.length > 0 ? (
+        {quoteFields.length > 0 ? (
+          <dl className="space-y-2">
+            {quoteFields.map((field) => {
+              const fieldKey = field.name.toLowerCase();
+              const collected = collectedMap.get(fieldKey);
+              const label = field.label || field.name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+              if (fieldKey === "pictures") {
+                if (collected) {
+                  const rawValue = collected.value;
+                  const picUrls: string[] = Array.isArray(rawValue) ? rawValue.filter((v: any) => typeof v === "string") : [];
+                  const picLinks: { label: string; url: string }[] = Array.isArray(collected.links) ? collected.links : picUrls.map((url: string, j: number) => ({ label: `Picture ${j + 1}`, url }));
+                  return (
+                    <div key={field.id} className="flex flex-col gap-1 text-sm">
+                      <dt className="text-muted-foreground">Pictures received:</dt>
+                      <dd>
+                        {picLinks.length > 0 && (
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mb-1">
+                            {picLinks.map((link, j) => <a key={j} href={link.url} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80 text-sm">{link.label}</a>)}
+                          </div>
+                        )}
+                        <PicturesThumbnails urls={picUrls} />
+                      </dd>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={field.id} className="flex gap-2 text-sm">
+                    <dt className="text-muted-foreground min-w-[140px]">{label}:</dt>
+                    <dd className="text-muted-foreground/50 italic">waiting for input from user</dd>
+                  </div>
+                );
+              }
+
+              return (
+                <div key={field.id} className="flex gap-2 text-sm">
+                  <dt className="text-muted-foreground min-w-[140px]">{label}{field.units ? ` (${field.units})` : ""}:</dt>
+                  {collected ? (
+                    <dd className="font-medium">{toDisplayText(collected.value)}{collected.units ? ` (${toDisplayText(collected.units)})` : ""}</dd>
+                  ) : (
+                    <dd className="text-muted-foreground/50 italic">waiting for input from user</dd>
+                  )}
+                </div>
+              );
+            })}
+            {/* Also show any collected fields not in quote fields */}
+            {collectedInfos
+              .filter((info: any) => {
+                const key = (str(info.field_name) || str(info.name) || "").toLowerCase();
+                return key && !quoteFields.some((f) => f.name.toLowerCase() === key);
+              })
+              .map((info: any, i: number) => (
+                <div key={`extra-${i}`} className="flex gap-2 text-sm">
+                  <dt className="text-muted-foreground min-w-[140px]">{str(info.field_name) || str(info.name) || `Field ${i + 1}`}:</dt>
+                  <dd className="font-medium">{toDisplayText(info.value)}{info.units ? ` (${toDisplayText(info.units)})` : ""}</dd>
+                </div>
+              ))}
+          </dl>
+        ) : collectedInfos.length > 0 ? (
           <dl className="space-y-2">
             {collectedInfos.map((info: any, i: number) => {
               const fieldName = (str(info.field_name) || str(info.name) || "").toLowerCase();
@@ -323,7 +383,7 @@ const LeadDetail = () => {
             })}
           </dl>
         ) : (
-          <p className="text-sm text-muted-foreground">None yet</p>
+          <p className="text-sm text-muted-foreground italic">No info collected yet — waiting for input from user</p>
         )}
       </div>
 
@@ -331,7 +391,6 @@ const LeadDetail = () => {
       {leadId && <LeadIntelligence leadId={leadId} />}
 
       {/* Appointments */}
-      <LeadDetailAppointments appointments={Array.isArray(lead?.appointments) ? lead.appointments : []} />
       {leadId && <LeadAppointments key={apptRefreshKey} leadId={leadId} leadName={leadName} collectedSummary={collectedInfos.map((i: any) => `${str(i.field_name) || str(i.name)}: ${str(i.value)}`).join(", ")} />}
       {leadId && <LeadSchedulingRequests key={`sched-${schedReqRefreshKey}`} leadId={leadId} leadName={leadName} onConvertToAppointment={handleConvertRequest} />}
 
