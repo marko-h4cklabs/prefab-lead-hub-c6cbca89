@@ -105,9 +105,10 @@ const App = () => {
             {/* Leads & CRM */}
             <Route path="/dashboard/leads" element={<LeadsSection />} />
             <Route path="/dashboard/leads/board" element={<LeadBoardPage />} />
-            <Route path="/dashboard/leads/inbox" element={<InboxPage />} />
-            <Route path="/dashboard/leads/inbox/:leadId" element={<InboxPage />} />
-            <Route path="/dashboard/leads/inbox/:leadId/conversation" element={<InboxPage />} />
+            <Route path="/dashboard/leads/inbox" element={<InboxPage />}>
+              <Route path=":leadId" element={<LeadDetail />} />
+              <Route path=":leadId/conversation" element={<Conversation />} />
+            </Route>
             <Route path="/dashboard/leads/pipeline" element={<PipelinePage />} />
             <Route path="/dashboard/leads/calendar" element={<CalendarPage />} />
 

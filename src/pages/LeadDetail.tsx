@@ -206,7 +206,7 @@ const LeadDetail = () => {
           <button onClick={() => setApptModalOpen(true)} className="dark-btn-primary text-sm">
             <CalendarPlus size={14} /> Add to Calendar
           </button>
-          <button onClick={() => navigate(`/leads/${leadId}/conversation`)} className="dark-btn-secondary text-sm">
+          <button onClick={() => navigate(`/dashboard/leads/inbox/${leadId}/conversation`)} className="dark-btn-secondary text-sm">
             <MessageSquare size={14} /> Conversation
           </button>
         </div>

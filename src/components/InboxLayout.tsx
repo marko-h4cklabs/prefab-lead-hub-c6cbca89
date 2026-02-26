@@ -181,7 +181,7 @@ const InboxLayout = () => {
                     key={lead.id}
                     lead={lead}
                     isActive={lead.id === leadId}
-                    onClick={() => navigate(`/leads/${lead.id}`)}
+                    onClick={() => navigate(`/dashboard/leads/inbox/${lead.id}`)}
                   />
                 ))}
               </div>
@@ -192,7 +192,7 @@ const InboxLayout = () => {
                 key={lead.id}
                 lead={lead}
                 isActive={lead.id === leadId}
-                onClick={() => navigate(`/leads/${lead.id}`)}
+                onClick={() => navigate(`/dashboard/leads/inbox/${lead.id}`)}
               />
             ))
           )}
