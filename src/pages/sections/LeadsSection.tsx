@@ -42,8 +42,22 @@ const LeadsSection = () => {
   }, [companyId]);
 
   return (
-    <div className="h-full flex flex-col items-center justify-center px-6">
-      <StaggerContainer className="flex flex-col gap-6 max-w-[1100px] w-full">
+    <div className="h-full flex flex-col items-center justify-center px-6 relative overflow-hidden">
+      {/* Grid background */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: 'linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
+          backgroundSize: '40px 40px',
+        }}
+      />
+      {/* Center glow */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse at 50% 50%, hsl(48 92% 53% / 0.07) 0%, transparent 55%)' }}
+      />
+
+      <StaggerContainer className="flex flex-col gap-6 max-w-[1100px] w-full relative z-10">
         {/* Inbox — full width top row */}
         <StaggerItem>
           <motion.button
@@ -118,7 +132,7 @@ const LeadsSection = () => {
       </StaggerContainer>
 
       {/* Back / Home */}
-      <div className="flex items-center gap-4 mt-8">
+      <div className="flex items-center gap-4 mt-8 relative z-10">
         <button onClick={() => navigate(-1 as any)} className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border bg-secondary text-sm text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft size={14} /> Back
         </button>

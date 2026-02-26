@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Users, Bot, Wrench, ArrowLeft, Home } from "lucide-react";
+import { Users, Bot, Wrench, Home } from "lucide-react";
 import { api, requireCompanyId } from "@/lib/apiClient";
 import { StaggerContainer, StaggerItem } from "@/components/catalog/PageTransition";
 import { motion } from "framer-motion";
@@ -109,11 +109,8 @@ const MainHub = () => {
         {stats.activeLeads} active leads · {stats.appointmentsToday} appointments today · {stats.messagesThisWeek} messages this week
       </div>
 
-      {/* Back / Home */}
+      {/* Home */}
       <div className="flex items-center gap-4 mt-4">
-        <button onClick={() => navigate(-1 as any)} className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border bg-secondary text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft size={14} /> Back
-        </button>
         <button onClick={() => navigate("/dashboard")} className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border bg-secondary text-sm text-muted-foreground hover:text-foreground transition-colors">
           <Home size={14} /> Home
         </button>
