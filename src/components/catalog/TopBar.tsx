@@ -1,8 +1,10 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Bell, Settings, LogOut } from "lucide-react";
+import { Bell, Settings, LogOut, CheckCheck, Loader2, User, MessageSquare, Calendar, Flame, Zap, Bot, CreditCard, ArrowRightCircle } from "lucide-react";
 import { api, requireCompanyId, clearAuth } from "@/lib/apiClient";
 import { motion } from "framer-motion";
+
+const str = (v: unknown): string => (v == null ? "" : typeof v === "object" ? "" : String(v));
 
 function normalizeList(payload: unknown, keys: string[] = []): any[] {
   if (Array.isArray(payload)) return payload;
@@ -12,6 +14,57 @@ function normalizeList(payload: unknown, keys: string[] = []): any[] {
     }
   }
   return [];
+}
+
+interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  url?: string;
+  is_read: boolean;
+  created_at: string;
+  lead_id?: string;
+}
+
+const NOTIF_ICONS: Record<string, React.ElementType> = {
+  new_lead: User,
+  new_message: MessageSquare,
+  appointment: Calendar,
+  appointment_created: Calendar,
+  booking_confirmed: Calendar,
+  deal_logged: CreditCard,
+  scheduling_request: Calendar,
+  hot_lead: Flame,
+  autoresponder: Bot,
+  status_change: ArrowRightCircle,
+  budget_detected: Zap,
+};
+
+const NOTIF_COLORS: Record<string, string> = {
+  new_lead: "text-[hsl(48_92%_53%)]",
+  new_message: "text-blue-400",
+  appointment: "text-purple-400",
+  appointment_created: "text-purple-400",
+  booking_confirmed: "text-green-400",
+  deal_logged: "text-green-400",
+  scheduling_request: "text-orange-400",
+  hot_lead: "text-red-400",
+  autoresponder: "text-teal-400",
+  status_change: "text-blue-400",
+  budget_detected: "text-[hsl(48_92%_53%)]",
+};
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return `${Math.floor(days / 7)}w ago`;
 }
 
 interface TopBarProps {
@@ -29,6 +82,13 @@ export default function TopBar({ onSettingsClick }: TopBarProps) {
   const [operatingMode, setOperatingMode] = useState<string | null>(null);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const logoutRef = useRef<HTMLDivElement>(null);
+
+  // Notification panel state
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [markingAllRead, setMarkingAllRead] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
 
   // Determine hierarchy
   const path = location.pathname;
@@ -53,18 +113,20 @@ export default function TopBar({ onSettingsClick }: TopBarProps) {
     return labels[last] || last;
   };
 
-  useEffect(() => {
-    api.getCompany(companyId).then((c) => setCompanyName(c.company_name || c.name || "")).catch(() => {});
-
-    // Real unread message count
+  const fetchUnreadCount = useCallback(() => {
     api.getUnreadCount().then((res) => {
       setUnreadCount(res?.count ?? res?.unread_count ?? res?.total ?? 0);
     }).catch(() => {
-      // Fallback to notifications endpoint
       api.getNotifications({ limit: 1 }).then((res) => {
         setUnreadCount(res?.unread_count ?? res?.total ?? 0);
       }).catch(() => {});
     });
+  }, []);
+
+  useEffect(() => {
+    api.getCompany(companyId).then((c) => setCompanyName(str(c.company_name) || str(c.name) || "")).catch(() => {});
+
+    fetchUnreadCount();
 
     // Leads created in last 24h
     api.getLeads(companyId, { limit: 200 }).then((res) => {
@@ -82,25 +144,79 @@ export default function TopBar({ onSettingsClick }: TopBarProps) {
     }).catch(() => {});
 
     api.getOperatingMode().then((res) => {
-      setOperatingMode(res?.operating_mode || res?.mode || null);
+      setOperatingMode(str(res?.operating_mode) || str(res?.mode) || null);
     }).catch(() => {});
-  }, [companyId]);
+
+    // Poll unread count every 30s
+    const pollInterval = setInterval(fetchUnreadCount, 30_000);
+    return () => clearInterval(pollInterval);
+  }, [companyId, fetchUnreadCount]);
+
+  const fetchNotifications = useCallback(() => {
+    setNotifLoading(true);
+    api.getNotifications({ limit: 20 })
+      .then((res) => {
+        const list = normalizeList(res, ["data", "notifications", "items"]);
+        setNotifications(list);
+      })
+      .catch(() => {})
+      .finally(() => setNotifLoading(false));
+  }, []);
+
+  const handleBellClick = () => {
+    if (!notifOpen) {
+      fetchNotifications();
+    }
+    setNotifOpen((o) => !o);
+    setLogoutOpen(false);
+  };
+
+  const handleMarkRead = async (id: string) => {
+    try {
+      await api.markNotificationRead(id);
+      setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, is_read: true } : n));
+      setUnreadCount((c) => Math.max(0, c - 1));
+    } catch { /* best effort */ }
+  };
+
+  const handleMarkAllRead = async () => {
+    setMarkingAllRead(true);
+    try {
+      await api.markAllNotificationsRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      setUnreadCount(0);
+    } catch { /* best effort */ }
+    setMarkingAllRead(false);
+  };
+
+  const handleNotifClick = (notif: Notification) => {
+    if (!notif.is_read) handleMarkRead(notif.id);
+    setNotifOpen(false);
+    if (notif.url) {
+      navigate(notif.url);
+    } else if (notif.lead_id) {
+      navigate(`/dashboard/leads/inbox/${notif.lead_id}`);
+    }
+  };
 
   const handleLogout = () => {
     clearAuth();
     navigate("/login");
   };
 
-  // Close logout dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (logoutRef.current && !logoutRef.current.contains(e.target as Node)) {
         setLogoutOpen(false);
       }
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
     };
-    if (logoutOpen) document.addEventListener("mousedown", handler);
+    if (logoutOpen || notifOpen) document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [logoutOpen]);
+  }, [logoutOpen, notifOpen]);
 
   const modeIsAutopilot = operatingMode === "autopilot";
   const modeIsCopilot = operatingMode === "copilot";
@@ -109,17 +225,89 @@ export default function TopBar({ onSettingsClick }: TopBarProps) {
     <header className="h-16 shrink-0 flex items-center justify-between px-6 border-b border-[hsl(0_0%_13%)] bg-[hsl(0_0%_0%)] z-20">
       {/* LEFT */}
       <div className="flex items-center gap-3">
-        <button
-          className="relative flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground transition-colors"
-          title="Notifications"
-        >
-          <Bell size={18} />
-          {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1">
-              {unreadCount}
-            </span>
+        <div className="relative" ref={notifRef}>
+          <button
+            onClick={handleBellClick}
+            className="relative flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground transition-colors"
+            title="Notifications"
+          >
+            <Bell size={18} />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
+          {/* Notification dropdown */}
+          {notifOpen && (
+            <div className="absolute left-0 top-full mt-2 w-80 rounded-xl border border-[hsl(0_0%_16%)] bg-[hsl(0_0%_5%)] shadow-xl shadow-black/50 z-50 overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[hsl(0_0%_13%)]">
+                <span className="text-xs font-bold text-foreground uppercase tracking-wider">Notifications</span>
+                {notifications.some((n) => !n.is_read) && (
+                  <button
+                    onClick={handleMarkAllRead}
+                    disabled={markingAllRead}
+                    className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                  >
+                    {markingAllRead ? <Loader2 size={10} className="animate-spin" /> : <CheckCheck size={10} />}
+                    Mark all read
+                  </button>
+                )}
+              </div>
+
+              {/* List */}
+              <div className="max-h-80 overflow-y-auto">
+                {notifLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 size={16} className="animate-spin text-muted-foreground" />
+                  </div>
+                ) : notifications.length === 0 ? (
+                  <div className="py-8 text-center">
+                    <Bell size={20} className="mx-auto text-muted-foreground/40 mb-2" />
+                    <p className="text-xs text-muted-foreground">No notifications yet</p>
+                  </div>
+                ) : (
+                  notifications.map((notif) => {
+                    const Icon = NOTIF_ICONS[notif.type] || Bell;
+                    const color = NOTIF_COLORS[notif.type] || "text-muted-foreground";
+                    return (
+                      <button
+                        key={notif.id}
+                        onClick={() => handleNotifClick(notif)}
+                        className={`w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-[hsl(0_0%_8%)] transition-colors border-b border-[hsl(0_0%_10%)] last:border-b-0 ${
+                          !notif.is_read ? "bg-[hsl(48_92%_53%/0.03)]" : ""
+                        }`}
+                      >
+                        <div className={`mt-0.5 shrink-0 ${color}`}>
+                          <Icon size={14} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-medium truncate ${!notif.is_read ? "text-foreground" : "text-muted-foreground"}`}>
+                              {str(notif.title)}
+                            </span>
+                            {!notif.is_read && (
+                              <span className="h-1.5 w-1.5 rounded-full bg-[hsl(48_92%_53%)] shrink-0" />
+                            )}
+                          </div>
+                          {str(notif.body) && (
+                            <p className="text-[11px] text-muted-foreground truncate mt-0.5">{str(notif.body)}</p>
+                          )}
+                          {str(notif.created_at) && (
+                            <span className="text-[10px] text-muted-foreground/60 mt-0.5 block">{timeAgo(notif.created_at)}</span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
           )}
-        </button>
+        </div>
+
         <button
           onClick={() => navigate("/dashboard/leads/inbox")}
           className="flex items-center gap-1.5 rounded-full bg-[hsl(24_95%_53%/0.15)] px-3 py-1 text-xs font-semibold text-[hsl(24_95%_53%)] hover:bg-[hsl(24_95%_53%/0.25)] transition-colors"
@@ -169,7 +357,7 @@ export default function TopBar({ onSettingsClick }: TopBarProps) {
         </button>
         <div className="relative" ref={logoutRef}>
           <button
-            onClick={() => setLogoutOpen((o) => !o)}
+            onClick={() => { setLogoutOpen((o) => !o); setNotifOpen(false); }}
             className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-all"
           >
             <LogOut size={18} />
