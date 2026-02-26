@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, Sliders, FileText, MessagesSquare } from "lucide-react";
+import { User, Sliders, FileText, MessagesSquare, ArrowLeft, Home } from "lucide-react";
 import { api } from "@/lib/apiClient";
 import { StaggerContainer, StaggerItem } from "@/components/catalog/PageTransition";
 import { motion } from "framer-motion";
@@ -14,6 +14,14 @@ function normalizeList(payload: unknown, keys: string[] = []): any[] {
   }
   return [];
 }
+
+const ACCENT = {
+  border: "hover:border-[hsl(142_71%_45%)]",
+  shadow: "hover:shadow-[0_0_20px_hsl(142_71%_45%/0.15)]",
+  text: "text-[hsl(142_71%_45%)]",
+  iconBg: "bg-[hsl(142_71%_45%/0.20)]",
+  iconText: "text-[hsl(142_71%_45%)]",
+};
 
 const AgentSection = () => {
   const navigate = useNavigate();
@@ -37,8 +45,6 @@ const AgentSection = () => {
       title: "Identity & Persona",
       description: "Name, backstory, and personality of your AI agent",
       icon: User,
-      iconBg: "bg-success/20",
-      iconColor: "text-success",
       route: "/dashboard/agent/identity",
       preview: <span className="text-sm text-muted-foreground">Agent: <span className="text-foreground font-medium">{agentName}</span></span>,
     },
@@ -46,8 +52,6 @@ const AgentSection = () => {
       title: "Behavior & Strategy",
       description: "Tone, style, guardrails, and conversation strategy",
       icon: Sliders,
-      iconBg: "bg-primary/20",
-      iconColor: "text-primary",
       route: "/dashboard/agent/behavior",
       preview: (
         <div className="text-sm text-muted-foreground space-y-1 text-center">
@@ -60,8 +64,6 @@ const AgentSection = () => {
       title: "Quote Builder",
       description: "Configure what information your AI collects",
       icon: FileText,
-      iconBg: "bg-info/20",
-      iconColor: "text-info",
       route: "/dashboard/agent/quote",
       preview: <span className="text-sm text-muted-foreground">{activeFields} fields configured, {requiredFields} required</span>,
     },
@@ -69,32 +71,30 @@ const AgentSection = () => {
       title: "Test Chat",
       description: "Chat with your AI agent to test behavior",
       icon: MessagesSquare,
-      iconBg: "bg-success/20",
-      iconColor: "text-success",
       route: "/dashboard/agent/test",
-      preview: <span className="text-sm text-success font-medium">Ready to test</span>,
+      preview: <span className={`text-sm font-medium ${ACCENT.text}`}>Ready to test</span>,
     },
   ];
 
   return (
-    <div className="h-full flex items-center justify-center px-6">
+    <div className="h-full flex flex-col items-center justify-center px-6">
       <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-[1100px] w-full">
         {cards.map((card) => (
           <StaggerItem key={card.route}>
             <motion.button
               onClick={() => navigate(card.route)}
               whileHover={{ scale: 1.02 }}
-              className="w-full text-left rounded-xl border border-[hsl(0_0%_13%)] bg-[hsl(0_0%_7%)] p-6 transition-all duration-200 hover:border-primary hover:shadow-[0_0_20px_hsl(48_92%_53%/0.15)] flex gap-5 h-[240px] md:h-[260px]"
+              className={`w-full text-left rounded-xl border border-[hsl(0_0%_13%)] bg-[hsl(0_0%_7%)] p-6 transition-all duration-200 ${ACCENT.border} ${ACCENT.shadow} flex gap-5 h-[240px] md:h-[260px]`}
             >
               <div className="flex flex-col justify-between flex-[0_0_40%]">
                 <div>
-                  <div className={`w-12 h-12 rounded-xl ${card.iconBg} flex items-center justify-center mb-3`}>
-                    <card.icon size={24} className={card.iconColor} />
+                  <div className={`w-12 h-12 rounded-xl ${ACCENT.iconBg} flex items-center justify-center mb-3`}>
+                    <card.icon size={24} className={ACCENT.iconText} />
                   </div>
                   <h3 className="text-base font-bold text-foreground mb-1">{card.title}</h3>
                   <p className="text-xs text-muted-foreground leading-relaxed">{card.description}</p>
                 </div>
-                <span className="text-xs text-primary font-medium">Open →</span>
+                <span className={`text-xs font-medium ${ACCENT.text}`}>Open →</span>
               </div>
               <div className="flex-1 flex items-center justify-center rounded-lg bg-[hsl(0_0%_5%)] border border-[hsl(0_0%_13%)] p-4">
                 {card.preview}
@@ -103,6 +103,16 @@ const AgentSection = () => {
           </StaggerItem>
         ))}
       </StaggerContainer>
+
+      {/* Back / Home */}
+      <div className="flex items-center gap-4 mt-8">
+        <button onClick={() => navigate(-1 as any)} className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border bg-secondary text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft size={14} /> Back
+        </button>
+        <button onClick={() => navigate("/dashboard")} className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border bg-secondary text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <Home size={14} /> Home
+        </button>
+      </div>
     </div>
   );
 };

@@ -48,6 +48,10 @@ const statusBadgeClass = (name: string) => {
   return "bg-info/15 text-info";
 };
 
+/** Safely coerce to a renderable string — prevents React error #31 from API objects. */
+const str = (v: unknown): string =>
+  v == null ? "" : typeof v === "object" ? "" : String(v);
+
 const LeadDetail = () => {
   const { leadId } = useParams();
   const companyId = requireCompanyId();
@@ -146,9 +150,9 @@ const LeadDetail = () => {
   if (loading) return <div className="flex items-center gap-2 p-8 text-muted-foreground"><Loader2 size={16} className="animate-spin" /> Loading…</div>;
   if (!lead) return <div className="p-8 text-destructive">Lead not found</div>;
 
-  const leadName = lead.name || lead.external_id || "—";
-  const statusId = lead.status_id || "";
-  const statusName = lead.status_name || "New";
+  const leadName = str(lead.name) || str(lead.external_id) || "—";
+  const statusId = str(lead.status_id);
+  const statusName = str(lead.status_name) || "New";
   const collectedInfos: any[] = safeArray(lead.collected_infos ?? lead.collected, "collectedInfos");
 
   const defaultApptPrefill: Partial<AppointmentFormData> = {
@@ -195,7 +199,7 @@ const LeadDetail = () => {
             )}
             <div className="flex items-center gap-2 mt-1">
               <span className={`status-badge text-xs ${statusBadgeClass(statusName)}`}>{statusName}</span>
-              {lead.channel && <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-md">{lead.channel}</span>}
+              {str(lead.channel) && <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-md">{str(lead.channel)}</span>}
             </div>
           </div>
         </div>
@@ -266,7 +270,7 @@ const LeadDetail = () => {
             <div className="w-full h-2 rounded-full bg-secondary overflow-hidden">
               <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${Math.min(100, score)}%` }} />
             </div>
-            {lead.score_reason && <p className="mt-2 text-sm italic text-muted-foreground">{lead.score_reason}</p>}
+            {str(lead.score_reason) && <p className="mt-2 text-sm italic text-muted-foreground">{str(lead.score_reason)}</p>}
           </div>
         );
       })()}
@@ -298,7 +302,7 @@ const LeadDetail = () => {
               }
               return (
                 <div key={i} className="flex gap-2 text-sm">
-                  <dt className="text-muted-foreground min-w-[140px]">{info.field_name || info.name || `Field ${i + 1}`}:</dt>
+                  <dt className="text-muted-foreground min-w-[140px]">{str(info.field_name) || str(info.name) || `Field ${i + 1}`}:</dt>
                   <dd className="font-medium">{toDisplayText(info.value)}{info.units ? ` (${toDisplayText(info.units)})` : ""}</dd>
                 </div>
               );

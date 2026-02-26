@@ -20,7 +20,6 @@ import MainHub from "./pages/MainHub";
 import LeadsSection from "./pages/sections/LeadsSection";
 import AgentSection from "./pages/sections/AgentSection";
 import SettingsSection from "./pages/sections/SettingsSection";
-import LeadBoardPage from "./pages/subtopics/LeadBoardPage";
 import InboxPage from "./pages/subtopics/InboxPage";
 import PipelinePage from "./pages/subtopics/PipelinePage";
 import CalendarPage from "./pages/subtopics/CalendarPage";
@@ -104,7 +103,6 @@ const App = () => {
 
             {/* Leads & CRM */}
             <Route path="/dashboard/leads" element={<LeadsSection />} />
-            <Route path="/dashboard/leads/board" element={<LeadBoardPage />} />
             <Route path="/dashboard/leads/inbox" element={<InboxPage />}>
               <Route path=":leadId" element={<LeadDetail />} />
               <Route path=":leadId/conversation" element={<Conversation />} />
