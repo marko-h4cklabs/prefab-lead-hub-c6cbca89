@@ -3,6 +3,8 @@ import { api } from "@/lib/apiClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import { X, Users, UserPlus } from "lucide-react";
 
+const str = (v: unknown): string => (v == null ? "" : typeof v === "object" ? "" : String(v));
+
 export default function CompanyDrawer({ companyId, onClose }: { companyId: string; onClose: () => void }) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -30,10 +32,10 @@ export default function CompanyDrawer({ companyId, onClose }: { companyId: strin
             <p className="text-muted-foreground text-sm">No data</p>
           ) : (
             <div className="space-y-5">
-              <Field label="Company Name" value={data.company_name || data.name} />
-              <Field label="Company ID" value={data.id || companyId} mono />
-              <Field label="Created" value={data.created_at ? new Date(data.created_at).toLocaleString() : undefined} mono />
-              <Field label="Operating Mode" value={data.operating_mode || data.mode} />
+              <Field label="Company Name" value={str(data.company_name) || str(data.name)} />
+              <Field label="Company ID" value={str(data.id) || companyId} mono />
+              <Field label="Created" value={str(data.created_at) ? new Date(data.created_at).toLocaleString() : undefined} mono />
+              <Field label="Operating Mode" value={str(data.operating_mode) || str(data.mode)} />
               <Field label="ManyChat Connected" value={data.manychat_connected ? "Yes" : "No"} />
 
               {(data.stats || data.lead_count !== undefined) && (
@@ -49,7 +51,7 @@ export default function CompanyDrawer({ companyId, onClose }: { companyId: strin
                   <div className="space-y-1">
                     {data.recent_leads.slice(0, 5).map((lead: any, i: number) => (
                       <div key={lead.id || i} className="text-sm px-2 py-1.5 rounded" style={{ background: "#1A1A1A" }}>
-                        {lead.name || "Unnamed"} <span className="text-muted-foreground text-xs ml-1">{lead.created_at ? new Date(lead.created_at).toLocaleDateString() : ""}</span>
+                        {str(lead.name) || "Unnamed"} <span className="text-muted-foreground text-xs ml-1">{str(lead.created_at) ? new Date(lead.created_at).toLocaleDateString() : ""}</span>
                       </div>
                     ))}
                   </div>

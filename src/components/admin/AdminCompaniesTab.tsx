@@ -5,6 +5,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Search, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import CompanyDrawer from "./CompanyDrawer";
 
+const str = (v: unknown): string => (v == null ? "" : typeof v === "object" ? "" : String(v));
+
 function normalizeList(payload: unknown, keys: string[] = []): any[] {
   if (Array.isArray(payload)) return payload;
   if (payload && typeof payload === "object") {
@@ -85,7 +87,7 @@ export default function AdminCompaniesTab() {
         localStorage.setItem("plcs_admin_token", currentToken);
       }
 
-      localStorage.setItem("plcs_impersonating", company.company_name || company.name || companyId);
+      localStorage.setItem("plcs_impersonating", str(company.company_name) || str(company.name) || companyId);
       localStorage.setItem("plcs_token", impersonateToken);
       localStorage.setItem("auth_token", impersonateToken);
       localStorage.setItem("plcs_company_id", companyId);
@@ -141,13 +143,13 @@ export default function AdminCompaniesTab() {
             ) : (
               companies.map((c) => (
                 <tr key={c.id} className="border-b hover:bg-secondary/20 transition-colors" style={{ borderColor: "#2A2A2A" }}>
-                  <td className="px-4 py-3 font-semibold">{c.company_name || c.name || "—"}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{c.created_at ? new Date(c.created_at).toLocaleDateString() : "—"}</td>
-                  <td className="px-4 py-3"><ModeBadge mode={c.operating_mode || c.mode} /></td>
+                  <td className="px-4 py-3 font-semibold">{str(c.company_name) || str(c.name) || "—"}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{str(c.created_at) ? new Date(c.created_at).toLocaleDateString() : "—"}</td>
+                  <td className="px-4 py-3"><ModeBadge mode={str(c.operating_mode) || str(c.mode) || undefined} /></td>
                   <td className="px-4 py-3 font-mono">{c.lead_count ?? "—"}</td>
                   <td className="px-4 py-3 font-mono">{c.conversation_count ?? c.conversations ?? "—"}</td>
                   <td className="px-4 py-3"><ManychatBadge connected={c.manychat_connected} /></td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{c.last_active ? new Date(c.last_active).toLocaleDateString() : "—"}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{str(c.last_active) ? new Date(c.last_active).toLocaleDateString() : "—"}</td>
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
                       <button

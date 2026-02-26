@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/apiClient";
-import { Loader2, Shield } from "lucide-react";
+import { Loader2, Shield, AlertCircle } from "lucide-react";
 import AdminOverviewTab from "@/components/admin/AdminOverviewTab";
 import AdminCompaniesTab from "@/components/admin/AdminCompaniesTab";
 import AdminUsersTab from "@/components/admin/AdminUsersTab";
@@ -19,18 +19,25 @@ const AdminPanel = () => {
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [authChecking, setAuthChecking] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
+    const token = localStorage.getItem("auth_token") || localStorage.getItem("plcs_token");
+    if (!token) {
+      navigate("/login", { replace: true });
+      return;
+    }
+
     api.me()
       .then((res: any) => {
         if (res?.is_admin || res?.role === "admin" || res?.role === "super_admin") {
           setIsAdmin(true);
         } else {
-          navigate("/leads", { replace: true });
+          setAuthError("Access denied — your account does not have admin privileges. Backend must return is_admin: true or role: \"admin\" from /api/me.");
         }
       })
-      .catch(() => {
-        navigate("/login", { replace: true });
+      .catch((err: any) => {
+        setAuthError(`Failed to verify admin access: ${err?.message || "API error"}. Check that /api/me endpoint is working.`);
       })
       .finally(() => setAuthChecking(false));
   }, [navigate]);
@@ -39,6 +46,32 @@ const AdminPanel = () => {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 size={24} className="animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (authError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="max-w-md w-full rounded-xl border border-[hsl(0_0%_16%)] bg-[hsl(0_0%_7%)] p-8 text-center space-y-4">
+          <AlertCircle size={32} className="text-destructive mx-auto" />
+          <h2 className="text-sm font-bold text-foreground">Admin Access Error</h2>
+          <p className="text-xs text-muted-foreground">{authError}</p>
+          <div className="flex gap-2 justify-center">
+            <button
+              onClick={() => navigate("/dashboard", { replace: true })}
+              className="text-xs px-4 py-2 rounded-lg border border-[hsl(0_0%_18%)] text-muted-foreground hover:text-foreground hover:bg-[hsl(0_0%_12%)] transition-all"
+            >
+              Go to Dashboard
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="text-xs px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-all font-semibold"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

@@ -3,6 +3,8 @@ import { api } from "@/lib/apiClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2 } from "lucide-react";
 
+const str = (v: unknown): string => (v == null ? "" : typeof v === "object" ? "" : String(v));
+
 function normalizeList(payload: unknown, keys: string[] = []): any[] {
   if (Array.isArray(payload)) return payload;
   if (payload && typeof payload === "object") {
@@ -93,10 +95,10 @@ export default function AdminUsersTab() {
                 const isAdmin = u.is_admin || u.role === "admin";
                 return (
                   <tr key={u.id} className="border-b hover:bg-secondary/20 transition-colors" style={{ borderColor: "#2A2A2A" }}>
-                    <td className="px-4 py-3 font-semibold">{u.name || u.full_name || "—"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{u.email || "—"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{u.company_name || "—"}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}</td>
+                    <td className="px-4 py-3 font-semibold">{str(u.name) || str(u.full_name) || "—"}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{str(u.email) || "—"}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{str(u.company_name) || "—"}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{str(u.created_at) ? new Date(u.created_at).toLocaleDateString() : "—"}</td>
                     <td className="px-4 py-3">
                       {togglingId === u.id ? (
                         <Loader2 size={16} className="animate-spin text-muted-foreground" />
@@ -132,7 +134,7 @@ export default function AdminUsersTab() {
             <div className="relative rounded-lg border p-6 max-w-sm w-full" style={{ background: "#1A1A1A", borderColor: "#2A2A2A" }}>
               <h3 className="text-sm font-bold mb-2">Grant Admin Access</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Are you sure you want to give admin access to <span className="font-semibold text-foreground">{user?.name || user?.email || "this user"}</span>? This gives full platform access.
+                Are you sure you want to give admin access to <span className="font-semibold text-foreground">{str(user?.name) || str(user?.email) || "this user"}</span>? This gives full platform access.
               </p>
               <div className="flex gap-2 justify-end">
                 <button

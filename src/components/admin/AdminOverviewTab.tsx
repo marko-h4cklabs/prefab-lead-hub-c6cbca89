@@ -7,6 +7,8 @@ import {
   TrendingUp, Flame, UserPlus, Mail,
 } from "lucide-react";
 
+const str = (v: unknown): string => (v == null ? "" : typeof v === "object" ? "" : String(v));
+
 function normalizeList(payload: unknown, keys: string[] = []): any[] {
   if (Array.isArray(payload)) return payload;
   if (payload && typeof payload === "object") {
@@ -125,12 +127,12 @@ export default function AdminOverviewTab() {
               ) : (
                 hotLeads.map((hl, i) => (
                   <tr key={hl.id || i} className="border-b hover:bg-secondary/30 transition-colors" style={{ borderColor: "#2A2A2A" }}>
-                    <td className="px-4 py-3 font-medium">{hl.company_name || "—"}</td>
-                    <td className="px-4 py-3">{hl.lead_name || hl.name || "—"}</td>
+                    <td className="px-4 py-3 font-medium">{str(hl.company_name) || "—"}</td>
+                    <td className="px-4 py-3">{str(hl.lead_name) || str(hl.name) || "—"}</td>
                     <td className="px-4 py-3 font-mono">{hl.score ?? hl.intent_score ?? "—"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{hl.trigger_reason || hl.reason || "—"}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{str(hl.trigger_reason) || str(hl.reason) || "—"}</td>
                     <td className="px-4 py-3 text-muted-foreground font-mono text-xs">
-                      {hl.created_at ? new Date(hl.created_at).toLocaleString() : "—"}
+                      {str(hl.created_at) ? new Date(hl.created_at).toLocaleString() : "—"}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
