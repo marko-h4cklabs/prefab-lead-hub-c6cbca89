@@ -25,6 +25,20 @@ function normalizeList(payload: unknown, keys: string[] = []): any[] {
   return [];
 }
 
+/** Strip empty-object ({}) values from a lead payload to prevent React error #31. */
+function sanitizeLead(data: any): any {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return data;
+  const clean: any = {};
+  for (const [k, v] of Object.entries(data)) {
+    if (v !== null && typeof v === "object" && !Array.isArray(v) && Object.keys(v as object).length === 0) {
+      clean[k] = null;
+    } else {
+      clean[k] = v;
+    }
+  }
+  return clean;
+}
+
 interface LeadStatus {
   id: string;
   name: string;
@@ -76,8 +90,8 @@ const LeadDetail = () => {
     if (!leadId) return Promise.resolve();
     return api.getLead(companyId, leadId)
       .then((data) => {
-        setLead(data);
-        setNameValue(data?.name || data?.external_id || "");
+        setLead(sanitizeLead(data));
+        setNameValue(str(data?.name) || str(data?.external_id) || "");
       })
       .catch(() => {});
   }, [companyId, leadId]);
@@ -98,8 +112,8 @@ const LeadDetail = () => {
       if (!leadId) return;
       api.getLead(companyId, leadId)
         .then((data) => {
-          setLead(data);
-          if (!editingName) setNameValue(data?.name || data?.external_id || "");
+          setLead(sanitizeLead(data));
+          if (!editingName) setNameValue(str(data?.name) || str(data?.external_id) || "");
         })
         .catch(() => {});
     }, POLL_INTERVAL);
@@ -127,7 +141,7 @@ const LeadDetail = () => {
     if (!leadId) return;
     const trimmed = nameValue.trim();
     if (!trimmed) {
-      setNameValue(lead?.name || lead?.external_id || "");
+      setNameValue(str(lead?.name) || str(lead?.external_id) || "");
       setEditingName(false);
       return;
     }
@@ -281,7 +295,7 @@ const LeadDetail = () => {
         {collectedInfos.length > 0 ? (
           <dl className="space-y-2">
             {collectedInfos.map((info: any, i: number) => {
-              const fieldName = (info.field_name || info.name || "").toLowerCase();
+              const fieldName = (str(info.field_name) || str(info.name) || "").toLowerCase();
               if (fieldName === "pictures") {
                 const rawValue = info.value;
                 const picUrls: string[] = Array.isArray(rawValue) ? rawValue.filter((v: any) => typeof v === "string") : [];
@@ -318,7 +332,7 @@ const LeadDetail = () => {
 
       {/* Appointments */}
       <LeadDetailAppointments appointments={Array.isArray(lead?.appointments) ? lead.appointments : []} />
-      {leadId && <LeadAppointments key={apptRefreshKey} leadId={leadId} leadName={leadName} collectedSummary={collectedInfos.map((i: any) => `${i.field_name || i.name}: ${i.value}`).join(", ")} />}
+      {leadId && <LeadAppointments key={apptRefreshKey} leadId={leadId} leadName={leadName} collectedSummary={collectedInfos.map((i: any) => `${str(i.field_name) || str(i.name)}: ${str(i.value)}`).join(", ")} />}
       {leadId && <LeadSchedulingRequests key={`sched-${schedReqRefreshKey}`} leadId={leadId} leadName={leadName} onConvertToAppointment={handleConvertRequest} />}
 
       {/* CRM */}

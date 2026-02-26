@@ -50,6 +50,10 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
+/** Safely coerce to a renderable string — prevents React error #31 from API objects. */
+const str = (v: unknown): string =>
+  v == null ? "" : typeof v === "object" ? "" : String(v);
+
 interface Props {
   leadId: string;
 }
@@ -92,29 +96,29 @@ export default function CrmActivityTab({ leadId }: Props) {
       {items.map((item, i) => (
         <div key={item.id || i} className="flex gap-3 py-2.5 border-b border-border last:border-0">
           <div className="mt-0.5 text-muted-foreground">
-            {SCHEDULING_EVENTS.has(item.event_type || item.type)
-              ? (item.event_type || item.type || "").includes("appointment")
+            {SCHEDULING_EVENTS.has(str(item.event_type) || str(item.type))
+              ? (str(item.event_type) || str(item.type)).includes("appointment")
                 ? <CalendarCheck size={14} className="text-accent" />
                 : <CalendarDays size={14} className="text-accent" />
               : <Clock size={14} />
             }
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium">{formatEventLabel(item.event_type || item.type)}</p>
-            {item.metadata && typeof item.metadata === "object" && (
+            <p className="text-sm font-medium">{formatEventLabel(str(item.event_type) || str(item.type))}</p>
+            {item.metadata && typeof item.metadata === "object" && Object.keys(item.metadata).length > 0 && (
               <p className="text-xs text-muted-foreground truncate">
-                {item.metadata.from && item.metadata.to
-                  ? `${item.metadata.from} → ${item.metadata.to}`
-                  : Object.entries(item.metadata).map(([k, v]) => `${k}: ${v}`).join(", ")}
+                {str(item.metadata.from) && str(item.metadata.to)
+                  ? `${str(item.metadata.from)} → ${str(item.metadata.to)}`
+                  : Object.entries(item.metadata).map(([k, v]) => `${k}: ${str(v)}`).join(", ")}
               </p>
             )}
           </div>
           <div className="text-xs text-muted-foreground whitespace-nowrap mt-0.5">
             {item.created_at ? timeAgo(item.created_at) : ""}
           </div>
-          {(item.actor || item.source) && (
+          {(str(item.actor) || str(item.source)) && (
             <span className="status-badge bg-muted text-muted-foreground text-[10px] self-start">
-              {item.actor || item.source}
+              {str(item.actor) || str(item.source)}
             </span>
           )}
         </div>
