@@ -76,13 +76,42 @@ const Analytics = () => {
     setLoading(true);
     setError("");
     try {
-      const [dealStats, overview] = await Promise.all([
+      const [dealStats, pipelineStats] = await Promise.all([
         api.getDealStats().catch(() => ({})),
-        api.getAnalyticsOverview().catch(() => ({})),
+        api.getPipelineStats().catch(() => ({})),
       ]);
-      const merged = { ...overview, ...dealStats };
-      // Normalize if wrapped in data
-      const normalized = merged?.data && typeof merged.data === "object" && !Array.isArray(merged.data) ? merged.data : merged;
+      // Map backend field names → frontend DealStats interface
+      const ds = dealStats?.data && typeof dealStats.data === "object" ? dealStats.data : dealStats;
+      const normalized: DealStats = {
+        total_revenue: ds?.total_revenue ?? 0,
+        deals_closed: ds?.deals_closed ?? ds?.total_deals ?? 0,
+        avg_deal_value: ds?.avg_deal_value ?? 0,
+        conversion_rate: ds?.conversion_rate ?? 0,
+        avg_time_to_close: ds?.avg_time_to_close ?? ds?.avg_time_to_close_days ?? 0,
+        mom_growth: ds?.mom_growth ?? ds?.mom_growth_percent ?? 0,
+        best_setter: ds?.best_setter
+          ? { name: ds.best_setter.name, deal_count: ds.best_setter.deal_count ?? ds.best_setter.deals ?? 0 }
+          : undefined,
+        revenue_over_time: (ds?.revenue_over_time ?? ds?.revenue_by_month ?? []).map((r: any) => ({
+          month: r.month,
+          revenue: r.revenue ?? 0,
+          deal_count: r.deal_count ?? r.deals ?? 0,
+        })),
+        revenue_by_source: (ds?.revenue_by_source ?? []).map((r: any) => ({
+          source: r.source,
+          revenue: r.revenue ?? 0,
+          deal_count: r.deal_count ?? r.deals ?? 0,
+        })),
+        setter_performance: ds?.setter_performance ?? [],
+      };
+      // Build pipeline funnel from pipeline stats
+      const byStage = pipelineStats?.by_stage;
+      if (byStage && typeof byStage === "object") {
+        const stageOrder = ["new_inquiry", "contacted", "qualified", "proposal_sent", "call_booked", "call_done", "closed_won", "closed_lost"];
+        normalized.pipeline_funnel = stageOrder
+          .filter((s) => (byStage[s] ?? 0) > 0)
+          .map((s) => ({ stage: s.replace(/_/g, " "), count: byStage[s] ?? 0 }));
+      }
       setStats(normalized);
     } catch (err: unknown) {
       setError(getErrorMessage(err));
@@ -102,7 +131,7 @@ const Analytics = () => {
         limit: PAGE_SIZE,
         offset: dealsPage * PAGE_SIZE,
       });
-      const list = Array.isArray(res) ? res : res?.deals || res?.data || [];
+      const list = Array.isArray(res) ? res : res?.items || res?.deals || res?.data || [];
       setDeals(list);
       const total = res?.total || res?.totalCount || list.length;
       setDealsTotalPages(Math.max(1, Math.ceil(total / PAGE_SIZE)));

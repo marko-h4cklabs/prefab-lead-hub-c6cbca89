@@ -26,7 +26,15 @@ const TemplatesSection = () => {
 
   const fetchTemplates = () => {
     api.getTemplates()
-      .then((res) => setTemplates(normalizeList(res, ["templates", "data"])))
+      .then((res) => {
+        // Backend returns { by_category: { cat: [...] } } — flatten to single array
+        if (res?.by_category && typeof res.by_category === "object") {
+          const flat = Object.values(res.by_category).flat() as any[];
+          setTemplates(flat);
+        } else {
+          setTemplates(normalizeList(res, ["templates", "data"]));
+        }
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   };

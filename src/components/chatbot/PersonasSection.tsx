@@ -13,7 +13,7 @@ function normalizeList(payload: unknown, keys: string[] = []): any[] {
   return [];
 }
 
-const TONES = ["professional", "friendly", "direct"];
+const TONES = ["professional", "friendly", "confident", "relatable"];
 
 const PersonasSection = () => {
   const [personas, setPersonas] = useState<any[]>([]);
@@ -25,7 +25,7 @@ const PersonasSection = () => {
 
   const fetch = () => {
     api.getPersonas()
-      .then((res) => setPersonas(normalizeList(res, ["personas", "data"])))
+      .then((res) => setPersonas(normalizeList(res, ["items", "personas", "data"])))
       .catch(() => {})
       .finally(() => setLoading(false));
   };

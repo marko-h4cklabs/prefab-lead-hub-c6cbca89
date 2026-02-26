@@ -132,8 +132,8 @@ const TestChatPage = () => {
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-muted-foreground">No lead or message is saved</span>
               {messages.length > 0 && (
-                <button onClick={() => setMessages([])} className="dark-btn-ghost h-6 px-2 text-[10px] gap-1">
-                  <Trash2 size={10} /> Clear
+                <button onClick={() => setMessages([])} className="dark-btn-ghost h-8 px-3 text-xs gap-1.5 border border-border text-destructive hover:bg-destructive/10">
+                  <Trash2 size={13} /> Clear Chat
                 </button>
               )}
             </div>

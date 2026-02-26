@@ -85,12 +85,30 @@ const Pipeline = () => {
       const data = await api.getPipeline();
       const grouped: Record<string, PipelineLead[]> = {};
       STAGES.forEach((s) => (grouped[s.id] = []));
-      const leads: PipelineLead[] = Array.isArray(data) ? data : data?.leads || data?.data || [];
-      leads.forEach((l) => {
-        const stage = l.stage || "new_inquiry";
-        if (grouped[stage]) grouped[stage].push(l);
-        else grouped["new_inquiry"].push(l);
-      });
+
+      if (data?.stages && typeof data.stages === "object") {
+        // Backend returns { stages: { stage_name: [...leads] } }
+        for (const [stage, leads] of Object.entries(data.stages)) {
+          if (Array.isArray(leads)) {
+            const mapped = (leads as any[]).map((l) => ({
+              ...l,
+              stage: l.stage || l.pipeline_stage || stage,
+            }));
+            if (grouped[stage] !== undefined) {
+              grouped[stage] = mapped;
+            } else {
+              grouped["new_inquiry"].push(...mapped);
+            }
+          }
+        }
+      } else {
+        const leads: PipelineLead[] = Array.isArray(data) ? data : data?.leads || data?.data || [];
+        leads.forEach((l) => {
+          const stage = l.stage || l.pipeline_stage || "new_inquiry";
+          if (grouped[stage]) grouped[stage].push(l);
+          else grouped["new_inquiry"].push(l);
+        });
+      }
       setColumns(grouped);
     } catch {
       /* fail silently on poll */
