@@ -84,6 +84,7 @@ const App = () => {
           <Route path="/verify-email-pending" element={<VerifyEmailPending />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/admin" element={<AdminPanel />} />
+          <Route path="/dashboard/admin" element={<AdminPanel />} />
           <Route path="/onboarding" element={<Onboarding />} />
 
           {/* Redirects */}
