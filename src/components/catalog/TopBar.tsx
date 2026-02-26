@@ -110,8 +110,8 @@ export default function TopBar({ onSettingsClick }: TopBarProps) {
     const labels: Record<string, string> = {
       board: "Lead Board", inbox: "Inbox", pipeline: "Pipeline & Deals",
       calendar: "Calendar", identity: "Database", behavior: "Behavior & Strategy",
-      quote: "Quote Builder", test: "Test Chat", integrations: "Integrations",
-      scheduling: "Scheduling", analytics: "Analytics", account: "Account & Billing",
+      quote: "Lead Qualification", test: "Test Chat", integrations: "Integrations",
+      analytics: "Analytics", account: "Account & Billing",
     };
     return labels[last] || last;
   };

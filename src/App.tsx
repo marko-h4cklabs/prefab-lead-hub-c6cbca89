@@ -28,7 +28,6 @@ import BehaviorPage from "./pages/subtopics/BehaviorPage";
 import QuotePage from "./pages/subtopics/QuotePage";
 import TestChatPage from "./pages/subtopics/TestChatPage";
 import IntegrationsPage from "./pages/subtopics/IntegrationsPage";
-import SchedulingPage from "./pages/subtopics/SchedulingPage";
 import AnalyticsPage from "./pages/subtopics/AnalyticsPage";
 import AccountBillingPage from "./pages/subtopics/AccountBillingPage";
 import LeadDetail from "./pages/LeadDetail";
@@ -122,7 +121,7 @@ const App = () => {
             {/* Settings & Tools */}
             <Route path="/dashboard/settings" element={<SettingsSection />} />
             <Route path="/dashboard/settings/integrations" element={<IntegrationsPage />} />
-            <Route path="/dashboard/settings/scheduling" element={<SchedulingPage />} />
+            <Route path="/dashboard/settings/scheduling" element={<Navigate to="/dashboard/settings" replace />} />
             <Route path="/dashboard/settings/analytics" element={<Navigate to="/dashboard/leads/analytics" replace />} />
             <Route path="/dashboard/settings/account" element={<AccountBillingPage />} />
           </Route>

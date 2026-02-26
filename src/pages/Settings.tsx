@@ -5,11 +5,9 @@ import { Link } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import NotificationSettings from "@/components/settings/NotificationSettings";
-import SchedulingSettings from "@/components/settings/SchedulingSettings";
-import GoogleCalendarSettings from "@/components/settings/GoogleCalendarSettings";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-const TABS = ["General", "Scheduling", "Notifications"] as const;
+const TABS = ["General", "Notifications"] as const;
 type SettingsTab = (typeof TABS)[number];
 
 const Settings = () => {
@@ -161,8 +159,6 @@ const Settings = () => {
 
       {activeTab === "Notifications" ? (
         <NotificationSettings />
-      ) : activeTab === "Scheduling" ? (
-        <SchedulingSettings />
       ) : (
         <>
           {/* Operating Mode */}
@@ -439,9 +435,6 @@ const Settings = () => {
 
           {/* ManyChat Webhook URL */}
           <WebhookUrlSection />
-
-          {/* Google Calendar */}
-          <GoogleCalendarSettings />
 
           {/* Calendly Integration */}
           <CalendlySection />

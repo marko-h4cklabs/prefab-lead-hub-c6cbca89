@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plug, Clock, CreditCard, ArrowLeft, Home } from "lucide-react";
+import { Plug, CreditCard, ArrowLeft, Home } from "lucide-react";
 import { api } from "@/lib/apiClient";
 import { StaggerContainer, StaggerItem } from "@/components/catalog/PageTransition";
 import { motion } from "framer-motion";
@@ -16,28 +16,20 @@ const ACCENT = {
 const SettingsSection = () => {
   const navigate = useNavigate();
   const [manychat, setManychat] = useState<any>(null);
-  const [gcalStatus, setGcalStatus] = useState<any>(null);
-  const [schedulingOn, setSchedulingOn] = useState(false);
   const [billingStatus, setBillingStatus] = useState<any>(null);
 
   useEffect(() => {
     api.getManychatSettings().then(setManychat).catch(() => {});
-    api.getGoogleCalendarStatus().then(setGcalStatus).catch(() => {});
-    api.getSchedulingSettings().then((res) => {
-      const enabled = res?.scheduling_enabled ?? res?.chatbot_booking?.chatbot_booking_enabled ?? false;
-      setSchedulingOn(Boolean(enabled));
-    }).catch(() => {});
     api.getBillingStatus().then(setBillingStatus).catch(() => {});
   }, []);
 
   const manychatConnected = !!(manychat?.manychat_api_key || manychat?.connected);
-  const gcalConnected = gcalStatus?.connected;
   const planName = billingStatus?.plan || billingStatus?.plan_name || "Free";
 
   const cards = [
     {
       title: "Integrations",
-      description: "ManyChat, Google Calendar, voice, and webhooks",
+      description: "ManyChat, Calendly, voice, and webhooks",
       icon: Plug,
       route: "/dashboard/settings/integrations",
       preview: (
@@ -46,22 +38,7 @@ const SettingsSection = () => {
             <span className={`h-2 w-2 rounded-full ${manychatConnected ? "bg-success" : "bg-muted-foreground"}`} />
             <span className="text-muted-foreground">ManyChat</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className={`h-2 w-2 rounded-full ${gcalConnected ? "bg-success" : "bg-muted-foreground"}`} />
-            <span className="text-muted-foreground">Google Calendar</span>
-          </div>
         </div>
-      ),
-    },
-    {
-      title: "Scheduling",
-      description: "Working hours, slots, and booking configuration",
-      icon: Clock,
-      route: "/dashboard/settings/scheduling",
-      preview: (
-        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${schedulingOn ? "bg-success/15 text-success" : "bg-secondary text-muted-foreground"}`}>
-          Scheduling: {schedulingOn ? "ON" : "OFF"}
-        </span>
       ),
     },
     {

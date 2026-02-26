@@ -22,7 +22,6 @@ const PRESETS: PresetConfig[] = [
   { id: "full_name", label: "Full Name", description: "Contact full name" },
   { id: "additional_notes", label: "Additional Notes", description: "Any extra information from the lead" },
   { id: "pictures", label: "Pictures", description: "Photo uploads from the lead" },
-  { id: "object_type", label: "Object Type", description: "Type of object or project", configType: "options" },
 ];
 
 const TagInput = ({ tags, onChange }: { tags: string[]; onChange: (t: string[]) => void }) => {
@@ -336,9 +335,18 @@ const QuoteFieldsSection = ({ onFieldsChanged }: { onFieldsChanged?: () => void 
       <h2 className="text-base font-bold text-foreground">📋 Data Collection</h2>
       <p className="text-xs text-muted-foreground">Select what information your AI collects from leads. Start with the presets below, then add any custom fields your business needs.</p>
 
-      {/* Preset fields */}
+      {/* Preset fields — enabled first sorted by priority, then disabled */}
       <div className="space-y-2">
-        {PRESETS.map(renderPreset)}
+        {[...PRESETS]
+          .sort((a, b) => {
+            const aEnabled = presets[a.id]?.enabled ?? false;
+            const bEnabled = presets[b.id]?.enabled ?? false;
+            if (aEnabled && !bEnabled) return -1;
+            if (!aEnabled && bEnabled) return 1;
+            if (aEnabled && bEnabled) return (presets[a.id]?.priority ?? 999) - (presets[b.id]?.priority ?? 999);
+            return 0;
+          })
+          .map(renderPreset)}
       </div>
 
       {/* Custom fields */}

@@ -61,7 +61,7 @@ const AgentSection = () => {
       ),
     },
     {
-      title: "Quote Builder",
+      title: "Lead Qualification",
       description: "Configure what information your AI collects",
       icon: FileText,
       route: "/dashboard/agent/quote",

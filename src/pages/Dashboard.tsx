@@ -56,8 +56,6 @@ const Dashboard = () => {
   const [quoteFields, setQuoteFields] = useState<any[]>([]);
   const [manychat, setManychat] = useState<any>(null);
   const [dealModalOpen, setDealModalOpen] = useState(false);
-  const [gcalStatus, setGcalStatus] = useState<any>(null);
-  const [gcalEvents, setGcalEvents] = useState<any[]>([]);
   const [voiceSettings, setVoiceSettings] = useState<any>(null);
 
   const fetchAll = useCallback(() => {
@@ -80,15 +78,6 @@ const Dashboard = () => {
     api.getChatbotBehavior().then(setChatbotBehavior).catch(() => {});
     api.getQuoteFields().then((r) => setQuoteFields(normalizeList(r, ["presets", "fields", "data"]))).catch(() => {});
     api.getManychatSettings().then(setManychat).catch(() => {});
-    api.getGoogleCalendarStatus().then((res) => {
-      setGcalStatus(res);
-      if (res?.connected) {
-        api.getGoogleUpcomingEvents().then((r) => {
-          const list = Array.isArray(r) ? r : Array.isArray(r?.events) ? r.events : Array.isArray(r?.data) ? r.data : [];
-          setGcalEvents(list.slice(0, 3));
-        }).catch(() => {});
-      }
-    }).catch(() => setGcalStatus(null));
     api.getVoiceSettings().then(setVoiceSettings).catch(() => setVoiceSettings(null));
   }, [companyId]);
 
@@ -398,41 +387,6 @@ const Dashboard = () => {
             )}
           </div>
 
-          {/* Google Calendar Widget */}
-          <div className="dark-card p-5">
-            <h2 className="text-sm font-bold text-foreground mb-3">📅 From Google Calendar</h2>
-            {gcalStatus?.connected ? (
-              gcalEvents.length > 0 ? (
-                <div className="space-y-2">
-                  {gcalEvents.map((ev: any, i: number) => {
-                    const start = ev.start?.dateTime || ev.start?.date || ev.start_at || "";
-                    const dt = start ? new Date(start) : null;
-                    return (
-                      <div key={i} className="flex items-center gap-3 rounded-lg bg-secondary p-2.5">
-                        <CalendarDays size={14} className="text-info shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium text-foreground truncate">{ev.summary || ev.title || "Event"}</p>
-                          {dt && (
-                            <p className="text-[10px] text-muted-foreground">
-                              {dt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} · {dt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground text-center py-4">No upcoming Google Calendar events</p>
-              )
-            ) : (
-              <div className="rounded-lg bg-secondary p-3 flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Connect Google Calendar to see all your events here</span>
-                <button onClick={() => navigate("/settings")} className="text-xs text-primary hover:underline shrink-0 ml-2">Connect</button>
-              </div>
-            )}
-          </div>
-
           {/* Pipeline Summary */}
           {pipelineSummary && (
             <div className="dark-card p-5">
@@ -539,10 +493,6 @@ const Dashboard = () => {
               <button onClick={() => navigate("/settings")} className="w-full flex items-center gap-3 rounded-lg bg-secondary p-3 hover:border-l-2 hover:border-l-primary transition-all">
                 <span className={`h-2.5 w-2.5 rounded-full ${manychatConnected ? "bg-success" : "bg-destructive"}`} />
                 <span className="text-sm text-foreground">ManyChat: <span className={manychatConnected ? "text-success" : "text-destructive"}>{manychatConnected ? "Connected" : "Not connected"}</span></span>
-              </button>
-              <button onClick={() => navigate("/settings")} className="w-full flex items-center gap-3 rounded-lg bg-secondary p-3 hover:border-l-2 hover:border-l-primary transition-all">
-                <span className={`h-2.5 w-2.5 rounded-full ${gcalStatus?.connected ? "bg-success" : "bg-warning"}`} />
-                <span className="text-sm text-foreground">Google Calendar: <span className={gcalStatus?.connected ? "text-success" : "text-warning"}>{gcalStatus?.connected ? "Connected" : "Not connected"}</span></span>
               </button>
             </div>
           </div>

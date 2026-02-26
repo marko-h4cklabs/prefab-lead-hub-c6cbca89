@@ -149,7 +149,7 @@ const Billing = () => {
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li className="flex items-center gap-2"><Check size={14} className="text-success" /> 2,000 AI messages/month</li>
               <li className="flex items-center gap-2"><Check size={14} className="text-success" /> Unlimited leads</li>
-              <li className="flex items-center gap-2"><Check size={14} className="text-success" /> Google Calendar sync</li>
+              <li className="flex items-center gap-2"><Check size={14} className="text-success" /> Calendly integration</li>
               <li className="flex items-center gap-2"><Check size={14} className="text-success" /> Pipeline board</li>
               <li className="flex items-center gap-2"><Check size={14} className="text-success" /> Analytics dashboard</li>
               <li className="flex items-center gap-2"><Check size={14} className="text-success" /> Email support</li>

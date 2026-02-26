@@ -11,7 +11,7 @@ interface Props {
 
 interface BookingConfig {
   enabled: boolean;
-  platform: "google_calendar" | "calendly";
+  platform: "calendly";
   calendly_url: string;
   required_fields: string[];
   custom_offer_message: string;
@@ -26,7 +26,7 @@ interface AvailableField {
 
 const DEFAULT: BookingConfig = {
   enabled: false,
-  platform: "google_calendar",
+  platform: "calendly",
   calendly_url: "",
   required_fields: ["full_name"],
   custom_offer_message: "",
@@ -40,21 +40,17 @@ export default function BookingTriggerSection({ onSaved, onDirty, quoteFieldsVer
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveError, setSaveError] = useState('');
-  const [gcConnected, setGcConnected] = useState<boolean | null>(null);
   const [availableFields, setAvailableFields] = useState<AvailableField[]>([]);
   const initialRef = useRef(JSON.stringify(DEFAULT));
   const loadedOnce = useRef(false);
 
   // Load booking settings + GC status
   useEffect(() => {
-    Promise.all([
-      api.getBookingSettings().catch(() => null),
-      api.getGoogleCalendarStatus().catch(() => null),
-    ]).then(([bs, gc]) => {
+    api.getBookingSettings().catch(() => null).then((bs) => {
       if (bs) {
         const loaded: BookingConfig = {
           enabled: Boolean(bs.enabled ?? bs.booking_trigger_enabled),
-          platform: bs.platform || bs.booking_platform || "google_calendar",
+          platform: "calendly",
           calendly_url: bs.calendly_url || "",
           required_fields: bs.required_fields || bs.booking_required_fields || ["full_name"],
           custom_offer_message: bs.custom_offer_message || bs.booking_offer_message || "",
@@ -63,17 +59,14 @@ export default function BookingTriggerSection({ onSaved, onDirty, quoteFieldsVer
         setConfig(loaded);
         initialRef.current = JSON.stringify(loaded);
         sessionStorage.removeItem(STORAGE_KEY);
-        // Set available fields from API response
         const fields = bs.available_fields || [];
         if (fields.length > 0) setAvailableFields(fields);
       } else {
-        // Fallback: try sessionStorage draft
         const draft = sessionStorage.getItem(STORAGE_KEY);
         if (draft) {
           try { setConfig(JSON.parse(draft)); } catch {}
         }
       }
-      setGcConnected(Boolean(gc?.connected || gc?.is_connected));
       loadedOnce.current = true;
     }).finally(() => setLoading(false));
   }, []);
@@ -174,43 +167,11 @@ export default function BookingTriggerSection({ onSaved, onDirty, quoteFieldsVer
 
       {config.enabled && (
         <div className="space-y-5">
-          {/* Platform cards */}
+          {/* Calendly URL */}
           <div>
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Booking Platform</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button type="button" onClick={() => set("platform", "google_calendar")}
-                className={`text-left rounded-lg p-4 border-2 transition-all ${config.platform === "google_calendar" ? "border-primary bg-primary/5 shadow-[0_0_12px_hsl(48_92%_53%/0.15)]" : "border-border bg-secondary/30 hover:border-muted-foreground"}`}>
-                <div className="flex items-center gap-2 mb-1.5">
-                  <Calendar size={16} className="text-primary" />
-                  <span className="text-sm font-bold text-foreground">Google Calendar 📅</span>
-                </div>
-                <p className="text-[11px] text-muted-foreground mb-2">Use your connected Google Calendar. AI checks your availability and offers real time slots.</p>
-                {gcConnected === null ? <Loader2 size={12} className="animate-spin text-muted-foreground" /> : gcConnected ? (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/15 text-success font-medium">Connected</span>
-                ) : (
-                  <span className="inline-flex items-center gap-1">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-warning/15 text-warning font-medium">Not connected</span>
-                    <a href="/settings" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">Connect in Settings <ExternalLink size={8} /></a>
-                  </span>
-                )}
-              </button>
-
-              <button type="button" onClick={() => set("platform", "calendly")}
-                className={`text-left rounded-lg p-4 border-2 transition-all ${config.platform === "calendly" ? "border-primary bg-primary/5 shadow-[0_0_12px_hsl(48_92%_53%/0.15)]" : "border-border bg-secondary/30 hover:border-muted-foreground"}`}>
-                <div className="flex items-center gap-2 mb-1.5">
-                  <Link2 size={16} className="text-primary" />
-                  <span className="text-sm font-bold text-foreground">Calendly 🔗</span>
-                </div>
-                <p className="text-[11px] text-muted-foreground">Use your Calendly booking link. Lead picks their own time from your Calendly page.</p>
-              </button>
-            </div>
-
-            {config.platform === "calendly" && (
-              <div className="mt-3">
-                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Calendly URL</label>
-                <input type="url" value={config.calendly_url} onChange={(e) => set("calendly_url", e.target.value)} placeholder="https://calendly.com/yourname/30min" className="dark-input w-full" />
-              </div>
-            )}
+            <label className="mb-1 block text-xs font-semibold text-muted-foreground">Calendly URL</label>
+            <input type="url" value={config.calendly_url} onChange={(e) => set("calendly_url", e.target.value)} placeholder="https://calendly.com/yourname/30min" className="dark-input w-full" />
+            <p className="text-[10px] text-muted-foreground mt-1">Your Calendly booking link. Lead picks their own time from your Calendly page.</p>
           </div>
 
           {/* Required fields — from available_fields API */}

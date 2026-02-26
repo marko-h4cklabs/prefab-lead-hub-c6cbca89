@@ -636,10 +636,10 @@ export const api = {
 
   // --- Follow-up Queue ---
   getQueueStats: () =>
-    request<any>("/api/admin/queue/stats"),
+    request<any>("/api/queue/stats"),
 
   scheduleFollowUp: (data: { lead_id: string; type: string; delay_minutes: number; message?: string }) =>
-    request<any>("/api/admin/queue/follow-up", {
+    request<any>("/api/queue/follow-up", {
       method: "POST",
       body: JSON.stringify(data),
     }),
@@ -724,19 +724,6 @@ export const api = {
 
   getAnalyticsOverview: () =>
     request<any>("/api/analytics/overview"),
-
-  // --- Google Calendar Integration ---
-  getGoogleCalendarStatus: () =>
-    request<any>("/api/integrations/google/status"),
-
-  getGoogleAuthUrl: () =>
-    request<any>("/api/integrations/google/auth"),
-
-  disconnectGoogleCalendar: () =>
-    request<any>("/api/integrations/google/disconnect", { method: "DELETE" }),
-
-  getGoogleUpcomingEvents: () =>
-    request<any>("/api/integrations/google/upcoming"),
 
   // --- Billing ---
   getBillingStatus: () =>
@@ -961,10 +948,10 @@ export const api = {
 
   // --- Custom Quote Fields ---
   createCustomQuoteField: (data: { label: string; field_type: string }) =>
-    request<any>("/api/quote-fields/custom", { method: "POST", body: JSON.stringify(data) }),
+    request<any>("/api/chatbot/quote-fields/custom", { method: "POST", body: JSON.stringify(data) }),
 
   deleteQuoteField: (id: string) =>
-    request<any>(`/api/quote-fields/${id}`, { method: "DELETE" }),
+    request<any>(`/api/chatbot/quote-fields/${id}`, { method: "DELETE" }),
 
   saveOperatingMode: (mode: string) =>
     request<any>("/api/settings/mode", { method: "PUT", body: JSON.stringify({ mode }) }),

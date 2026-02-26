@@ -6,7 +6,6 @@ import Settings from "@/pages/Settings";
 
 interface IntegrationStatus {
   manychat: boolean;
-  googleCal: boolean;
   calendly: boolean;
   webhook: boolean;
 }
@@ -15,7 +14,6 @@ const IntegrationsPage = () => {
   const navigate = useNavigate();
   const [status, setStatus] = useState<IntegrationStatus>({
     manychat: false,
-    googleCal: false,
     calendly: false,
     webhook: false,
   });
@@ -29,7 +27,6 @@ const IntegrationsPage = () => {
     ]).then(([mc, wh, booking]) => {
       setStatus({
         manychat: !!(mc?.manychat_api_key && mc?.manychat_page_id),
-        googleCal: !!(booking?.google_calendar_connected),
         calendly: !!(booking?.calendly_url),
         webhook: !!(wh?.webhook_url || wh?.url),
       });
@@ -48,12 +45,6 @@ const IntegrationsPage = () => {
       desc: "Receive DMs via webhook",
       icon: Link2,
       connected: status.webhook,
-    },
-    {
-      name: "Google Calendar",
-      desc: "Sync appointments",
-      icon: Calendar,
-      connected: status.googleCal,
     },
     {
       name: "Calendly",
