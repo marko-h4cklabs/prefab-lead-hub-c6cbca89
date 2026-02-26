@@ -12,7 +12,7 @@ const QuotePage = () => {
 
   return (
     <div className="h-full p-6 overflow-hidden flex flex-col">
-      <button onClick={() => navigate(-1 as any)} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3 shrink-0">
+      <button onClick={() => navigate(-1 as any)} className="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-[hsl(0_0%_10%)] border border-[hsl(0_0%_18%)] text-muted-foreground hover:text-foreground hover:bg-[hsl(0_0%_14%)] transition-all mb-3 shrink-0">
         <ArrowLeft size={14} /> Back
       </button>
       <div className="flex-1 flex gap-6 overflow-hidden">

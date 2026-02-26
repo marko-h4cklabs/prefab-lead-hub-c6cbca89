@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plug, Clock, BarChart3, CreditCard, ArrowLeft, Home } from "lucide-react";
+import { Plug, Clock, CreditCard, ArrowLeft, Home } from "lucide-react";
 import { api } from "@/lib/apiClient";
 import { StaggerContainer, StaggerItem } from "@/components/catalog/PageTransition";
 import { motion } from "framer-motion";
@@ -19,7 +19,6 @@ const SettingsSection = () => {
   const [gcalStatus, setGcalStatus] = useState<any>(null);
   const [schedulingOn, setSchedulingOn] = useState(false);
   const [billingStatus, setBillingStatus] = useState<any>(null);
-  const [overview, setOverview] = useState<any>(null);
 
   useEffect(() => {
     api.getManychatSettings().then(setManychat).catch(() => {});
@@ -29,7 +28,6 @@ const SettingsSection = () => {
       setSchedulingOn(Boolean(enabled));
     }).catch(() => {});
     api.getBillingStatus().then(setBillingStatus).catch(() => {});
-    api.getAnalyticsOverview().then(setOverview).catch(() => {});
   }, []);
 
   const manychatConnected = !!(manychat?.manychat_api_key || manychat?.connected);
@@ -63,17 +61,6 @@ const SettingsSection = () => {
       preview: (
         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${schedulingOn ? "bg-success/15 text-success" : "bg-secondary text-muted-foreground"}`}>
           Scheduling: {schedulingOn ? "ON" : "OFF"}
-        </span>
-      ),
-    },
-    {
-      title: "Analytics",
-      description: "Performance metrics, trends, and insights",
-      icon: BarChart3,
-      route: "/dashboard/settings/analytics",
-      preview: (
-        <span className="text-sm text-muted-foreground">
-          {overview?.total_leads ?? 0} total leads
         </span>
       ),
     },

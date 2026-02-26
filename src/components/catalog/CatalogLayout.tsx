@@ -2,7 +2,6 @@ import { Outlet, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/apiClient";
 import TopBar from "./TopBar";
-import ModeBanner from "./ModeBanner";
 import ImpersonationBanner from "@/components/admin/ImpersonationBanner";
 
 const CatalogLayout = () => {
@@ -53,7 +52,6 @@ const CatalogLayout = () => {
 
       <ImpersonationBanner />
       <TopBar />
-      <ModeBanner />
 
       {/* Main content — fills remaining viewport */}
       <main className="flex-1 min-h-0 overflow-hidden">

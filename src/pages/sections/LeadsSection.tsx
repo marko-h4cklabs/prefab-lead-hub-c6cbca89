@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MessageSquare, TrendingUp, CalendarDays, ArrowLeft, Home } from "lucide-react";
+import { MessageSquare, TrendingUp, CalendarDays, BarChart3, ArrowLeft, Home } from "lucide-react";
 import { api, requireCompanyId } from "@/lib/apiClient";
 import { StaggerContainer, StaggerItem } from "@/components/catalog/PageTransition";
 import { motion } from "framer-motion";
@@ -29,10 +29,12 @@ const LeadsSection = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [dealStats, setDealStats] = useState<any>(null);
   const [upcomingCount, setUpcomingCount] = useState(0);
+  const [overview, setOverview] = useState<any>(null);
 
   useEffect(() => {
     api.getAnalyticsOverview().then((res) => {
       setUnreadCount(res?.needs_reply ?? res?.active_conversations ?? 0);
+      setOverview(res);
     }).catch(() => {});
     api.getDealStats().then(setDealStats).catch(() => {});
     api.getUpcomingAppointments().then((res) => {
@@ -58,28 +60,52 @@ const LeadsSection = () => {
       />
 
       <StaggerContainer className="flex flex-col gap-6 max-w-[1100px] w-full relative z-10">
-        {/* Inbox — full width top row */}
-        <StaggerItem>
-          <motion.button
-            onClick={() => navigate("/dashboard/leads/inbox")}
-            whileHover={{ scale: 1.02 }}
-            className={`w-full text-left rounded-xl border border-[hsl(0_0%_13%)] bg-[hsl(0_0%_7%)] p-6 transition-all duration-200 ${ACCENT.border} ${ACCENT.shadow} flex gap-5 h-[240px] md:h-[260px]`}
-          >
-            <div className="flex flex-col justify-between flex-[0_0_40%]">
-              <div>
-                <div className={`w-12 h-12 rounded-xl ${ACCENT.iconBg} flex items-center justify-center mb-3`}>
-                  <MessageSquare size={24} className={ACCENT.iconText} />
+        {/* Inbox + Analytics — 2-col top row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <StaggerItem>
+            <motion.button
+              onClick={() => navigate("/dashboard/leads/inbox")}
+              whileHover={{ scale: 1.02 }}
+              className={`w-full text-left rounded-xl border border-[hsl(0_0%_13%)] bg-[hsl(0_0%_7%)] p-6 transition-all duration-200 ${ACCENT.border} ${ACCENT.shadow} flex gap-5 h-[240px] md:h-[260px]`}
+            >
+              <div className="flex flex-col justify-between flex-[0_0_40%]">
+                <div>
+                  <div className={`w-12 h-12 rounded-xl ${ACCENT.iconBg} flex items-center justify-center mb-3`}>
+                    <MessageSquare size={24} className={ACCENT.iconText} />
+                  </div>
+                  <h3 className="text-base font-bold text-foreground mb-1">Inbox</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">Live conversations and AI reply suggestions</p>
                 </div>
-                <h3 className="text-base font-bold text-foreground mb-1">Inbox</h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">Live conversations and AI reply suggestions</p>
+                <span className={`text-xs font-medium ${ACCENT.text}`}>Open →</span>
               </div>
-              <span className={`text-xs font-medium ${ACCENT.text}`}>Open →</span>
-            </div>
-            <div className="flex-1 flex items-center justify-center rounded-lg bg-[hsl(0_0%_5%)] border border-[hsl(0_0%_13%)] p-4">
-              <span className="text-sm text-muted-foreground">{unreadCount} need reply</span>
-            </div>
-          </motion.button>
-        </StaggerItem>
+              <div className="flex-1 flex items-center justify-center rounded-lg bg-[hsl(0_0%_5%)] border border-[hsl(0_0%_13%)] p-4">
+                <span className="text-sm text-muted-foreground">{unreadCount} need reply</span>
+              </div>
+            </motion.button>
+          </StaggerItem>
+
+          <StaggerItem>
+            <motion.button
+              onClick={() => navigate("/dashboard/leads/analytics")}
+              whileHover={{ scale: 1.02 }}
+              className={`w-full text-left rounded-xl border border-[hsl(0_0%_13%)] bg-[hsl(0_0%_7%)] p-6 transition-all duration-200 ${ACCENT.border} ${ACCENT.shadow} flex gap-5 h-[240px] md:h-[260px]`}
+            >
+              <div className="flex flex-col justify-between flex-[0_0_40%]">
+                <div>
+                  <div className={`w-12 h-12 rounded-xl ${ACCENT.iconBg} flex items-center justify-center mb-3`}>
+                    <BarChart3 size={24} className={ACCENT.iconText} />
+                  </div>
+                  <h3 className="text-base font-bold text-foreground mb-1">Analytics</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">Performance metrics, trends, and insights</p>
+                </div>
+                <span className={`text-xs font-medium ${ACCENT.text}`}>Open →</span>
+              </div>
+              <div className="flex-1 flex items-center justify-center rounded-lg bg-[hsl(0_0%_5%)] border border-[hsl(0_0%_13%)] p-4">
+                <span className="text-sm text-muted-foreground">{overview?.total_leads ?? 0} total leads</span>
+              </div>
+            </motion.button>
+          </StaggerItem>
+        </div>
 
         {/* Pipeline & Calendar — 2-col bottom row */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

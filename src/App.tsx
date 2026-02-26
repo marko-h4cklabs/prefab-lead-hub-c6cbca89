@@ -90,7 +90,7 @@ const App = () => {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/leads" element={<Navigate to="/dashboard/leads/inbox" replace />} />
           <Route path="/pipeline" element={<Navigate to="/dashboard/leads/pipeline" replace />} />
-          <Route path="/analytics" element={<Navigate to="/dashboard/settings/analytics" replace />} />
+          <Route path="/analytics" element={<Navigate to="/dashboard/leads/analytics" replace />} />
           <Route path="/calendar" element={<Navigate to="/dashboard/leads/calendar" replace />} />
           <Route path="/fields" element={<Navigate to="/dashboard/agent" replace />} />
           <Route path="/settings" element={<Navigate to="/dashboard/settings" replace />} />
@@ -109,6 +109,7 @@ const App = () => {
             </Route>
             <Route path="/dashboard/leads/pipeline" element={<PipelinePage />} />
             <Route path="/dashboard/leads/calendar" element={<CalendarPage />} />
+            <Route path="/dashboard/leads/analytics" element={<AnalyticsPage />} />
 
             {/* AI Agent */}
             <Route path="/dashboard/agent" element={<AgentSection />} />
@@ -121,7 +122,7 @@ const App = () => {
             <Route path="/dashboard/settings" element={<SettingsSection />} />
             <Route path="/dashboard/settings/integrations" element={<IntegrationsPage />} />
             <Route path="/dashboard/settings/scheduling" element={<SchedulingPage />} />
-            <Route path="/dashboard/settings/analytics" element={<AnalyticsPage />} />
+            <Route path="/dashboard/settings/analytics" element={<Navigate to="/dashboard/leads/analytics" replace />} />
             <Route path="/dashboard/settings/account" element={<AccountBillingPage />} />
           </Route>
 
