@@ -47,6 +47,19 @@ const MODE_CARDS = [
   { value: "never", icon: "💬", title: "Text Only", desc: "Disable voice replies (same as turning off voice)", recommended: false },
 ] as const;
 
+const VOICE_PRESETS = [
+  { name: "Warm & Friendly", stability: 0.4, similarity_boost: 0.75, style: 0.15, speaker_boost: true },
+  { name: "Professional", stability: 0.65, similarity_boost: 0.7, style: 0.05, speaker_boost: true },
+  { name: "Energetic", stability: 0.3, similarity_boost: 0.8, style: 0.35, speaker_boost: true },
+  { name: "Calm & Reassuring", stability: 0.75, similarity_boost: 0.65, style: 0.0, speaker_boost: false },
+] as const;
+
+const TEST_SAMPLES = [
+  { label: "Greeting", text: "Hey! Thanks for reaching out, I'd love to help you with that." },
+  { label: "Follow-up", text: "Just checking in — were you still interested in what we discussed?" },
+  { label: "Closing", text: "Awesome, let me set that up for you. You're going to love it!" },
+] as const;
+
 const MODELS = [
   { value: "eleven_turbo_v2_5", label: "Turbo v2.5 (Fastest, recommended)" },
   { value: "eleven_multilingual_v2", label: "Multilingual v2 (Best quality)" },
@@ -255,12 +268,12 @@ const VoiceSettingsSection = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Sub-section 1 — Enable & Mode */}
-      <div className="dark-card border-l-4 border-l-primary p-6 space-y-5">
+    <div className="p-6 space-y-6">
+      {/* Header — Enable & Mode */}
+      <div className="space-y-5">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-bold text-foreground">🎙️ Voice Replies</h2>
+            <h2 className="text-base font-bold text-foreground">Voice Replies</h2>
             <p className="text-xs text-muted-foreground mt-0.5">Enable AI voice responses for your leads</p>
           </div>
           <Switch
@@ -305,29 +318,32 @@ const VoiceSettingsSection = () => {
           </select>
         </div>
 
-        {/* Usage Bar */}
+        {/* Usage Meter */}
         {usage && (
-          <div className={disabled ? "opacity-40 pointer-events-none" : ""}>
-            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-              <span>ElevenLabs Usage</span>
-              <span>{usage.characters_used.toLocaleString()} / {usage.character_limit.toLocaleString()} characters</span>
+          <div className={`rounded-lg border border-border bg-secondary/30 p-4 space-y-2 ${disabled ? "opacity-40 pointer-events-none" : ""}`}>
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-medium text-foreground">Character Usage</span>
+              <span className={`font-mono ${usagePct > 80 ? "text-destructive" : usagePct > 50 ? "text-warning" : "text-success"}`}>
+                {usage.characters_used.toLocaleString()} / {usage.character_limit.toLocaleString()}
+              </span>
             </div>
-            <Progress value={usagePct} className="h-2" />
-            {usagePct > 80 && (
-              <p className="text-xs text-warning mt-1">⚠️ You've used over 80% of your character limit</p>
-            )}
+            <Progress value={usagePct} className={`h-2.5 ${usagePct > 80 ? "[&>div]:bg-destructive" : usagePct > 50 ? "[&>div]:bg-warning" : "[&>div]:bg-success"}`} />
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+              <span>~{Math.max(0, Math.floor((usage.character_limit - usage.characters_used) / 150))} voice messages remaining</span>
+              {usagePct > 80 && <span className="text-destructive font-medium">Running low — consider upgrading</span>}
+            </div>
           </div>
         )}
 
         {/* Save button for enable/mode/model */}
         <button onClick={handleSaveSettings} disabled={saving} className="dark-btn-primary h-9 px-4 text-xs">
-          {saving ? <Loader2 size={14} className="animate-spin" /> : settingsSaved ? <><Check size={14} /> Saved ✓</> : <><Save size={14} /> Save</>}
+          {saving ? <Loader2 size={14} className="animate-spin" /> : settingsSaved ? <><Check size={14} /> Saved</> : <><Save size={14} /> Save</>}
         </button>
       </div>
 
-      {/* Sub-section 2 — Voice Selection — always visible so users can browse */}
-      <div className="dark-card border-l-4 border-l-primary p-6 space-y-4">
-        <h2 className="text-base font-bold text-foreground">Select a Voice</h2>
+      {/* Voice Selection */}
+      <div className="border-t border-border pt-5 space-y-4">
+        <h2 className="text-sm font-bold text-foreground">Select a Voice</h2>
         {disabled && (
           <div className="rounded-lg bg-muted border border-border px-4 py-2.5 text-xs text-muted-foreground">
             ℹ️ Add your <span className="font-mono text-foreground">ELEVENLABS_API_KEY</span> in Railway to enable voice previews and cloning
@@ -483,9 +499,9 @@ const VoiceSettingsSection = () => {
         </Tabs>
       </div>
 
-      {/* Sub-section 3 — Voice Cloning */}
-      <div id="voice-clone-section" className={`dark-card border-l-4 border-l-primary p-6 space-y-4 ${disabled ? "opacity-40 pointer-events-none" : ""}`}>
-        <h2 className="text-base font-bold text-foreground">🧬 Clone Your Voice</h2>
+      {/* Voice Cloning */}
+      <div id="voice-clone-section" className={`border-t border-border pt-5 space-y-4 ${disabled ? "opacity-40 pointer-events-none" : ""}`}>
+        <h2 className="text-sm font-bold text-foreground">Clone Your Voice</h2>
         <p className="text-xs text-muted-foreground">Upload audio samples of your voice. For best results, use clear recordings of 30-60 seconds each in a quiet environment. Minimum 1 sample, maximum 5.</p>
 
         <div className="space-y-3">
@@ -562,10 +578,33 @@ const VoiceSettingsSection = () => {
         </div>
       </div>
 
-      {/* Sub-section 4 — Voice Settings / Fine-tuning */}
+      {/* Fine-Tuning & Test Bench */}
       {settings?.selected_voice_id && (
-        <div className={`dark-card border-l-4 border-l-primary p-6 space-y-5 ${disabled ? "opacity-40 pointer-events-none" : ""}`}>
-          <h2 className="text-base font-bold text-foreground">🎛️ Voice Settings</h2>
+        <div className={`border-t border-border pt-5 space-y-5 ${disabled ? "opacity-40 pointer-events-none" : ""}`}>
+          <h2 className="text-sm font-bold text-foreground">Fine-Tune Voice</h2>
+
+          {/* Voice Presets */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-2 block">Quick Presets</label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {VOICE_PRESETS.map((preset) => {
+                const isActive = settings.stability === preset.stability && settings.similarity_boost === preset.similarity_boost && settings.style === preset.style;
+                return (
+                  <button
+                    key={preset.name}
+                    onClick={() => setSettings({ ...settings, stability: preset.stability, similarity_boost: preset.similarity_boost, style: preset.style, speaker_boost: preset.speaker_boost })}
+                    className={`rounded-lg px-3 py-2.5 text-xs font-medium border transition-all text-left ${
+                      isActive
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-card hover:border-muted-foreground/30 text-foreground"
+                    }`}
+                  >
+                    {preset.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           {/* Stability */}
           <div>
@@ -636,18 +675,37 @@ const VoiceSettingsSection = () => {
             />
           </div>
 
-          {/* Test */}
+          {/* Test Bench */}
           <div className="border-t border-border pt-4 space-y-3">
-            <label className="text-xs font-medium text-muted-foreground block">Test Current Settings</label>
-            <input value={testText} onChange={(e) => setTestText(e.target.value)} placeholder="Enter a test message..." className="dark-input w-full" />
-            <button onClick={handleTestPlay} disabled={testPlaying || !testText.trim()} className="dark-btn-ghost h-8 px-4 text-xs border border-border">
-              {testPlaying ? <><Loader2 size={12} className="animate-spin" /> Playing...</> : "🔊 Play Test"}
+            <label className="text-xs font-medium text-foreground block">Test Bench</label>
+            <div className="flex gap-1.5 flex-wrap">
+              {TEST_SAMPLES.map((sample) => (
+                <button
+                  key={sample.label}
+                  onClick={() => setTestText(sample.text)}
+                  className={`px-2.5 py-1 text-[10px] rounded-md border transition-colors ${
+                    testText === sample.text ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {sample.label}
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={testText}
+              onChange={(e) => setTestText(e.target.value)}
+              placeholder="Type any text to hear how it sounds..."
+              rows={2}
+              className="dark-input w-full resize-none"
+            />
+            <button onClick={handleTestPlay} disabled={testPlaying || !testText.trim()} className="dark-btn-primary h-9 px-5 text-xs">
+              {testPlaying ? <><Loader2 size={12} className="animate-spin" /> Playing...</> : <><Play size={12} /> Play Test</>}
             </button>
           </div>
 
           {/* Save */}
           <button onClick={handleSaveSettings} disabled={saving} className="dark-btn-primary w-full h-10">
-            {saving ? <Loader2 size={14} className="animate-spin" /> : settingsSaved ? "Saved ✓" : <><Save size={14} /> Save Voice Settings</>}
+            {saving ? <Loader2 size={14} className="animate-spin" /> : settingsSaved ? <><Check size={14} /> Saved</> : <><Save size={14} /> Save Voice Settings</>}
           </button>
         </div>
       )}

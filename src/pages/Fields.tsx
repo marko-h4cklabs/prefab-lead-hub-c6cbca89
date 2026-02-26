@@ -157,29 +157,29 @@ const Fields = () => {
         <SocialProofSection onDirty={() => markDirty('social_proof')} onSaved={() => { markClean('social_proof'); refreshPreview(); }} />
       </div>
 
-      {/* Section 7 — Data Collection */}
+      {/* Section 7 — Voice Settings */}
+      <div className="dark-card border-l-4 border-l-primary">
+        <VoiceSettingsSection />
+      </div>
+
+      {/* Section 8 — Data Collection */}
       <div className="dark-card border-l-4 border-l-primary">
         <QuoteFieldsSection onFieldsChanged={refreshQuoteFields} />
       </div>
 
-      {/* Section 8 — Personas */}
+      {/* Section 9 — Personas */}
       <div className="dark-card border-l-4 border-l-primary">
         <PersonasSection />
       </div>
 
-      {/* Section 9 — Message Templates */}
+      {/* Section 10 — Message Templates */}
       <div className="dark-card border-l-4 border-l-primary">
         <TemplatesSection />
       </div>
 
-      {/* Section 10 — Autoresponder Rules */}
+      {/* Section 11 — Autoresponder Rules */}
       <div className="dark-card border-l-4 border-l-primary">
         <AutoresponderSection />
-      </div>
-
-      {/* Section 11 — Voice Settings */}
-      <div className="border-t border-border pt-6">
-        <VoiceSettingsSection />
       </div>
     </div>
   );

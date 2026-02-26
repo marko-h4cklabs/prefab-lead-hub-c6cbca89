@@ -882,6 +882,47 @@ export const api = {
   deleteVoiceClone: (voiceId: string) =>
     request<any>(`/api/voice/clone/${voiceId}`, { method: "DELETE" }),
 
+  compareVoices: (data: { text: string; voice_a: any; voice_b: any }) =>
+    request<any>("/api/voice/compare", { method: "POST", body: JSON.stringify(data) }),
+
+  // --- Handoff / Human-Break ---
+  getHandoffRules: () =>
+    request<any>("/api/handoff/rules"),
+
+  createHandoffRule: (data: any) =>
+    request<any>("/api/handoff/rules", { method: "POST", body: JSON.stringify(data) }),
+
+  updateHandoffRule: (id: string, data: any) =>
+    request<any>(`/api/handoff/rules/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+
+  deleteHandoffRule: (id: string) =>
+    request<any>(`/api/handoff/rules/${id}`, { method: "DELETE" }),
+
+  pauseBot: (leadId: string, reason?: string) =>
+    request<any>(`/api/handoff/pause/${leadId}`, { method: "POST", body: JSON.stringify({ reason }) }),
+
+  resumeBot: (leadId: string, instruction?: string) =>
+    request<any>(`/api/handoff/resume/${leadId}`, { method: "POST", body: JSON.stringify({ instruction }) }),
+
+  getHandoffStatus: (leadId: string) =>
+    request<any>(`/api/handoff/status/${leadId}`),
+
+  getActiveHandoffs: () =>
+    request<any>("/api/handoff/active"),
+
+  getHandoffLog: (params?: { limit?: number; offset?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.limit) q.set("limit", String(params.limit));
+    if (params?.offset) q.set("offset", String(params.offset));
+    return request<any>(`/api/handoff/log?${q.toString()}`);
+  },
+
+  getHandoffSettings: () =>
+    request<any>("/api/handoff/settings"),
+
+  updateHandoffSettings: (data: any) =>
+    request<any>("/api/handoff/settings", { method: "PUT", body: JSON.stringify(data) }),
+
   // --- Behavior Preview & Test ---
   getBehaviorPreview: () =>
     request<any>("/api/chatbot/behavior/preview"),
