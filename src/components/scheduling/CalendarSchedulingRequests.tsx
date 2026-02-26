@@ -17,7 +17,7 @@ const str = (v: unknown): string => (v == null ? "" : typeof v === "object" ? ""
 import { Input } from "@/components/ui/input";
 
 const STATUS_OPTIONS = ["all", "open", "converted", "closed", "cancelled"];
-const TYPE_OPTIONS = ["all", "call", "site_visit", "meeting", "follow_up"];
+const TYPE_OPTIONS = ["all", "call", "meeting", "follow_up"];
 const SOURCE_OPTIONS = ["all", "chatbot", "manual", "simulation"];
 
 interface Props {

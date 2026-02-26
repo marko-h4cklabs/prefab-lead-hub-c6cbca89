@@ -42,8 +42,8 @@ const AgentSection = () => {
 
   const cards = [
     {
-      title: "Identity & Persona",
-      description: "Name, backstory, and personality of your AI agent",
+      title: "Database",
+      description: "Agent identity, business info, and persona configuration",
       icon: User,
       route: "/dashboard/agent/identity",
       preview: <span className="text-sm text-muted-foreground">Agent: <span className="text-foreground font-medium">{agentName}</span></span>,

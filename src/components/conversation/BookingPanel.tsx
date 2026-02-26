@@ -143,7 +143,7 @@ function formatSlotLabel(slot: BookingSlot): string {
 }
 
 const TYPE_ICONS: Record<string, string> = {
-  call: "📞", site_visit: "📍", meeting: "🤝", follow_up: "🔄",
+  call: "📞", meeting: "🤝", follow_up: "🔄",
 };
 
 /** Normalize mode aliases into canonical values */

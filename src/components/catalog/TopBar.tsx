@@ -79,6 +79,9 @@ export default function TopBar({ onSettingsClick }: TopBarProps) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [todayLeadCount, setTodayLeadCount] = useState(0);
   const [revenue, setRevenue] = useState(0);
+  const [revenueRange, setRevenueRange] = useState<"1D" | "1W" | "1M" | "1Y">("1M");
+  const [revenueDropdownOpen, setRevenueDropdownOpen] = useState(false);
+  const revenueRef = useRef<HTMLDivElement>(null);
   const [operatingMode, setOperatingMode] = useState<string | null>(null);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const logoutRef = useRef<HTMLDivElement>(null);
@@ -106,7 +109,7 @@ export default function TopBar({ onSettingsClick }: TopBarProps) {
     const last = path.split("/").pop() || "";
     const labels: Record<string, string> = {
       board: "Lead Board", inbox: "Inbox", pipeline: "Pipeline & Deals",
-      calendar: "Calendar", identity: "Identity & Persona", behavior: "Behavior & Strategy",
+      calendar: "Calendar", identity: "Database", behavior: "Behavior & Strategy",
       quote: "Quote Builder", test: "Test Chat", integrations: "Integrations",
       scheduling: "Scheduling", analytics: "Analytics", account: "Account & Billing",
     };
@@ -139,7 +142,7 @@ export default function TopBar({ onSettingsClick }: TopBarProps) {
       setTodayLeadCount(todayCount);
     }).catch(() => {});
 
-    api.getDealStats().then((res) => {
+    api.getDealStats({ range: revenueRange }).then((res) => {
       setRevenue(res?.total_revenue ?? res?.revenue_this_month ?? 0);
     }).catch(() => {});
 
@@ -150,7 +153,7 @@ export default function TopBar({ onSettingsClick }: TopBarProps) {
     // Poll unread count every 30s
     const pollInterval = setInterval(fetchUnreadCount, 30_000);
     return () => clearInterval(pollInterval);
-  }, [companyId, fetchUnreadCount]);
+  }, [companyId, fetchUnreadCount, revenueRange]);
 
   const fetchNotifications = useCallback(() => {
     setNotifLoading(true);
@@ -213,10 +216,13 @@ export default function TopBar({ onSettingsClick }: TopBarProps) {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
         setNotifOpen(false);
       }
+      if (revenueRef.current && !revenueRef.current.contains(e.target as Node)) {
+        setRevenueDropdownOpen(false);
+      }
     };
-    if (logoutOpen || notifOpen) document.addEventListener("mousedown", handler);
+    if (logoutOpen || notifOpen || revenueDropdownOpen) document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [logoutOpen, notifOpen]);
+  }, [logoutOpen, notifOpen, revenueDropdownOpen]);
 
   const modeIsAutopilot = operatingMode === "autopilot";
   const modeIsCopilot = operatingMode === "copilot";
@@ -346,9 +352,32 @@ export default function TopBar({ onSettingsClick }: TopBarProps) {
 
       {/* RIGHT */}
       <div className="flex items-center gap-3">
-        <span className="flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-primary">
-          €{Number(revenue).toLocaleString()} Revenue
-        </span>
+        <div className="relative" ref={revenueRef}>
+          <button
+            onClick={() => { setRevenueDropdownOpen((o) => !o); setLogoutOpen(false); setNotifOpen(false); }}
+            className="flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/25 transition-colors"
+          >
+            €{Number(revenue).toLocaleString()} Revenue
+            <span className="text-[10px] opacity-70 ml-0.5">{revenueRange}</span>
+          </button>
+          {revenueDropdownOpen && (
+            <div className="absolute right-0 top-full mt-2 w-32 rounded-xl border border-[hsl(0_0%_16%)] bg-[hsl(0_0%_5%)] shadow-xl shadow-black/50 z-50 overflow-hidden">
+              {(["1D", "1W", "1M", "1Y"] as const).map((range) => (
+                <button
+                  key={range}
+                  onClick={() => { setRevenueRange(range); setRevenueDropdownOpen(false); }}
+                  className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors ${
+                    revenueRange === range
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:text-foreground hover:bg-[hsl(0_0%_8%)]"
+                  }`}
+                >
+                  {{ "1D": "Today", "1W": "This Week", "1M": "This Month", "1Y": "This Year" }[range]}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <button
           onClick={onSettingsClick || (() => navigate("/dashboard/settings"))}
           className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-all"

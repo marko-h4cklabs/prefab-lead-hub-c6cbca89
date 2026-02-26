@@ -26,14 +26,12 @@ interface Props {
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
   call: <Phone size={12} />,
-  site_visit: <MapPin size={12} />,
   meeting: <CalendarDays size={12} />,
   follow_up: <Clock size={12} />,
 };
 
 const TYPE_LABELS: Record<string, string> = {
   call: "Call",
-  site_visit: "Site Visit",
   meeting: "Meeting",
   follow_up: "Follow-up",
 };

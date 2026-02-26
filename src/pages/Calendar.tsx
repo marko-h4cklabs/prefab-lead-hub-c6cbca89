@@ -34,7 +34,7 @@ const RANGE_OPTIONS = [
 
 const SOURCE_OPTIONS = ["all", "manual", "chatbot", "inbox", "simulation"];
 const STATUS_OPTIONS = ["all", "scheduled", "completed", "cancelled", "no_show"];
-const TYPE_OPTIONS = ["all", "call", "site_visit", "meeting", "follow_up"];
+const TYPE_OPTIONS = ["all", "call", "meeting", "follow_up"];
 
 const CALENDAR_TABS = ["Appointments", "Scheduling Requests", "Follow-ups"] as const;
 type CalendarTab = (typeof CALENDAR_TABS)[number];

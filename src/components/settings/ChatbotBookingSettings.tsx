@@ -28,7 +28,6 @@ const BOOKING_MODES = [
 
 const APPOINTMENT_TYPES = [
   { value: "call", label: "Call" },
-  { value: "site_visit", label: "Site Visit" },
   { value: "meeting", label: "Meeting" },
   { value: "follow_up", label: "Follow-up" },
 ];

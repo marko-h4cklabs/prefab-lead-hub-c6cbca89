@@ -54,7 +54,7 @@ const CatalogLayout = () => {
       <TopBar />
 
       {/* Main content — fills remaining viewport */}
-      <main className="flex-1 min-h-0 overflow-hidden">
+      <main className="flex-1 min-h-0 overflow-hidden grid-bg">
         <Outlet />
       </main>
     </div>

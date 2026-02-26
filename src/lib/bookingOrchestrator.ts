@@ -18,7 +18,7 @@ import type { BookingPayload, BookingSlot } from "@/components/conversation/Book
 
 const BOOKING_KEYWORDS = [
   /\b(book|booking|schedule|appointment)\b/i,
-  /\b(call me|can we talk|site visit|meeting)\b/i,
+  /\b(call me|can we talk|meeting)\b/i,
   /\b(tomorrow|next week|this week|at \d{1,2}(:\d{2})?\s*(am|pm)?)\b/i,
   /\b(can i schedule|set up a (call|meeting|visit))\b/i,
   /\b(available\s*(time|slot)s?)\b/i,

@@ -15,10 +15,9 @@ import { getErrorMessage } from "@/lib/errorUtils";
 import { api, requireCompanyId } from "@/lib/apiClient";
 import AvailabilitySlots from "./AvailabilitySlots";
 
-const TYPES = ["call", "site_visit", "meeting", "follow_up"] as const;
+const TYPES = ["call", "meeting", "follow_up"] as const;
 const TYPE_LABELS: Record<string, string> = {
   call: "Call",
-  site_visit: "Site Visit",
   meeting: "Meeting",
   follow_up: "Follow-up",
 };

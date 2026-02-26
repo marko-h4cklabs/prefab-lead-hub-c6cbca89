@@ -707,8 +707,10 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  getDealStats: () =>
-    request<any>("/api/deals/stats"),
+  getDealStats: (params?: { range?: string }) => {
+    const qs = params?.range ? `?range=${params.range}` : "";
+    return request<any>(`/api/deals/stats${qs}`);
+  },
 
   getDeals: (params?: { from?: string; to?: string; setter?: string; limit?: number; offset?: number }) => {
     const search = new URLSearchParams();

@@ -97,7 +97,6 @@ export function normalizeAppointmentList(raw: unknown): NormalizedAppointment[] 
 /** Format constants */
 export const TYPE_LABELS: Record<string, string> = {
   call: "Call",
-  site_visit: "Site Visit",
   meeting: "Meeting",
   follow_up: "Follow-up",
 };

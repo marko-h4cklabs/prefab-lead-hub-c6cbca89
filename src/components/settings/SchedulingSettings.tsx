@@ -8,7 +8,6 @@ import ChatbotBookingSettings, { defaultChatbotBookingConfig } from "./ChatbotBo
 
 const APPOINTMENT_TYPES = [
   { value: "call", label: "Call" },
-  { value: "site_visit", label: "Site Visit" },
   { value: "meeting", label: "Meeting" },
   { value: "follow_up", label: "Follow-up" },
 ];
@@ -134,7 +133,7 @@ const defaultConfig = (): SchedulingConfig => ({
   scheduling_enabled: true,
   allow_manual_booking: true,
   timezone: "Europe/Zagreb",
-  default_appointment_types: ["call", "site_visit", "meeting", "follow_up"],
+  default_appointment_types: ["call", "meeting", "follow_up"],
   slot_duration_minutes: 30,
   buffer_before_minutes: 0,
   buffer_after_minutes: 0,

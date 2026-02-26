@@ -1,24 +1,84 @@
-import { useState } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, RotateCcw } from "lucide-react";
-import PreviewPanel from "@/components/chatbot/PreviewPanel";
+import { ArrowLeft, RotateCcw, Copy, RefreshCw, Send, Loader2, Trash2 } from "lucide-react";
+import { api } from "@/lib/apiClient";
+import { toast } from "@/hooks/use-toast";
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  provider?: string;
+}
 
 const TestChatPage = () => {
   const navigate = useNavigate();
-  const [previewKey, setPreviewKey] = useState(0);
+
+  // System prompt state
+  const [prompt, setPrompt] = useState("");
+  const [promptLoading, setPromptLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Chat state
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  const fetchPrompt = useCallback(() => {
+    setPromptLoading(true);
+    api.getBehaviorPreview()
+      .then((res) => {
+        const text = typeof res === "string" ? res : (res as any)?.prompt || (res as any)?.system_prompt || JSON.stringify(res, null, 2);
+        setPrompt(text);
+      })
+      .catch(() => setPrompt(""))
+      .finally(() => setPromptLoading(false));
+  }, []);
+
+  useEffect(() => { fetchPrompt(); }, [fetchPrompt]);
+
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [messages, sending]);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(prompt);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSend = async (e?: React.FormEvent | React.MouseEvent) => {
+    e?.preventDefault();
+    if (!input.trim() || sending) return;
+    const userMsg = input.trim();
+    setInput("");
+    setMessages((prev) => [...prev, { role: "user", content: userMsg }]);
+    setSending(true);
+    try {
+      const res = await api.testBehavior({ message: userMsg });
+      const content = (res as any)?.reply || (res as any)?.response || (res as any)?.message || (res as any)?.content || String(res);
+      const provider = (res as any)?.provider || "";
+      setMessages((prev) => [...prev, { role: "assistant", content, provider }]);
+    } catch (err: any) {
+      setMessages((prev) => [...prev, { role: "assistant", content: `Error: ${err?.message || "Failed to get response"}` }]);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleReset = () => {
+    setMessages([]);
+    fetchPrompt();
+  };
+
+  const charCount = prompt.length;
 
   return (
-    <div className="h-full flex flex-col p-6 relative overflow-hidden">
-      {/* Subtle grid background */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          backgroundImage: 'linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)',
-          backgroundSize: '40px 40px',
-        }}
-      />
-
-      <div className="flex items-center justify-between mb-4 shrink-0 relative z-10">
+    <div className="h-full flex flex-col p-6 overflow-hidden">
+      <div className="flex items-center justify-between mb-4 shrink-0">
         <button onClick={() => navigate(-1 as any)} className="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-[hsl(0_0%_10%)] border border-[hsl(0_0%_18%)] text-muted-foreground hover:text-foreground hover:bg-[hsl(0_0%_14%)] transition-all">
           <ArrowLeft size={14} /> Back
         </button>
@@ -27,15 +87,116 @@ const TestChatPage = () => {
           <p className="text-[11px] text-muted-foreground">Preview your AI agent in action</p>
         </div>
         <button
-          onClick={() => setPreviewKey((k) => k + 1)}
+          onClick={handleReset}
           className="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-[hsl(0_0%_10%)] border border-[hsl(0_0%_18%)] text-muted-foreground hover:text-foreground hover:bg-[hsl(0_0%_14%)] transition-all"
         >
           <RotateCcw size={14} /> Reset
         </button>
       </div>
-      <div className="flex-1 flex items-center justify-center relative z-10">
-        <div className="w-full max-w-[500px] h-full rounded-2xl border border-[hsl(0_0%_13%)] bg-[hsl(0_0%_5%)] overflow-hidden shadow-lg shadow-black/20">
-          <PreviewPanel refreshKey={previewKey} />
+
+      {/* Split layout: System Prompt left + Chat right */}
+      <div className="flex-1 flex gap-6 min-h-0">
+        {/* LEFT — System Prompt */}
+        <div className="flex-1 flex flex-col rounded-2xl border border-[hsl(0_0%_13%)] bg-[hsl(0_0%_5%)] overflow-hidden shadow-lg shadow-black/20">
+          <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
+            <h3 className="text-sm font-bold text-foreground">System Prompt</h3>
+            <div className="flex items-center gap-2">
+              <button onClick={fetchPrompt} disabled={promptLoading} className="dark-btn-ghost h-7 px-2 text-xs border border-border">
+                {promptLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                Refresh
+              </button>
+              <button onClick={handleCopy} className="dark-btn-ghost h-7 px-2 text-xs border border-border">
+                <Copy size={12} />
+                {copied ? "Copied!" : "Copy"}
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-auto p-4 min-h-0">
+            {prompt ? (
+              <pre className="text-xs font-mono whitespace-pre-wrap text-foreground/90">{prompt}</pre>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">Configure your agent settings and save to see the system prompt preview</p>
+            )}
+          </div>
+          {prompt && (
+            <div className="text-right px-4 py-1.5 border-t border-border shrink-0">
+              <span className="text-[10px] text-muted-foreground">~{charCount.toLocaleString()} characters</span>
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT — Chat */}
+        <div className="flex-1 flex flex-col rounded-2xl border border-[hsl(0_0%_13%)] bg-[hsl(0_0%_5%)] overflow-hidden shadow-lg shadow-black/20">
+          <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
+            <h3 className="text-sm font-bold text-foreground">Test Chat</h3>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-muted-foreground">No lead or message is saved</span>
+              {messages.length > 0 && (
+                <button onClick={() => setMessages([])} className="dark-btn-ghost h-6 px-2 text-[10px] gap-1">
+                  <Trash2 size={10} /> Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div ref={chatContainerRef} className="flex-1 overflow-auto p-3 space-y-3 min-h-0">
+            {messages.length === 0 && (
+              <p className="text-xs text-muted-foreground italic text-center py-8">Send a message to test your AI agent</p>
+            )}
+            {messages.map((msg, i) => (
+              <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[85%] rounded-lg px-3 py-2 ${
+                  msg.role === "user"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-foreground"
+                }`}>
+                  <p className="text-xs whitespace-pre-wrap">{msg.content}</p>
+                  {msg.role === "assistant" && (
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="text-[9px] text-muted-foreground">Using current settings</span>
+                      {msg.provider && (
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded ${
+                          msg.provider.toLowerCase().includes("claude")
+                            ? "bg-purple-500/15 text-purple-400"
+                            : "bg-success/15 text-success"
+                        }`}>
+                          {msg.provider.toLowerCase().includes("claude") ? "Claude" : "GPT-4o"}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+            {sending && (
+              <div className="flex justify-start">
+                <div className="bg-muted rounded-lg px-4 py-3">
+                  <div className="flex gap-1">
+                    <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <form onSubmit={handleSend} className="flex gap-2 p-3 border-t border-border shrink-0">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Test a message..."
+              className="dark-input flex-1"
+              disabled={sending}
+            />
+            <button
+              type="submit"
+              disabled={sending || !input.trim()}
+              className="dark-btn bg-primary text-primary-foreground hover:bg-primary/90 h-10 w-10 p-0 flex items-center justify-center"
+            >
+              {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+            </button>
+          </form>
         </div>
       </div>
     </div>

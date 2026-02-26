@@ -210,16 +210,26 @@ const QuoteFieldsSection = ({ onFieldsChanged }: { onFieldsChanged?: () => void 
       .finally(() => setSaving(false));
   };
 
+  const refetchFields = async () => {
+    try {
+      const res = await api.getQuoteFields();
+      const { merged, customs } = applyFetched(res);
+      setPresets(merged);
+      setCustomFields(customs);
+      initialRef.current = JSON.stringify(merged);
+      setIsDirty(false);
+    } catch { /* best effort */ }
+  };
+
   const handleAddCustom = async () => {
     if (!newLabel.trim()) return;
     setAddingCustom(true);
     try {
-      const res = await api.createCustomQuoteField({ label: newLabel.trim(), field_type: newType });
-      const newField: CustomField = { id: res?.id || Date.now().toString(), label: res?.label || newLabel.trim(), field_type: res?.field_type || newType, is_custom: true };
-      setCustomFields((prev) => [...prev, newField]);
+      await api.createCustomQuoteField({ label: newLabel.trim(), field_type: newType });
       setNewLabel("");
       setNewType("text");
       toast({ title: "Custom field added" });
+      await refetchFields();
       onFieldsChanged?.();
     } catch (err) {
       toast({ title: "Failed to add field", description: getErrorMessage(err), variant: "destructive" });
@@ -231,8 +241,8 @@ const QuoteFieldsSection = ({ onFieldsChanged }: { onFieldsChanged?: () => void 
     setDeletingId(id);
     try {
       await api.deleteQuoteField(id);
-      setCustomFields((prev) => prev.filter((f) => f.id !== id));
       toast({ title: "Field removed" });
+      await refetchFields();
       onFieldsChanged?.();
     } catch (err) {
       toast({ title: "Failed to remove", description: getErrorMessage(err), variant: "destructive" });

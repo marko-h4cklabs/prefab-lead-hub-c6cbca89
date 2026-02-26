@@ -5,12 +5,10 @@ import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const TONES = [
-  { value: "professional", icon: "🎯", label: "Professional", desc: "Polished and credible" },
-  { value: "friendly", icon: "😊", label: "Friendly", desc: "Warm and approachable" },
-  { value: "casual", icon: "😎", label: "Casual", desc: "Relaxed and natural" },
-  { value: "direct", icon: "⚡", label: "Direct", desc: "Concise and no-fluff" },
-  { value: "empathetic", icon: "💙", label: "Empathetic", desc: "Understanding first" },
-  { value: "humorous", icon: "😄", label: "Humorous", desc: "Light-hearted and fun" },
+  { value: "professional", icon: "🎯", label: "Professional", desc: "Polished, authoritative and business-like" },
+  { value: "friendly", icon: "😊", label: "Friendly", desc: "Warm, approachable and conversational" },
+  { value: "confident", icon: "⚡", label: "Confident", desc: "Bold, direct and persuasive" },
+  { value: "relatable", icon: "🤝", label: "Relatable", desc: "Casual, down-to-earth and authentic" },
 ];
 
 const LENGTHS = [
@@ -150,7 +148,7 @@ const CommunicationStyleSection = ({ onSaved, onDirty }: { onSaved?: () => void;
       {/* Tone Cards */}
       <div>
         <label className="text-xs font-medium text-muted-foreground mb-2 block">Tone</label>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {TONES.map((t) => (
             <button
               key={t.value}

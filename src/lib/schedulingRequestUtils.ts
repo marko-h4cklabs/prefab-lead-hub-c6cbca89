@@ -99,7 +99,6 @@ export const REQUEST_STATUS_CLASSES: Record<string, string> = {
 
 export const REQUEST_TYPE_LABELS: Record<string, string> = {
   call: "Call",
-  site_visit: "Site Visit",
   meeting: "Meeting",
   follow_up: "Follow-up",
 };
