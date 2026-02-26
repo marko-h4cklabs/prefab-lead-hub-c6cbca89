@@ -368,7 +368,7 @@ export default function SchedulingSettings() {
   if (fetchError) {
     return (
       <div className="space-y-4">
-        <div className="rounded-sm border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {fetchError}
         </div>
         <p className="text-xs text-muted-foreground">Scheduling settings endpoint may not be available yet. Configuration will load once the backend supports it.</p>
@@ -379,26 +379,26 @@ export default function SchedulingSettings() {
   return (
     <div className="space-y-6">
       {/* A) Booking Controls */}
-      <div className="industrial-card p-6 space-y-4">
-        <h2 className="text-sm font-bold uppercase tracking-wider">Booking Controls</h2>
+      <div className="dark-card rounded-xl p-6 space-y-4">
+        <h2 className="text-sm font-bold text-foreground">Booking Controls</h2>
 
         <ToggleRow label="Enable scheduling" checked={config.scheduling_enabled} onChange={(v) => set("scheduling_enabled", v)} />
         <ToggleRow label="Chatbot offers booking" checked={config.chatbot_booking_enabled} onChange={(v) => set("chatbot_booking_enabled", v)} />
         <ToggleRow label="Allow manual booking from lead detail" checked={config.allow_manual_booking} onChange={(v) => set("allow_manual_booking", v)} />
 
         <div>
-          <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">Timezone</label>
+          <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">Timezone</label>
           <input
             type="text"
             value={config.timezone}
             onChange={(e) => set("timezone", e.target.value)}
-            className="industrial-input w-full max-w-xs"
+            className="dark-input rounded-lg w-full max-w-xs"
             placeholder="Europe/Zagreb"
           />
         </div>
 
         <div>
-          <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">Default Appointment Types</label>
+          <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">Default Appointment Types</label>
           <div className="flex flex-wrap gap-2 mt-1">
             {APPOINTMENT_TYPES.map((t) => (
               <button
@@ -419,41 +419,41 @@ export default function SchedulingSettings() {
       </div>
 
       {/* B) Slot Rules */}
-      <div className="industrial-card p-6 space-y-4">
-        <h2 className="text-sm font-bold uppercase tracking-wider">Slot Rules</h2>
+      <div className="dark-card rounded-xl p-6 space-y-4">
+        <h2 className="text-sm font-bold text-foreground">Slot Rules</h2>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <div>
-            <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">Slot Duration</label>
-            <select className="industrial-input w-full" value={config.slot_duration_minutes} onChange={(e) => set("slot_duration_minutes", Number(e.target.value))}>
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">Slot Duration</label>
+            <select className="dark-input rounded-lg w-full" value={config.slot_duration_minutes} onChange={(e) => set("slot_duration_minutes", Number(e.target.value))}>
               {SLOT_DURATIONS.map((d) => <option key={d} value={d}>{d} min</option>)}
             </select>
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">Buffer Before</label>
-            <input type="number" min={0} className="industrial-input w-full" value={config.buffer_before_minutes} onChange={(e) => set("buffer_before_minutes", Number(e.target.value))} />
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">Buffer Before</label>
+            <input type="number" min={0} className="dark-input rounded-lg w-full" value={config.buffer_before_minutes} onChange={(e) => set("buffer_before_minutes", Number(e.target.value))} />
             <span className="text-[10px] text-muted-foreground">minutes</span>
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">Buffer After</label>
-            <input type="number" min={0} className="industrial-input w-full" value={config.buffer_after_minutes} onChange={(e) => set("buffer_after_minutes", Number(e.target.value))} />
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">Buffer After</label>
+            <input type="number" min={0} className="dark-input rounded-lg w-full" value={config.buffer_after_minutes} onChange={(e) => set("buffer_after_minutes", Number(e.target.value))} />
             <span className="text-[10px] text-muted-foreground">minutes</span>
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">Min Notice</label>
-            <input type="number" min={0} className="industrial-input w-full" value={config.minimum_notice_hours} onChange={(e) => set("minimum_notice_hours", Number(e.target.value))} />
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">Min Notice</label>
+            <input type="number" min={0} className="dark-input rounded-lg w-full" value={config.minimum_notice_hours} onChange={(e) => set("minimum_notice_hours", Number(e.target.value))} />
             <span className="text-[10px] text-muted-foreground">hours</span>
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">Max Days Ahead</label>
-            <input type="number" min={1} className="industrial-input w-full" value={config.max_days_ahead} onChange={(e) => set("max_days_ahead", Number(e.target.value))} />
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">Max Days Ahead</label>
+            <input type="number" min={1} className="dark-input rounded-lg w-full" value={config.max_days_ahead} onChange={(e) => set("max_days_ahead", Number(e.target.value))} />
           </div>
         </div>
       </div>
 
       {/* C) Working Hours */}
-      <div className="industrial-card p-6 space-y-4">
-        <h2 className="text-sm font-bold uppercase tracking-wider">Working Hours</h2>
+      <div className="dark-card rounded-xl p-6 space-y-4">
+        <h2 className="text-sm font-bold text-foreground">Working Hours</h2>
         <div className="space-y-2">
           {DAYS.map((day) => {
             const dayConf = config.working_hours[day] || { enabled: false, ranges: [{ start: "09:00", end: "17:00" }] };
@@ -465,9 +465,9 @@ export default function SchedulingSettings() {
                       type="checkbox"
                       checked={dayConf.enabled}
                       onChange={(e) => updateDay(day, { enabled: e.target.checked })}
-                      className="rounded-sm accent-accent"
+                      className="rounded-lg accent-accent"
                     />
-                    <span className="text-xs font-mono uppercase tracking-wider">{DAY_LABELS[day]?.slice(0, 3)}</span>
+                    <span className="text-xs font-medium uppercase tracking-wider">{DAY_LABELS[day]?.slice(0, 3)}</span>
                   </label>
                 </div>
                 {dayConf.enabled && (
@@ -478,14 +478,14 @@ export default function SchedulingSettings() {
                           type="time"
                           value={range.start}
                           onChange={(e) => updateRange(day, idx, "start", e.target.value)}
-                          className="industrial-input py-1 text-xs"
+                          className="dark-input rounded-lg py-1 text-xs"
                         />
                         <span className="text-xs text-muted-foreground">–</span>
                         <input
                           type="time"
                           value={range.end}
                           onChange={(e) => updateRange(day, idx, "end", e.target.value)}
-                          className="industrial-input py-1 text-xs"
+                          className="dark-input rounded-lg py-1 text-xs"
                         />
                         {dayConf.ranges.length > 1 && (
                           <button type="button" onClick={() => removeRange(day, idx)} className="text-destructive hover:text-destructive/80 transition-colors">
@@ -506,13 +506,13 @@ export default function SchedulingSettings() {
       </div>
 
       {/* D) Reminder Defaults */}
-      <div className="industrial-card p-6 space-y-4">
-        <h2 className="text-sm font-bold uppercase tracking-wider">Reminder Defaults</h2>
+      <div className="dark-card rounded-xl p-6 space-y-4">
+        <h2 className="text-sm font-bold text-foreground">Reminder Defaults</h2>
         <ToggleRow label="In-app reminders" checked={config.in_app_reminders} onChange={(v) => set("in_app_reminders", v)} />
         <ToggleRow label="Email reminders" checked={config.email_reminders} onChange={(v) => set("email_reminders", v)} />
         <div>
-          <label className="mb-1.5 block text-xs font-mono uppercase tracking-wider text-muted-foreground">Reminder Lead Time</label>
-          <select className="industrial-input w-full max-w-xs" value={config.reminder_lead_time_minutes} onChange={(e) => set("reminder_lead_time_minutes", Number(e.target.value))}>
+          <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">Reminder Lead Time</label>
+          <select className="dark-input rounded-lg w-full max-w-xs" value={config.reminder_lead_time_minutes} onChange={(e) => set("reminder_lead_time_minutes", Number(e.target.value))}>
             {REMINDER_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
           </select>
         </div>

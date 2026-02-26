@@ -117,32 +117,32 @@ const InboxLayout = () => {
   }, {});
 
   return (
-    <div className="flex h-[calc(100vh-0px)] overflow-hidden">
-      {/* Zone 2 — Lead List Sidebar */}
-      <aside className="w-72 border-r border-border bg-muted/30 flex flex-col shrink-0">
+    <div className="flex h-full overflow-hidden">
+      {/* Sidebar */}
+      <aside className="w-80 border-r border-[hsl(0_0%_13%)] bg-[hsl(0_0%_4%)] flex flex-col shrink-0">
         {/* Header */}
-        <div className="p-3 border-b border-border space-y-2">
-          <h2 className="text-sm font-semibold text-foreground px-1">Inbox</h2>
+        <div className="p-4 border-b border-[hsl(0_0%_13%)] space-y-3">
+          <h2 className="text-sm font-bold text-foreground tracking-wide">Inbox</h2>
           {/* Search */}
           <div className="relative">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               value={searchInput}
               onChange={(e) => handleSearchInput(e.target.value)}
               placeholder="Search leads..."
-              className="dark-input w-full pl-8 py-1.5 text-xs"
+              className="w-full pl-9 pr-3 py-2 text-xs rounded-lg bg-[hsl(0_0%_8%)] border border-[hsl(0_0%_16%)] text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[hsl(48_92%_53%/0.5)] transition-colors"
             />
           </div>
           {/* Status filter pills */}
-          <div className="flex gap-1 flex-wrap">
+          <div className="flex gap-1.5 flex-wrap">
             {statuses.slice(0, 4).map((s) => (
               <button
                 key={s.id}
                 onClick={() => setStatusFilter(s.id)}
-                className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
                   statusFilter === s.id
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-secondary text-muted-foreground hover:text-foreground"
+                    ? "bg-[hsl(48_92%_53%)] text-[hsl(0_0%_4%)] shadow-sm"
+                    : "bg-[hsl(0_0%_10%)] text-muted-foreground hover:text-foreground hover:bg-[hsl(0_0%_14%)]"
                 }`}
               >
                 {s.name}
@@ -150,10 +150,10 @@ const InboxLayout = () => {
             ))}
             <button
               onClick={() => setStatusFilter("__ALL__")}
-              className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
+              className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
                 statusFilter === "__ALL__"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-muted-foreground hover:text-foreground"
+                  ? "bg-[hsl(48_92%_53%)] text-[hsl(0_0%_4%)] shadow-sm"
+                  : "bg-[hsl(0_0%_10%)] text-muted-foreground hover:text-foreground hover:bg-[hsl(0_0%_14%)]"
               }`}
             >
               All
@@ -164,16 +164,15 @@ const InboxLayout = () => {
         {/* Lead list */}
         <div className="flex-1 overflow-y-auto">
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 size={16} className="animate-spin text-muted-foreground" />
+            <div className="flex items-center justify-center py-12">
+              <Loader2 size={18} className="animate-spin text-muted-foreground" />
             </div>
           ) : leads.length === 0 ? (
-            <div className="py-8 text-center text-xs text-muted-foreground">No leads found</div>
+            <div className="py-12 text-center text-xs text-muted-foreground">No leads found</div>
           ) : statusFilter === "__ALL__" ? (
-            // Show grouped by status when "All" is selected
             Object.entries(groupedByStatus).map(([status, statusLeads]: [string, any[]]) => (
               <div key={status}>
-                <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-background/50 sticky top-0">
+                <div className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-[hsl(0_0%_3%)] sticky top-0 border-b border-[hsl(0_0%_10%)]">
                   {status} · {statusLeads.length}
                 </div>
                 {statusLeads.map((lead: any) => (
@@ -199,8 +198,8 @@ const InboxLayout = () => {
         </div>
       </aside>
 
-      {/* Zone 3+4 — Main Content */}
-      <div className="flex-1 overflow-auto">
+      {/* Main Content */}
+      <div className="flex-1 overflow-auto bg-[hsl(0_0%_2%)]">
         <Outlet />
       </div>
     </div>
@@ -218,13 +217,13 @@ function LeadRow({ lead, isActive, onClick }: { lead: any; isActive: boolean; on
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left px-3 py-2.5 flex items-center gap-2.5 transition-colors border-l-2 ${
+      className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-all border-l-2 ${
         isActive
-          ? "bg-secondary border-l-primary"
-          : "border-l-transparent hover:bg-secondary/50"
+          ? "bg-[hsl(48_92%_53%/0.08)] border-l-[hsl(48_92%_53%)]"
+          : "border-l-transparent hover:bg-[hsl(0_0%_8%)]"
       }`}
     >
-      <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${colorClass}`}>
+      <div className={`h-9 w-9 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 ${colorClass}`}>
         {initial}
       </div>
       <div className="flex-1 min-w-0">
@@ -238,7 +237,7 @@ function LeadRow({ lead, isActive, onClick }: { lead: any; isActive: boolean; on
         </div>
         <div className="flex items-center gap-1.5 mt-0.5">
           {lead.channel && (
-            <span className="text-[10px] text-muted-foreground">{lead.channel}</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[hsl(0_0%_10%)] text-muted-foreground">{lead.channel}</span>
           )}
           {lead.score > 0 && (
             <span className={`text-[10px] font-semibold ${

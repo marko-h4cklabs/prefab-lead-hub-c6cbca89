@@ -22,7 +22,7 @@ export default function UpcomingPanel({ appointments, onSelect }: Props) {
   if (upcoming.length === 0) return null;
 
   return (
-    <div className="industrial-card p-4 mb-4">
+    <div className="dark-card rounded-xl p-4 mb-4">
       <div className="flex items-center gap-2 mb-3">
         <Clock size={14} className="text-accent" />
         <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
@@ -36,7 +36,7 @@ export default function UpcomingPanel({ appointments, onSelect }: Props) {
             <button
               key={appt.id}
               onClick={() => onSelect(appt)}
-              className="text-left industrial-card p-3 hover:bg-muted/30 transition-colors border-l-2 border-l-accent"
+              className="text-left dark-card rounded-xl p-3 hover:bg-muted/30 transition-colors border-l-2 border-l-accent"
             >
               <div className="text-sm font-medium truncate">{appt.title}</div>
               {appt.lead?.name && (

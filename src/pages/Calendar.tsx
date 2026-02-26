@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { api } from "@/lib/apiClient";
 import { CalendarPlus, Loader2, Search, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import AppointmentModal, { AppointmentFormData } from "@/components/appointments/AppointmentModal";
@@ -147,29 +145,29 @@ const Calendar = () => {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-1">
+      <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-xl font-bold">Calendar</h1>
-          <p className="text-sm text-muted-foreground">Manage appointments and scheduled activities</p>
+          <h1 className="text-xl font-bold text-foreground">Calendar</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Manage appointments and scheduled activities</p>
         </div>
-        <Button
-          className="gap-1.5 bg-accent text-accent-foreground hover:bg-accent/90"
+        <button
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[hsl(48_92%_53%)] text-[hsl(0_0%_4%)] text-sm font-semibold hover:bg-[hsl(48_92%_53%/0.9)] transition-colors"
           onClick={() => { setEditingAppt(null); setModalOpen(true); }}
         >
           <CalendarPlus size={16} />
           New Appointment
-        </Button>
+        </button>
       </div>
 
       {/* Tab bar */}
-      <div className="flex gap-1 mb-4 border-b border-border">
+      <div className="flex gap-1 mb-5 border-b border-[hsl(0_0%_13%)]">
         {CALENDAR_TABS.map((tab) => (
           <button
             key={tab}
             onClick={() => setCalendarTab(tab)}
-            className={`px-4 py-2 text-sm font-semibold uppercase tracking-wider transition-colors -mb-px ${
+            className={`px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition-colors -mb-px ${
               calendarTab === tab
-                ? "border-b-2 border-accent text-foreground"
+                ? "border-b-2 border-[hsl(48_92%_53%)] text-foreground"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -185,60 +183,60 @@ const Calendar = () => {
       ) : (
       <>
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2 my-4">
+      <div className="flex flex-wrap items-center gap-2.5 my-4">
         {/* Range */}
-        <div className="flex rounded-sm border border-border overflow-hidden">
+        <div className="flex rounded-lg border border-[hsl(0_0%_16%)] overflow-hidden">
           {RANGE_OPTIONS.map((r) => (
             <button
               key={r.days}
               onClick={() => setRangeDays(r.days)}
-              className={`px-3 py-1.5 text-xs font-mono transition-colors ${rangeDays === r.days ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-muted/50"}`}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${rangeDays === r.days ? "bg-[hsl(48_92%_53%)] text-[hsl(0_0%_4%)]" : "bg-[hsl(0_0%_7%)] text-muted-foreground hover:bg-[hsl(0_0%_12%)] hover:text-foreground"}`}
             >
               {r.label}
             </button>
           ))}
         </div>
 
-        <select className="industrial-input py-1.5 text-xs" value={source} onChange={(e) => setSource(e.target.value)}>
+        <select className="dark-input py-1.5 text-xs rounded-lg" value={source} onChange={(e) => setSource(e.target.value)}>
           {SOURCE_OPTIONS.map((s) => (
             <option key={s} value={s}>{s === "all" ? "All Sources" : SOURCE_LABELS[s] || s}</option>
           ))}
         </select>
 
-        <select className="industrial-input py-1.5 text-xs" value={status} onChange={(e) => setStatus(e.target.value)}>
+        <select className="dark-input py-1.5 text-xs rounded-lg" value={status} onChange={(e) => setStatus(e.target.value)}>
           {STATUS_OPTIONS.map((s) => (
             <option key={s} value={s}>{s === "all" ? "All Statuses" : STATUS_LABELS[s] || s}</option>
           ))}
         </select>
 
-        <select className="industrial-input py-1.5 text-xs" value={type} onChange={(e) => setType(e.target.value)}>
+        <select className="dark-input py-1.5 text-xs rounded-lg" value={type} onChange={(e) => setType(e.target.value)}>
           {TYPE_OPTIONS.map((t) => (
             <option key={t} value={t}>{t === "all" ? "All Types" : TYPE_LABELS[t] || t}</option>
           ))}
         </select>
 
         <div className="relative">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search…"
-            className="pl-8 h-8 text-xs w-40"
+            className="dark-input pl-9 pr-3 py-1.5 text-xs w-40 rounded-lg"
           />
         </div>
       </div>
 
       {/* Error state */}
       {error && !loading && (
-        <div className="industrial-card p-6 flex items-center gap-3 mb-4 border-destructive/30">
+        <div className="dark-card p-5 flex items-center gap-3 mb-4 border-destructive/30 rounded-xl">
           <AlertCircle size={18} className="text-destructive shrink-0" />
           <div>
             <p className="text-sm font-medium text-destructive">Failed to load appointments</p>
             <p className="text-xs text-muted-foreground mt-0.5">{error}</p>
           </div>
-          <Button variant="outline" size="sm" className="ml-auto text-xs" onClick={fetchAppointments}>
+          <button onClick={fetchAppointments} className="ml-auto text-xs px-3 py-1.5 rounded-lg border border-[hsl(0_0%_18%)] text-muted-foreground hover:text-foreground hover:bg-[hsl(0_0%_12%)] transition-all">
             Retry
-          </Button>
+          </button>
         </div>
       )}
 
@@ -251,38 +249,37 @@ const Calendar = () => {
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="industrial-card p-4">
-              <div className="h-4 w-32 bg-muted animate-pulse rounded-sm mb-3" />
-              <div className="h-16 bg-muted animate-pulse rounded-sm" />
+            <div key={i} className="dark-card p-5 rounded-xl">
+              <div className="h-4 w-32 bg-[hsl(0_0%_12%)] animate-pulse rounded-lg mb-3" />
+              <div className="h-16 bg-[hsl(0_0%_12%)] animate-pulse rounded-lg" />
             </div>
           ))}
         </div>
       ) : !error && filteredAppointments.length === 0 ? (
-        <div className="industrial-card p-12 text-center">
+        <div className="dark-card p-12 text-center rounded-xl">
           <p className="text-muted-foreground text-sm">No appointments in this range</p>
-          <Button
-            variant="outline"
-            className="mt-4 gap-1.5"
+          <button
+            className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[hsl(0_0%_18%)] text-sm text-muted-foreground hover:text-foreground hover:bg-[hsl(0_0%_12%)] transition-all"
             onClick={() => { setEditingAppt(null); setModalOpen(true); }}
           >
             <CalendarPlus size={14} /> Create your first appointment
-          </Button>
+          </button>
         </div>
       ) : !error && (
-        <div className="space-y-4">
+        <div className="space-y-5">
           {grouped.map(([day, appts]) => (
             <div key={day}>
-              <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2.5 pl-1">
                 {day !== "Unknown"
                   ? format(new Date(day + "T00:00:00"), "EEEE, MMM d, yyyy")
                   : "Unscheduled"}
               </h3>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {appts.map((appt) => (
                   <button
                     key={appt.id}
                     onClick={() => handleRowClick(appt)}
-                    className="w-full text-left industrial-card p-4 hover:bg-muted/30 transition-colors"
+                    className="w-full text-left rounded-xl border border-[hsl(0_0%_13%)] bg-[hsl(0_0%_7%)] p-4 hover:bg-[hsl(0_0%_9%)] hover:border-[hsl(0_0%_18%)] transition-all"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
@@ -296,13 +293,13 @@ const Calendar = () => {
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {appt.lead?.channel && (
-                          <span className="status-badge bg-muted text-muted-foreground text-[10px] hidden md:inline-flex">{appt.lead.channel}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[hsl(0_0%_12%)] text-muted-foreground hidden md:inline-flex">{appt.lead.channel}</span>
                         )}
-                        <span className="status-badge bg-muted text-muted-foreground text-[10px]">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[hsl(0_0%_12%)] text-muted-foreground">
                           {TYPE_LABELS[appt.appointmentType] || appt.appointmentType}
                         </span>
                         {appt.source !== "manual" && (
-                          <span className="status-badge bg-muted text-muted-foreground text-[10px] hidden lg:inline-flex">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[hsl(0_0%_12%)] text-muted-foreground hidden lg:inline-flex">
                             {SOURCE_LABELS[appt.source] || appt.source}
                           </span>
                         )}

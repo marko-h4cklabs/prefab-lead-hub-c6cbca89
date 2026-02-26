@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Users, Bot, Wrench, Home } from "lucide-react";
+import { Users, Bot, Wrench } from "lucide-react";
 import { api, requireCompanyId } from "@/lib/apiClient";
 import { StaggerContainer, StaggerItem } from "@/components/catalog/PageTransition";
 import { motion } from "framer-motion";
@@ -73,8 +73,22 @@ const MainHub = () => {
   }, [companyId]);
 
   return (
-    <div className="h-full flex flex-col items-center justify-center px-6">
-      <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-[1200px] w-full">
+    <div className="h-full flex flex-col items-center justify-center px-6 relative overflow-hidden">
+      {/* Grid background */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: 'linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
+          backgroundSize: '40px 40px',
+        }}
+      />
+      {/* Center glow */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse at 50% 50%, hsl(48 92% 53% / 0.05) 0%, transparent 55%)' }}
+      />
+
+      <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-[1200px] w-full relative z-10">
         {sections.map((section) => (
           <StaggerItem key={section.route}>
             <motion.button
@@ -105,15 +119,8 @@ const MainHub = () => {
       </StaggerContainer>
 
       {/* Stats */}
-      <div className="mt-8 text-xs text-muted-foreground text-center">
+      <div className="mt-8 text-xs text-muted-foreground text-center relative z-10">
         {stats.activeLeads} active leads · {stats.appointmentsToday} appointments today · {stats.messagesThisWeek} messages this week
-      </div>
-
-      {/* Home */}
-      <div className="flex items-center gap-4 mt-4">
-        <button onClick={() => navigate("/dashboard")} className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border bg-secondary text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <Home size={14} /> Home
-        </button>
       </div>
     </div>
   );

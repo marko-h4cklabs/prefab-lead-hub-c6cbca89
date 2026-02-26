@@ -20,7 +20,7 @@ const FOLLOW_UP_TYPES = [
 ];
 
 const StatPill = ({ label, value }: { label: string; value: number | undefined }) => (
-  <div className="inline-flex items-center gap-1.5 rounded-sm border border-border px-3 py-1.5">
+  <div className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5">
     <span className="text-xs font-mono text-muted-foreground">{label}</span>
     <span className="text-sm font-bold font-mono">{value ?? 0}</span>
   </div>
@@ -101,7 +101,7 @@ const FollowUpQueue = () => {
       </div>
 
       {/* Schedule form */}
-      <div className="industrial-card p-6 space-y-4">
+      <div className="dark-card rounded-xl p-6 space-y-4">
         <h3 className="text-sm font-bold uppercase tracking-wider">Schedule Follow-up</h3>
 
         <div>
@@ -109,7 +109,7 @@ const FollowUpQueue = () => {
           <input
             value={leadId}
             onChange={(e) => setLeadId(e.target.value)}
-            className="industrial-input w-full"
+            className="dark-input rounded-lg w-full"
             placeholder="Enter lead ID or search by name"
           />
         </div>
@@ -119,7 +119,7 @@ const FollowUpQueue = () => {
           <select
             value={type}
             onChange={(e) => setType(e.target.value)}
-            className="industrial-input w-full"
+            className="dark-input rounded-lg w-full"
           >
             {FOLLOW_UP_TYPES.map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>
@@ -133,7 +133,7 @@ const FollowUpQueue = () => {
             type="number"
             value={delayMinutes}
             onChange={(e) => setDelayMinutes(Math.max(1, Number(e.target.value) || 60))}
-            className="industrial-input w-32"
+            className="dark-input rounded-lg w-32"
             min={1}
           />
         </div>
@@ -144,7 +144,7 @@ const FollowUpQueue = () => {
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              className="industrial-input w-full min-h-[80px] resize-y"
+              className="dark-input rounded-lg w-full min-h-[80px] resize-y"
               placeholder="Custom follow-up message…"
             />
           </div>

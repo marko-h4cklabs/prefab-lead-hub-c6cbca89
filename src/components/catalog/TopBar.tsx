@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Mail, Settings, LogOut } from "lucide-react";
 import { api, requireCompanyId, clearAuth } from "@/lib/apiClient";
@@ -27,6 +27,8 @@ export default function TopBar({ onSettingsClick }: TopBarProps) {
   const [todayLeadCount, setTodayLeadCount] = useState(0);
   const [revenue, setRevenue] = useState(0);
   const [operatingMode, setOperatingMode] = useState<string | null>(null);
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const logoutRef = useRef<HTMLDivElement>(null);
 
   // Determine hierarchy
   const path = location.pathname;
@@ -88,6 +90,17 @@ export default function TopBar({ onSettingsClick }: TopBarProps) {
     clearAuth();
     navigate("/login");
   };
+
+  // Close logout dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (logoutRef.current && !logoutRef.current.contains(e.target as Node)) {
+        setLogoutOpen(false);
+      }
+    };
+    if (logoutOpen) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [logoutOpen]);
 
   const modeIsAutopilot = operatingMode === "autopilot";
   const modeIsCopilot = operatingMode === "copilot";
@@ -154,12 +167,33 @@ export default function TopBar({ onSettingsClick }: TopBarProps) {
         >
           <Settings size={18} />
         </button>
-        <button
-          onClick={handleLogout}
-          className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-all"
-        >
-          <LogOut size={18} />
-        </button>
+        <div className="relative" ref={logoutRef}>
+          <button
+            onClick={() => setLogoutOpen((o) => !o)}
+            className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-all"
+          >
+            <LogOut size={18} />
+          </button>
+          {logoutOpen && (
+            <div className="absolute right-0 top-full mt-2 w-52 rounded-xl border border-[hsl(0_0%_16%)] bg-[hsl(0_0%_7%)] shadow-lg shadow-black/40 p-3 z-50">
+              <p className="text-xs text-muted-foreground mb-3">Do you want to sign out?</p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setLogoutOpen(false)}
+                  className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-[hsl(0_0%_18%)] text-muted-foreground hover:text-foreground hover:bg-[hsl(0_0%_12%)] transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="flex-1 text-xs px-3 py-1.5 rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-all font-semibold"
+                >
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

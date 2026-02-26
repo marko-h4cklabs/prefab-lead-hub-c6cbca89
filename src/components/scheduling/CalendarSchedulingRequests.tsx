@@ -63,17 +63,17 @@ export default function CalendarSchedulingRequests({ onConvertToAppointment }: P
     <div>
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        <select className="industrial-input py-1.5 text-xs" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+        <select className="dark-input rounded-lg py-1.5 text-xs" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           {STATUS_OPTIONS.map((s) => (
             <option key={s} value={s}>{s === "all" ? "All Statuses" : REQUEST_STATUS_LABELS[s] || s}</option>
           ))}
         </select>
-        <select className="industrial-input py-1.5 text-xs" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+        <select className="dark-input rounded-lg py-1.5 text-xs" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
           {TYPE_OPTIONS.map((t) => (
             <option key={t} value={t}>{t === "all" ? "All Types" : REQUEST_TYPE_LABELS[t] || t}</option>
           ))}
         </select>
-        <select className="industrial-input py-1.5 text-xs" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+        <select className="dark-input rounded-lg py-1.5 text-xs" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
           {SOURCE_OPTIONS.map((s) => (
             <option key={s} value={s}>{s === "all" ? "All Sources" : REQUEST_SOURCE_LABELS[s] || s}</option>
           ))}
@@ -91,7 +91,7 @@ export default function CalendarSchedulingRequests({ onConvertToAppointment }: P
 
       {/* Error */}
       {error && !loading && (
-        <div className="industrial-card p-6 flex items-center gap-3 mb-4 border-destructive/30">
+        <div className="dark-card rounded-xl p-6 flex items-center gap-3 mb-4 border-destructive/30">
           <AlertCircle size={18} className="text-destructive shrink-0" />
           <div>
             <p className="text-sm font-medium text-destructive">Failed to load scheduling requests</p>
@@ -104,8 +104,8 @@ export default function CalendarSchedulingRequests({ onConvertToAppointment }: P
       {loading && (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="industrial-card p-4">
-              <div className="h-4 w-48 bg-muted animate-pulse rounded-sm" />
+            <div key={i} className="dark-card rounded-xl p-4">
+              <div className="h-4 w-48 bg-muted animate-pulse rounded-lg" />
             </div>
           ))}
         </div>
@@ -113,7 +113,7 @@ export default function CalendarSchedulingRequests({ onConvertToAppointment }: P
 
       {/* Empty */}
       {!loading && !error && items.length === 0 && (
-        <div className="industrial-card p-12 text-center">
+        <div className="dark-card rounded-xl p-12 text-center">
           <p className="text-muted-foreground text-sm">No scheduling requests found</p>
         </div>
       )}
@@ -122,7 +122,7 @@ export default function CalendarSchedulingRequests({ onConvertToAppointment }: P
       {!loading && !error && items.length > 0 && (
         <div className="space-y-1.5">
           {items.map((req) => (
-            <div key={req.id} className="industrial-card p-4">
+            <div key={req.id} className="dark-card rounded-xl p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className={`text-xs font-mono ${REQUEST_STATUS_CLASSES[req.status] || "status-pending"}`}>

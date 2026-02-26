@@ -58,7 +58,7 @@ export default function ChatbotBookingSettings({ config, onChange }: Props) {
   const isOff = config.booking_mode === "off";
 
   return (
-    <div className="industrial-card p-6 space-y-4">
+    <div className="dark-card rounded-xl p-6 space-y-4">
       <h2 className="text-sm font-bold uppercase tracking-wider">Chatbot Booking</h2>
 
       <ToggleRow
@@ -72,7 +72,7 @@ export default function ChatbotBookingSettings({ config, onChange }: Props) {
           Booking Mode
         </label>
         <select
-          className="industrial-input w-full max-w-xs"
+          className="dark-input rounded-lg w-full max-w-xs"
           value={config.booking_mode}
           onChange={(e) => set("booking_mode", e.target.value)}
         >
@@ -94,7 +94,7 @@ export default function ChatbotBookingSettings({ config, onChange }: Props) {
             Default Appointment Type
           </label>
           <select
-            className="industrial-input w-full max-w-xs"
+            className="dark-input rounded-lg w-full max-w-xs"
             value={config.default_booking_type}
             onChange={(e) => set("default_booking_type", e.target.value)}
           >
@@ -122,7 +122,7 @@ export default function ChatbotBookingSettings({ config, onChange }: Props) {
             Booking Prompt Style
           </label>
           <select
-            className="industrial-input w-full max-w-xs"
+            className="dark-input rounded-lg w-full max-w-xs"
             value={config.booking_prompt_style}
             onChange={(e) => set("booking_prompt_style", e.target.value)}
           >
