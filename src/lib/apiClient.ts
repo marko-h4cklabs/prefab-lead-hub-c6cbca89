@@ -923,6 +923,58 @@ export const api = {
   updateHandoffSettings: (data: any) =>
     request<any>("/api/handoff/settings", { method: "PUT", body: JSON.stringify(data) }),
 
+  // --- Warming / Follow-up Dashboard ---
+  getWarmingSequences: () =>
+    request<any>("/api/warming/sequences"),
+
+  createWarmingSequence: (data: any) =>
+    request<any>("/api/warming/sequences", { method: "POST", body: JSON.stringify(data) }),
+
+  updateWarmingSequence: (id: string, data: any) =>
+    request<any>(`/api/warming/sequences/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+
+  deleteWarmingSequence: (id: string) =>
+    request<any>(`/api/warming/sequences/${id}`, { method: "DELETE" }),
+
+  getWarmingEnrollments: (status?: string) =>
+    request<any>(`/api/warming/enrollments${status ? `?status=${status}` : ""}`),
+
+  enrollLead: (data: { lead_id: string; sequence_id: string }) =>
+    request<any>("/api/warming/enroll", { method: "POST", body: JSON.stringify(data) }),
+
+  cancelEnrollment: (id: string) =>
+    request<any>(`/api/warming/enrollments/${id}/cancel`, { method: "POST" }),
+
+  pauseEnrollment: (id: string) =>
+    request<any>(`/api/warming/enrollments/${id}/pause`, { method: "POST" }),
+
+  resumeEnrollment: (id: string) =>
+    request<any>(`/api/warming/enrollments/${id}/resume`, { method: "POST" }),
+
+  skipEnrollmentStep: (id: string) =>
+    request<any>(`/api/warming/enrollments/${id}/skip`, { method: "POST" }),
+
+  getFollowUpDashboard: () =>
+    request<any>("/api/warming/dashboard"),
+
+  getFollowUpUpcoming: (limit?: number) =>
+    request<any>(`/api/warming/dashboard/upcoming${limit ? `?limit=${limit}` : ""}`),
+
+  getFollowUpTimeline: (leadId: string) =>
+    request<any>(`/api/warming/dashboard/timeline/${leadId}`),
+
+  getFollowUpStats: () =>
+    request<any>("/api/warming/dashboard/stats"),
+
+  getFollowUpAnalytics: (days?: number) =>
+    request<any>(`/api/warming/analytics${days ? `?days=${days}` : ""}`),
+
+  updateWarmingStep: (id: string, data: any) =>
+    request<any>(`/api/warming/steps/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+
+  markMessageReplied: (messageId: string, sentiment?: string) =>
+    request<any>(`/api/warming/message-log/${messageId}/reply`, { method: "POST", body: JSON.stringify({ sentiment }) }),
+
   // --- Behavior Preview & Test ---
   getBehaviorPreview: () =>
     request<any>("/api/chatbot/behavior/preview"),
