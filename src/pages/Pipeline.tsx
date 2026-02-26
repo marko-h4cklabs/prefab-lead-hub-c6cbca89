@@ -118,7 +118,12 @@ const Pipeline = () => {
   const fetchStats = useCallback(async () => {
     try {
       const s = await api.getPipelineStats();
-      setStats(s || {});
+      setStats({
+        pipeline_value: s?.pipeline_value ?? 0,
+        won_value: s?.won_value ?? 0,
+        won_count: s?.won_count ?? 0,
+        conversion_rate: s?.conversion_rate ?? 0,
+      });
     } catch {}
   }, []);
 
@@ -247,9 +252,9 @@ const Pipeline = () => {
       </div>
 
       {/* Kanban */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4">
+      <div className="flex-1 overflow-x-auto overflow-y-auto pb-4">
         <DragDropContext onDragEnd={onDragEnd}>
-          <div className="flex gap-3 h-full" style={{ minWidth: STAGES.length * 260 }}>
+          <div className="flex gap-3 min-h-full" style={{ minWidth: STAGES.length * 230 }}>
             {STAGES.map((stage) => {
               const leads = columns[stage.id] || [];
               const isWon = stage.id === "closed_won";
@@ -261,7 +266,7 @@ const Pipeline = () => {
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className={`flex flex-col rounded-lg border border-border p-3 min-w-[240px] w-[240px] shrink-0 transition-colors ${
+                      className={`flex flex-col rounded-lg border border-border p-3 min-w-[220px] w-[220px] shrink-0 transition-colors ${
                         snapshot.isDraggingOver ? "bg-secondary/50" : "bg-muted"
                       }`}
                     >

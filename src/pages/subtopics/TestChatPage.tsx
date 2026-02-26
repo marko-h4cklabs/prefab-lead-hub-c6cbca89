@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, RotateCcw, Copy, RefreshCw, Send, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, RotateCcw, Copy, RefreshCw, Send, Loader2, Trash2, Timer } from "lucide-react";
 import { api } from "@/lib/apiClient";
 import { toast } from "@/hooks/use-toast";
 
@@ -8,7 +8,17 @@ interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   provider?: string;
+  responseTime?: number; // ms it took to respond
 }
+
+const DELAY_OPTIONS = [
+  { label: "Instant", value: 0 },
+  { label: "3s", value: 3 },
+  { label: "5s", value: 5 },
+  { label: "10s", value: 10 },
+  { label: "30s", value: 30 },
+  { label: "Smart", value: -1 },
+];
 
 const TestChatPage = () => {
   const navigate = useNavigate();
@@ -24,6 +34,11 @@ const TestChatPage = () => {
   const [sending, setSending] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // Timer state
+  const [delaySec, setDelaySec] = useState(0); // 0=instant, -1=smart (random 2-8s)
+  const [countdown, setCountdown] = useState(0);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchPrompt = useCallback(() => {
     setPromptLoading(true);
@@ -42,12 +57,23 @@ const TestChatPage = () => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
-  }, [messages, sending]);
+  }, [messages, sending, countdown]);
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
+  }, []);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(prompt);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const getDelay = (): number => {
+    if (delaySec === 0) return 0;
+    if (delaySec === -1) return Math.floor(Math.random() * 6 + 2); // Smart: 2-8 seconds
+    return delaySec;
   };
 
   const handleSend = async (e?: React.FormEvent | React.MouseEvent) => {
@@ -57,15 +83,42 @@ const TestChatPage = () => {
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: userMsg }]);
     setSending(true);
+    const startTime = Date.now();
     try {
       const res = await api.testBehavior({ message: userMsg });
       const content = (res as any)?.reply || (res as any)?.response || (res as any)?.message || (res as any)?.content || String(res);
       const provider = (res as any)?.provider || "";
-      setMessages((prev) => [...prev, { role: "assistant", content, provider }]);
+      const responseTime = Date.now() - startTime;
+
+      const actualDelay = getDelay();
+      const elapsed = responseTime / 1000;
+      const remaining = Math.max(0, actualDelay - elapsed);
+
+      if (remaining > 0) {
+        // Start countdown
+        setCountdown(Math.ceil(remaining));
+        await new Promise<void>((resolve) => {
+          const start = Date.now();
+          countdownRef.current = setInterval(() => {
+            const left = remaining - (Date.now() - start) / 1000;
+            if (left <= 0) {
+              if (countdownRef.current) clearInterval(countdownRef.current);
+              countdownRef.current = null;
+              setCountdown(0);
+              resolve();
+            } else {
+              setCountdown(Math.ceil(left));
+            }
+          }, 100);
+        });
+      }
+
+      setMessages((prev) => [...prev, { role: "assistant", content, provider, responseTime }]);
     } catch (err: any) {
       setMessages((prev) => [...prev, { role: "assistant", content: `Error: ${err?.message || "Failed to get response"}` }]);
     } finally {
       setSending(false);
+      setCountdown(0);
     }
   };
 
@@ -79,7 +132,7 @@ const TestChatPage = () => {
   return (
     <div className="h-full flex flex-col p-6 overflow-hidden">
       <div className="flex items-center justify-between mb-4 shrink-0">
-        <button onClick={() => navigate(-1 as any)} className="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-[hsl(0_0%_10%)] border border-[hsl(0_0%_18%)] text-muted-foreground hover:text-foreground hover:bg-[hsl(0_0%_14%)] transition-all">
+        <button onClick={() => navigate(-1 as any)} className="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-[hsl(0_0%_10%)] border border-[hsl(0_0%_18%)] text-muted-foreground hover:text-foreground hover:bg-[hsl(0_0%_14%)] transition-all self-start">
           <ArrowLeft size={14} /> Back
         </button>
         <div className="text-center">
@@ -130,7 +183,25 @@ const TestChatPage = () => {
           <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
             <h3 className="text-sm font-bold text-foreground">Test Chat</h3>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] text-muted-foreground">No lead or message is saved</span>
+              {/* Response delay selector */}
+              <div className="flex items-center gap-1">
+                <Timer size={11} className="text-muted-foreground" />
+                <div className="flex gap-0.5">
+                  {DELAY_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setDelaySec(opt.value)}
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                        delaySec === opt.value
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {messages.length > 0 && (
                 <button onClick={() => setMessages([])} className="dark-btn-ghost h-8 px-3 text-xs gap-1.5 border border-border text-destructive hover:bg-destructive/10">
                   <Trash2 size={13} /> Clear Chat
@@ -154,6 +225,9 @@ const TestChatPage = () => {
                   {msg.role === "assistant" && (
                     <div className="mt-1 flex items-center gap-2">
                       <span className="text-[9px] text-muted-foreground">Using current settings</span>
+                      {msg.responseTime && (
+                        <span className="text-[9px] text-muted-foreground">{(msg.responseTime / 1000).toFixed(1)}s</span>
+                      )}
                       {msg.provider && (
                         <span className={`text-[9px] px-1.5 py-0.5 rounded ${
                           msg.provider.toLowerCase().includes("claude")
@@ -171,11 +245,22 @@ const TestChatPage = () => {
             {sending && (
               <div className="flex justify-start">
                 <div className="bg-muted rounded-lg px-4 py-3">
-                  <div className="flex gap-1">
-                    <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                  </div>
+                  {countdown > 0 ? (
+                    <div className="flex items-center gap-2">
+                      <div className="flex gap-1">
+                        <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                      </div>
+                      <span className="text-[10px] text-primary font-mono font-semibold">{countdown}s</span>
+                    </div>
+                  ) : (
+                    <div className="flex gap-1">
+                      <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
