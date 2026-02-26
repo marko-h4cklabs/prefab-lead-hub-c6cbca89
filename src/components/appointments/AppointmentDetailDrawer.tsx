@@ -24,6 +24,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+const str = (v: unknown): string => (v == null ? "" : typeof v === "object" ? "" : String(v));
+
 interface Props {
   appointment: NormalizedAppointment | null;
   open: boolean;
@@ -62,23 +64,23 @@ export default function AppointmentDetailDrawer({
         <div className="space-y-4 py-2">
           {/* Title + Status */}
           <div className="flex items-start justify-between gap-3">
-            <h3 className="text-base font-semibold leading-tight">{appt.title}</h3>
-            <span className={`shrink-0 ${STATUS_CLASSES[appt.status] || "status-pending"}`}>
-              {STATUS_LABELS[appt.status] || appt.status}
+            <h3 className="text-base font-semibold leading-tight">{str(appt.title)}</h3>
+            <span className={`shrink-0 ${STATUS_CLASSES[str(appt.status)] || "status-pending"}`}>
+              {STATUS_LABELS[str(appt.status)] || str(appt.status)}
             </span>
           </div>
 
           {/* Info grid */}
           <dl className="space-y-2.5 text-sm">
             {/* Lead */}
-            {appt.lead?.name && (
+            {str(appt.lead?.name) && (
               <div className="flex items-center gap-2">
                 <User size={14} className="text-muted-foreground shrink-0" />
                 <dt className="text-muted-foreground w-20 shrink-0">Lead</dt>
                 <dd className="font-medium flex items-center gap-1.5">
-                  {appt.lead.name}
-                  {appt.lead.channel && (
-                    <span className="status-badge bg-muted text-muted-foreground text-[10px]">{appt.lead.channel}</span>
+                  {str(appt.lead?.name)}
+                  {str(appt.lead?.channel) && (
+                    <span className="status-badge bg-muted text-muted-foreground text-[10px]">{str(appt.lead?.channel)}</span>
                   )}
                   {appt.leadId && (
                     <button
@@ -113,7 +115,7 @@ export default function AppointmentDetailDrawer({
             <div className="flex items-center gap-2">
               <MapPin size={14} className="text-muted-foreground shrink-0" />
               <dt className="text-muted-foreground w-20 shrink-0">Timezone</dt>
-              <dd className="font-medium">{appt.timezone}</dd>
+              <dd className="font-medium">{str(appt.timezone)}</dd>
             </div>
 
             {/* Type */}
@@ -122,7 +124,7 @@ export default function AppointmentDetailDrawer({
               <dt className="text-muted-foreground w-20 shrink-0">Type</dt>
               <dd>
                 <span className="status-badge bg-muted text-muted-foreground">
-                  {TYPE_LABELS[appt.appointmentType] || appt.appointmentType}
+                  {TYPE_LABELS[str(appt.appointmentType)] || str(appt.appointmentType)}
                 </span>
               </dd>
             </div>
@@ -131,7 +133,7 @@ export default function AppointmentDetailDrawer({
             <div className="flex items-center gap-2">
               <FileText size={14} className="text-muted-foreground shrink-0" />
               <dt className="text-muted-foreground w-20 shrink-0">Source</dt>
-              <dd className="text-muted-foreground">{SOURCE_LABELS[appt.source] || appt.source}</dd>
+              <dd className="text-muted-foreground">{SOURCE_LABELS[str(appt.source)] || str(appt.source)}</dd>
             </div>
 
             {/* Reminder */}
@@ -166,7 +168,7 @@ export default function AppointmentDetailDrawer({
             )}
 
             {/* Google Calendar Sync Status */}
-            {(appt.synced_to_google || appt.sync_error) && (
+            {(appt.synced_to_google || str(appt.sync_error)) && (
               <div className="flex items-center gap-2">
                 <Calendar size={14} className="text-muted-foreground shrink-0" />
                 <dt className="text-muted-foreground w-20 shrink-0">Sync</dt>
@@ -174,14 +176,14 @@ export default function AppointmentDetailDrawer({
                   {appt.synced_to_google && !appt.sync_error && (
                     <span className="text-xs text-success">Synced to Google Calendar ✓</span>
                   )}
-                  {appt.sync_error && (
+                  {str(appt.sync_error) && (
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span className="text-xs text-warning cursor-help">⚠️ Sync failed</span>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p className="text-xs max-w-[200px]">{appt.sync_error}</p>
+                          <p className="text-xs max-w-[200px]">{str(appt.sync_error)}</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -191,10 +193,10 @@ export default function AppointmentDetailDrawer({
             )}
 
             {/* Notes */}
-            {appt.notes && (
+            {str(appt.notes) && (
               <div className="pt-2 border-t border-border">
                 <dt className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1">Notes</dt>
-                <dd className="text-sm whitespace-pre-wrap">{appt.notes}</dd>
+                <dd className="text-sm whitespace-pre-wrap">{str(appt.notes)}</dd>
               </div>
             )}
           </dl>

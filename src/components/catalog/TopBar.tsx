@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Mail, Settings, LogOut } from "lucide-react";
+import { Bell, Settings, LogOut } from "lucide-react";
 import { api, requireCompanyId, clearAuth } from "@/lib/apiClient";
 import { motion } from "framer-motion";
 
@@ -110,10 +110,10 @@ export default function TopBar({ onSettingsClick }: TopBarProps) {
       {/* LEFT */}
       <div className="flex items-center gap-3">
         <button
-          onClick={() => navigate("/dashboard/leads/inbox")}
           className="relative flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground transition-colors"
+          title="Notifications"
         >
-          <Mail size={18} />
+          <Bell size={18} />
           {unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1">
               {unreadCount}

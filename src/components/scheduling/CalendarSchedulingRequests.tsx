@@ -12,6 +12,8 @@ import {
   REQUEST_SOURCE_LABELS,
 } from "@/lib/schedulingRequestUtils";
 import { CalendarPlus, X, ExternalLink, Search, AlertCircle } from "lucide-react";
+
+const str = (v: unknown): string => (v == null ? "" : typeof v === "object" ? "" : String(v));
 import { Input } from "@/components/ui/input";
 
 const STATUS_OPTIONS = ["all", "open", "converted", "closed", "cancelled"];
@@ -125,30 +127,30 @@ export default function CalendarSchedulingRequests({ onConvertToAppointment }: P
             <div key={req.id} className="dark-card rounded-xl p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className={`text-xs font-mono ${REQUEST_STATUS_CLASSES[req.status] || "status-pending"}`}>
-                    {REQUEST_STATUS_LABELS[req.status] || req.status}
+                  <span className={`text-xs font-mono ${REQUEST_STATUS_CLASSES[str(req.status)] || "status-pending"}`}>
+                    {REQUEST_STATUS_LABELS[str(req.status)] || str(req.status)}
                   </span>
                   <span className="status-badge bg-muted text-muted-foreground text-[10px]">
-                    {REQUEST_TYPE_LABELS[req.requestType] || req.requestType}
+                    {REQUEST_TYPE_LABELS[str(req.requestType)] || str(req.requestType)}
                   </span>
-                  {req.lead?.name && (
-                    <span className="text-sm font-medium truncate">{req.lead.name}</span>
+                  {str(req.lead?.name) && (
+                    <span className="text-sm font-medium truncate">{str(req.lead?.name)}</span>
                   )}
-                  {req.lead?.channel && (
-                    <span className="status-badge bg-muted text-muted-foreground text-[10px] hidden sm:inline-flex">{req.lead.channel}</span>
+                  {str(req.lead?.channel) && (
+                    <span className="status-badge bg-muted text-muted-foreground text-[10px] hidden sm:inline-flex">{str(req.lead?.channel)}</span>
                   )}
-                  {req.preferredDate && (
+                  {str(req.preferredDate) && (
                     <span className="text-xs text-muted-foreground font-mono hidden md:inline">
-                      {req.preferredDate}{req.preferredTime ? ` ${req.preferredTime}` : ""}
+                      {str(req.preferredDate)}{str(req.preferredTime) ? ` ${str(req.preferredTime)}` : ""}
                     </span>
                   )}
-                  {req.preferredTimeWindow && (
-                    <span className="text-xs text-muted-foreground hidden lg:inline">({req.preferredTimeWindow})</span>
+                  {str(req.preferredTimeWindow) && (
+                    <span className="text-xs text-muted-foreground hidden lg:inline">({str(req.preferredTimeWindow)})</span>
                   )}
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span className="status-badge bg-muted text-muted-foreground text-[10px]">
-                    {REQUEST_SOURCE_LABELS[req.source] || req.source}
+                    {REQUEST_SOURCE_LABELS[str(req.source)] || str(req.source)}
                   </span>
                   {req.status === "open" && (
                     <>
@@ -179,8 +181,8 @@ export default function CalendarSchedulingRequests({ onConvertToAppointment }: P
                   )}
                 </div>
               </div>
-              {req.notes && (
-                <p className="text-xs text-muted-foreground mt-1.5 truncate">{req.notes}</p>
+              {str(req.notes) && (
+                <p className="text-xs text-muted-foreground mt-1.5 truncate">{str(req.notes)}</p>
               )}
             </div>
           ))}

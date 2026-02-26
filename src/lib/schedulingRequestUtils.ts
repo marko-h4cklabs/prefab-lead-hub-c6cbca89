@@ -23,9 +23,17 @@ export interface NormalizedSchedulingRequest {
   };
 }
 
+/** Safe string coercion – returns "" for null, undefined, and objects (e.g. {}) */
+function str(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "object") return "";
+  return String(v);
+}
+
 function pick(obj: any, ...keys: string[]): any {
   for (const k of keys) {
-    if (obj[k] !== undefined && obj[k] !== null) return obj[k];
+    const v = obj[k];
+    if (v !== undefined && v !== null && !(typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 0)) return v;
   }
   return undefined;
 }
@@ -33,27 +41,31 @@ function pick(obj: any, ...keys: string[]): any {
 export function normalizeSchedulingRequest(raw: any): NormalizedSchedulingRequest {
   if (!raw) return raw;
 
-  const lead = raw.lead
+  const rawLead = raw.lead && typeof raw.lead === "object" && Object.keys(raw.lead).length > 0
+    ? raw.lead
+    : undefined;
+
+  const lead = rawLead
     ? {
-        id: raw.lead.id || "",
-        name: raw.lead.name || raw.lead.external_id || "",
-        channel: raw.lead.channel || "",
+        id: str(rawLead.id),
+        name: str(rawLead.name) || str(rawLead.external_id),
+        channel: str(rawLead.channel),
       }
     : undefined;
 
   return {
-    id: raw.id || "",
-    leadId: pick(raw, "leadId", "lead_id") || "",
-    status: raw.status || "open",
-    requestType: pick(raw, "requestType", "request_type", "type") || "call",
-    preferredDate: pick(raw, "preferredDate", "preferred_date") || "",
-    preferredTime: pick(raw, "preferredTime", "preferred_time") || "",
-    preferredTimeWindow: pick(raw, "preferredTimeWindow", "preferred_time_window") || "",
-    convertedAppointmentId: pick(raw, "convertedAppointmentId", "converted_appointment_id") || null,
-    source: raw.source || "manual",
-    notes: raw.notes || "",
-    createdAt: pick(raw, "createdAt", "created_at") || "",
-    updatedAt: pick(raw, "updatedAt", "updated_at") || "",
+    id: str(raw.id),
+    leadId: str(pick(raw, "leadId", "lead_id")),
+    status: str(raw.status) || "open",
+    requestType: str(pick(raw, "requestType", "request_type", "type")) || "call",
+    preferredDate: str(pick(raw, "preferredDate", "preferred_date")),
+    preferredTime: str(pick(raw, "preferredTime", "preferred_time")),
+    preferredTimeWindow: str(pick(raw, "preferredTimeWindow", "preferred_time_window")),
+    convertedAppointmentId: str(pick(raw, "convertedAppointmentId", "converted_appointment_id")) || null,
+    source: str(raw.source) || "manual",
+    notes: str(raw.notes),
+    createdAt: str(pick(raw, "createdAt", "created_at")),
+    updatedAt: str(pick(raw, "updatedAt", "updated_at")),
     lead,
   };
 }

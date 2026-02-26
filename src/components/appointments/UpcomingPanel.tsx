@@ -7,6 +7,8 @@ import {
 } from "@/lib/appointmentUtils";
 import { Clock } from "lucide-react";
 
+const str = (v: unknown): string => (v == null ? "" : typeof v === "object" ? "" : String(v));
+
 interface Props {
   appointments: NormalizedAppointment[];
   onSelect: (appt: NormalizedAppointment) => void;
@@ -38,9 +40,9 @@ export default function UpcomingPanel({ appointments, onSelect }: Props) {
               onClick={() => onSelect(appt)}
               className="text-left dark-card rounded-xl p-3 hover:bg-muted/30 transition-colors border-l-2 border-l-accent"
             >
-              <div className="text-sm font-medium truncate">{appt.title}</div>
-              {appt.lead?.name && (
-                <div className="text-xs text-muted-foreground truncate mt-0.5">{appt.lead.name}</div>
+              <div className="text-sm font-medium truncate">{str(appt.title)}</div>
+              {str(appt.lead?.name) && (
+                <div className="text-xs text-muted-foreground truncate mt-0.5">{str(appt.lead?.name)}</div>
               )}
               <div className="text-xs font-mono text-muted-foreground mt-1">
                 {dateStr ? new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : ""}
@@ -49,7 +51,7 @@ export default function UpcomingPanel({ appointments, onSelect }: Props) {
               </div>
               <div className="flex items-center gap-1.5 mt-1.5">
                 <span className="status-badge bg-muted text-muted-foreground text-[10px]">
-                  {TYPE_LABELS[appt.appointmentType] || appt.appointmentType}
+                  {TYPE_LABELS[str(appt.appointmentType)] || str(appt.appointmentType)}
                 </span>
               </div>
             </button>

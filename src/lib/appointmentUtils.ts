@@ -27,10 +27,18 @@ export interface NormalizedAppointment {
   sync_error?: string | null;
 }
 
-/** Pick first truthy value from an object for a set of candidate keys */
+/** Safe string coercion – returns "" for null, undefined, and objects (e.g. {}) */
+function str(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "object") return "";
+  return String(v);
+}
+
+/** Pick first truthy value from an object for a set of candidate keys (skips objects like {}) */
 function pick(obj: any, ...keys: string[]): any {
   for (const k of keys) {
-    if (obj[k] !== undefined && obj[k] !== null) return obj[k];
+    const v = obj[k];
+    if (v !== undefined && v !== null && !(typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 0)) return v;
   }
   return undefined;
 }
@@ -39,32 +47,36 @@ function pick(obj: any, ...keys: string[]): any {
 export function normalizeAppointment(raw: any): NormalizedAppointment {
   if (!raw) return raw;
 
-  const lead = raw.lead
+  const rawLead = raw.lead && typeof raw.lead === "object" && Object.keys(raw.lead).length > 0
+    ? raw.lead
+    : undefined;
+
+  const lead = rawLead
     ? {
-        id: raw.lead.id || "",
-        name: raw.lead.name || raw.lead.external_id || "",
-        channel: raw.lead.channel || "",
+        id: str(rawLead.id),
+        name: str(rawLead.name) || str(rawLead.external_id),
+        channel: str(rawLead.channel),
       }
     : undefined;
 
   return {
-    id: raw.id || "",
-    leadId: pick(raw, "leadId", "lead_id") || "",
-    title: raw.title || "",
-    appointmentType: pick(raw, "appointmentType", "appointment_type", "type") || "call",
-    startAt: pick(raw, "startAt", "start_at") || "",
-    endAt: pick(raw, "endAt", "end_at") || "",
-    timezone: raw.timezone || "Europe/Zagreb",
-    notes: raw.notes || "",
-    source: raw.source || "manual",
-    status: raw.status || "scheduled",
+    id: str(raw.id),
+    leadId: str(pick(raw, "leadId", "lead_id")),
+    title: str(raw.title),
+    appointmentType: str(pick(raw, "appointmentType", "appointment_type", "type")) || "call",
+    startAt: str(pick(raw, "startAt", "start_at")),
+    endAt: str(pick(raw, "endAt", "end_at")),
+    timezone: str(raw.timezone) || "Europe/Zagreb",
+    notes: str(raw.notes),
+    source: str(raw.source) || "manual",
+    status: str(raw.status) || "scheduled",
     reminderMinutesBefore: pick(raw, "reminderMinutesBefore", "reminder_minutes_before") ?? null,
     lead,
-    createdAt: pick(raw, "createdAt", "created_at") || "",
-    updatedAt: pick(raw, "updatedAt", "updated_at") || "",
-    google_meet_link: pick(raw, "google_meet_link", "googleMeetLink") ?? null,
+    createdAt: str(pick(raw, "createdAt", "created_at")),
+    updatedAt: str(pick(raw, "updatedAt", "updated_at")),
+    google_meet_link: str(pick(raw, "google_meet_link", "googleMeetLink")) || null,
     synced_to_google: pick(raw, "synced_to_google", "syncedToGoogle") ?? false,
-    sync_error: pick(raw, "sync_error", "syncError") ?? null,
+    sync_error: str(pick(raw, "sync_error", "syncError")) || null,
   };
 }
 

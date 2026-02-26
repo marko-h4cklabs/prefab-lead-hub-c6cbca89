@@ -22,6 +22,9 @@ import {
 } from "@/lib/appointmentUtils";
 import { addDays, format, startOfDay } from "date-fns";
 
+/** Safe string coercion – returns "" for null, undefined, and objects (e.g. {}) */
+const str = (v: unknown): string => (v == null ? "" : typeof v === "object" ? "" : String(v));
+
 const RANGE_OPTIONS = [
   { label: "Today", days: 0 },
   { label: "7 days", days: 7 },
@@ -77,9 +80,9 @@ const Calendar = () => {
     if (!searchQuery.trim()) return appointments;
     const q = searchQuery.toLowerCase();
     return appointments.filter((a) =>
-      a.title.toLowerCase().includes(q) ||
-      (a.lead?.name || "").toLowerCase().includes(q) ||
-      (a.lead?.channel || "").toLowerCase().includes(q)
+      str(a.title).toLowerCase().includes(q) ||
+      str(a.lead?.name).toLowerCase().includes(q) ||
+      str(a.lead?.channel).toLowerCase().includes(q)
     );
   }, [appointments, searchQuery]);
 
@@ -125,8 +128,8 @@ const Calendar = () => {
   };
 
   const handleConvertRequest = (req: NormalizedSchedulingRequest) => {
-    const typeName = REQUEST_TYPE_LABELS[req.requestType] || req.requestType;
-    const leadName = req.lead?.name || "Lead";
+    const typeName = REQUEST_TYPE_LABELS[str(req.requestType)] || str(req.requestType);
+    const leadName = str(req.lead?.name) || "Lead";
     setSchedulingRequestPrefill({
       lead_id: req.leadId,
       lead_name: leadName,
@@ -286,33 +289,33 @@ const Calendar = () => {
                         <span className="text-xs font-mono text-muted-foreground w-24 shrink-0">
                           {formatAppointmentTime(appt)}
                         </span>
-                        <span className="text-sm font-medium truncate">{appt.title}</span>
-                        {appt.lead?.name && (
-                          <span className="text-xs text-muted-foreground truncate hidden sm:inline">• {appt.lead.name}</span>
+                        <span className="text-sm font-medium truncate">{str(appt.title)}</span>
+                        {str(appt.lead?.name) && (
+                          <span className="text-xs text-muted-foreground truncate hidden sm:inline">• {str(appt.lead?.name)}</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        {appt.lead?.channel && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[hsl(0_0%_12%)] text-muted-foreground hidden md:inline-flex">{appt.lead.channel}</span>
+                        {str(appt.lead?.channel) && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[hsl(0_0%_12%)] text-muted-foreground hidden md:inline-flex">{str(appt.lead?.channel)}</span>
                         )}
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-[hsl(0_0%_12%)] text-muted-foreground">
-                          {TYPE_LABELS[appt.appointmentType] || appt.appointmentType}
+                          {TYPE_LABELS[str(appt.appointmentType)] || str(appt.appointmentType)}
                         </span>
-                        {appt.source !== "manual" && (
+                        {str(appt.source) !== "manual" && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-[hsl(0_0%_12%)] text-muted-foreground hidden lg:inline-flex">
-                            {SOURCE_LABELS[appt.source] || appt.source}
+                            {SOURCE_LABELS[str(appt.source)] || str(appt.source)}
                           </span>
                         )}
                         {appt.reminderMinutesBefore && (
                           <span className="text-muted-foreground text-[10px] hidden lg:inline" title="Reminder set">🔔</span>
                         )}
-                        <span className={`text-xs ${STATUS_CLASSES[appt.status] || "status-pending"}`}>
-                          {STATUS_LABELS[appt.status] || appt.status}
+                        <span className={`text-xs ${STATUS_CLASSES[str(appt.status)] || "status-pending"}`}>
+                          {STATUS_LABELS[str(appt.status)] || str(appt.status)}
                         </span>
                       </div>
                     </div>
-                    {appt.notes && (
-                      <p className="text-xs text-muted-foreground mt-1.5 ml-[108px] truncate hidden sm:block">{appt.notes}</p>
+                    {str(appt.notes) && (
+                      <p className="text-xs text-muted-foreground mt-1.5 ml-[108px] truncate hidden sm:block">{str(appt.notes)}</p>
                     )}
                   </button>
                 ))}
