@@ -146,6 +146,17 @@ const HandoffPanel = () => {
 
   return (
     <div className="space-y-2 p-3">
+      {/* ── Summary Stats ── */}
+      <div className="flex items-center gap-3 text-[10px] text-muted-foreground pb-1.5 border-b border-border/50 mb-1">
+        <span>{activeHandoffs.length} active handoff{activeHandoffs.length !== 1 ? "s" : ""}</span>
+        <span className="text-border">|</span>
+        <span>{rules.filter(r => r.is_active).length} of {rules.length} rules active</span>
+        <span className="text-border">|</span>
+        <span>Auto-resume: {settings.auto_resume_minutes}min</span>
+      </div>
+      <p className="text-[10px] text-muted-foreground pb-1">
+        Controls when the bot pauses for human intervention. Configure trigger rules that detect pricing questions, complaints, or hot leads — then get notified to take over the conversation.
+      </p>
       {/* ── Active Handoffs ── */}
       <SectionToggle label="Active Handoffs" count={activeHandoffs.length} open={expanded === "active"} onClick={() => setExpanded(expanded === "active" ? "rules" : "active")} color={activeHandoffs.length > 0 ? "text-warning" : undefined} />
       {expanded === "active" && (

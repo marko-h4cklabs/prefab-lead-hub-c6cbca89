@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import AgentIdentitySection from "@/components/chatbot/AgentIdentitySection";
 import PersonasSection from "@/components/chatbot/PersonasSection";
+import AILearningGround from "@/components/chatbot/AILearningGround";
 
 const IdentityPage = () => {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ const IdentityPage = () => {
       <div className="flex-1 flex gap-6 overflow-hidden">
         <div className="flex-1 overflow-y-auto space-y-4 pr-2">
           <h2 className="text-lg font-bold text-foreground">Database</h2>
+          <AILearningGround onApplied={refreshPreview} />
           <div className="dark-card border-l-4 border-l-primary">
             <AgentIdentitySection onDirty={() => {}} onSaved={refreshPreview} />
           </div>

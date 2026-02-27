@@ -989,6 +989,10 @@ export const api = {
   putAgentIdentity: (data: any) =>
     request<any>("/api/chatbot/identity", { method: "PUT", body: JSON.stringify(data) }),
 
+  // --- AI Learning Ground ---
+  analyzeStyle: (data: { texts: string[]; images?: string[] }) =>
+    request<any>("/api/chatbot/learn-style", { method: "POST", body: JSON.stringify(data) }),
+
   // --- Conversation Strategy ---
   getConversationStrategy: () =>
     request<any>("/api/chatbot/strategy"),

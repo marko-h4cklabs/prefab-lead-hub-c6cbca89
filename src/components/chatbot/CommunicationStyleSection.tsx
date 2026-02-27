@@ -45,6 +45,9 @@ interface StyleState {
   emojis_enabled: boolean;
   language: string;
   response_delay_seconds: number;
+  delay_min_seconds: number;
+  delay_max_seconds: number;
+  delay_random_enabled: boolean;
 }
 
 const DEFAULTS: StyleState = {
@@ -54,6 +57,9 @@ const DEFAULTS: StyleState = {
   emojis_enabled: false,
   language: "en",
   response_delay_seconds: 0,
+  delay_min_seconds: 0,
+  delay_max_seconds: 0,
+  delay_random_enabled: false,
 };
 
 const STORAGE_KEY = "chatbot_style_draft";
@@ -78,6 +84,9 @@ const CommunicationStyleSection = ({ onSaved, onDirty }: { onSaved?: () => void;
             emojis_enabled: res.emojis_enabled ?? false,
             language: res.language_code || res.language || "en",
             response_delay_seconds: res.response_delay_seconds ?? 0,
+            delay_min_seconds: res.delay_min_seconds ?? 0,
+            delay_max_seconds: res.delay_max_seconds ?? 0,
+            delay_random_enabled: res.delay_random_enabled ?? false,
           };
           setData(merged);
           initialRef.current = JSON.stringify(merged);
@@ -126,6 +135,9 @@ const CommunicationStyleSection = ({ onSaved, onDirty }: { onSaved?: () => void;
         emojis_enabled: data.emojis_enabled,
         language_code: data.language,
         response_delay_seconds: data.response_delay_seconds,
+        delay_min_seconds: data.delay_min_seconds,
+        delay_max_seconds: data.delay_max_seconds,
+        delay_random_enabled: data.delay_random_enabled,
       } as any);
       initialRef.current = JSON.stringify(data);
       setIsDirty(false);
@@ -221,33 +233,80 @@ const CommunicationStyleSection = ({ onSaved, onDirty }: { onSaved?: () => void;
         <p className="text-[11px] text-muted-foreground">
           Set a delay so your bot feels more human in real DM conversations. The timer resets if the lead sends another message.
         </p>
-        <div className="flex flex-wrap gap-2">
-          {[0, 3, 5, 8, 10, 15, 20, 30].map((sec) => (
-            <button
-              key={sec}
-              onClick={() => update({ response_delay_seconds: sec })}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
-                data.response_delay_seconds === sec
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
-              }`}
-            >
-              {sec === 0 ? "Instant" : `${sec}s`}
-            </button>
-          ))}
+
+        {/* Random Interval Generator Toggle */}
+        <div className="flex items-center justify-between py-1">
+          <div>
+            <label className="text-xs font-medium text-foreground">Random Interval Generator</label>
+            <p className="text-[10px] text-muted-foreground">Each reply uses a random delay between min and max</p>
+          </div>
+          <Switch checked={data.delay_random_enabled} onCheckedChange={(v) => update({ delay_random_enabled: v })} />
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-muted-foreground">Custom:</span>
-          <input
-            type="number"
-            min={0}
-            max={60}
-            value={data.response_delay_seconds}
-            onChange={(e) => update({ response_delay_seconds: Math.max(0, Math.min(60, parseInt(e.target.value) || 0)) })}
-            className="dark-input w-16 text-center text-xs"
-          />
-          <span className="text-[11px] text-muted-foreground">seconds</span>
-        </div>
+
+        {data.delay_random_enabled ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <label className="text-[10px] text-muted-foreground block mb-1">Min delay (seconds)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={120}
+                  value={data.delay_min_seconds}
+                  onChange={(e) => update({ delay_min_seconds: Math.max(0, Math.min(120, parseInt(e.target.value) || 0)) })}
+                  className="dark-input w-full text-center text-xs"
+                />
+              </div>
+              <span className="text-muted-foreground text-xs mt-4">—</span>
+              <div className="flex-1">
+                <label className="text-[10px] text-muted-foreground block mb-1">Max delay (seconds)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={120}
+                  value={data.delay_max_seconds}
+                  onChange={(e) => update({ delay_max_seconds: Math.max(0, Math.min(120, parseInt(e.target.value) || 0)) })}
+                  className="dark-input w-full text-center text-xs"
+                />
+              </div>
+            </div>
+            {data.delay_min_seconds > 0 && data.delay_max_seconds > 0 && (
+              <p className="text-[10px] text-muted-foreground">
+                Bot will wait {data.delay_min_seconds}–{data.delay_max_seconds}s randomly before replying
+              </p>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-2">
+              {[0, 3, 5, 8, 10, 15, 20, 30].map((sec) => (
+                <button
+                  key={sec}
+                  onClick={() => update({ response_delay_seconds: sec })}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                    data.response_delay_seconds === sec
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
+                  }`}
+                >
+                  {sec === 0 ? "Instant" : `${sec}s`}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-muted-foreground">Custom:</span>
+              <input
+                type="number"
+                min={0}
+                max={60}
+                value={data.response_delay_seconds}
+                onChange={(e) => update({ response_delay_seconds: Math.max(0, Math.min(60, parseInt(e.target.value) || 0)) })}
+                className="dark-input w-16 text-center text-xs"
+              />
+              <span className="text-[11px] text-muted-foreground">seconds</span>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Language */}

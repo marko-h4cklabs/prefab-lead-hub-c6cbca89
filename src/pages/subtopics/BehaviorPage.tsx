@@ -5,6 +5,7 @@ import CommunicationStyleSection from "@/components/chatbot/CommunicationStyleSe
 import ConversationStrategySection from "@/components/chatbot/ConversationStrategySection";
 import GuardrailsSection from "@/components/chatbot/GuardrailsSection";
 import BookingTriggerSection from "@/components/chatbot/BookingTriggerSection";
+import HumanErrorSection from "@/components/chatbot/HumanErrorSection";
 import HandoffPanel from "@/components/handoff/HandoffPanel";
 
 const BehaviorPage = () => {
@@ -31,13 +32,17 @@ const BehaviorPage = () => {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto space-y-4 pl-2">
-          <h2 className="text-lg font-bold text-foreground">Guardrails</h2>
-          <div className="dark-card border-l-4 border-l-primary">
-            <GuardrailsSection onDirty={() => {}} onSaved={refreshPreview} />
-          </div>
-          <h2 className="text-lg font-bold text-foreground mt-2">Human-Break System</h2>
+          <h2 className="text-lg font-bold text-foreground">Human-Break System</h2>
           <div className="dark-card border-l-4 border-l-primary">
             <HandoffPanel />
+          </div>
+          <h2 className="text-lg font-bold text-foreground mt-2">Human Error Style</h2>
+          <div className="dark-card border-l-4 border-l-primary">
+            <HumanErrorSection onDirty={() => {}} onSaved={refreshPreview} />
+          </div>
+          <h2 className="text-lg font-bold text-foreground mt-2">Guardrails</h2>
+          <div className="dark-card border-l-4 border-l-primary">
+            <GuardrailsSection onDirty={() => {}} onSaved={refreshPreview} />
           </div>
         </div>
       </div>
