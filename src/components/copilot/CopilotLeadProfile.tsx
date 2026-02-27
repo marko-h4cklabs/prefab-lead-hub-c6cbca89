@@ -65,7 +65,7 @@ const CopilotLeadProfile = ({ leadId }: Props) => {
   const name = lead?.name || "Unknown";
   const channel = lead?.channel || "instagram";
   const stage = lead?.pipeline_stage || "new";
-  const qualStatus = lead?.qualification_status || "pending";
+  const qualStatus = score >= 70 ? "qualified" : score >= 40 ? "pending" : "unqualified";
 
   return (
     <div className="w-[300px] shrink-0 border-l border-border bg-[hsl(0_0%_4%)] flex flex-col h-full overflow-y-auto">
@@ -104,10 +104,10 @@ const CopilotLeadProfile = ({ leadId }: Props) => {
         <div className="flex items-center gap-1.5">
           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
             qualStatus === "qualified" ? "bg-success text-success-foreground" :
-            qualStatus === "disqualified" ? "bg-destructive text-destructive-foreground" :
+            qualStatus === "unqualified" ? "bg-destructive text-destructive-foreground" :
             "bg-muted text-muted-foreground"
           }`}>
-            {qualStatus === "qualified" ? "Qualified" : qualStatus === "disqualified" ? "Disqualified" : "Pending"}
+            {qualStatus === "qualified" ? "Qualified" : qualStatus === "unqualified" ? "Unqualified" : "Pending"}
           </span>
         </div>
       </div>
