@@ -68,6 +68,9 @@ const MODELS = [
 
 const VOICE_CATEGORIES = ["All", "Premade", "Professional", "High Quality"];
 
+// Curated recommended voices — 3 distinct popular voices to keep the library focused
+const RECOMMENDED_VOICE_NAMES = ["rachel", "adam", "bella"];
+
 const VoiceSettingsSection = () => {
   const [settings, setSettings] = useState<VoiceSettings | null>(null);
   const [voices, setVoices] = useState<Voice[]>([]);
@@ -248,11 +251,21 @@ const VoiceSettingsSection = () => {
     }
   };
 
-  const filteredVoices = voices.filter((v) => {
-    if (voiceSearch && !v.name.toLowerCase().includes(voiceSearch.toLowerCase())) return false;
-    if (voiceCategory !== "All" && v.category?.toLowerCase() !== voiceCategory.toLowerCase()) return false;
-    return true;
-  });
+  const filteredVoices = (() => {
+    // When no search or filter active, show only 3 curated voices
+    if (!voiceSearch && voiceCategory === "All") {
+      const recommended = RECOMMENDED_VOICE_NAMES.map(name =>
+        voices.find(v => v.name.toLowerCase() === name)
+      ).filter(Boolean) as Voice[];
+      // If we found the curated voices, use them; otherwise fall back to first 3
+      return recommended.length >= 3 ? recommended : voices.slice(0, 3);
+    }
+    return voices.filter((v) => {
+      if (voiceSearch && !v.name.toLowerCase().includes(voiceSearch.toLowerCase())) return false;
+      if (voiceCategory !== "All" && v.category?.toLowerCase() !== voiceCategory.toLowerCase()) return false;
+      return true;
+    });
+  })();
 
   const usagePct = usage ? Math.round((usage.characters_used / usage.character_limit) * 100) : 0;
   const disabled = !settings?.voice_enabled;
@@ -444,6 +457,11 @@ const VoiceSettingsSection = () => {
               <div className="text-center py-8">
                 <Volume2 size={24} className="mx-auto text-muted-foreground mb-2" />
                 <p className="text-xs text-muted-foreground">No voices found matching your search</p>
+              </div>
+            )}
+            {!voiceSearch && voiceCategory === "All" && (
+              <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 text-center">
+                <p className="text-xs text-muted-foreground">For the best results, <span className="text-primary font-medium">create your own voice clone</span> in the "My Cloned Voices" tab — it makes your AI sound like you.</p>
               </div>
             )}
           </TabsContent>

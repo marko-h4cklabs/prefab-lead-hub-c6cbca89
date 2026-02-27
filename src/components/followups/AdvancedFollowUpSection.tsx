@@ -4,6 +4,7 @@ import { toast } from "@/hooks/use-toast";
 import {
   Loader2, Plus, Pause, Play, SkipForward, X, ChevronDown, ChevronUp,
   BarChart3, Clock, Send, AlertTriangle, TrendingUp, Zap, Brain, RefreshCw,
+  Search, User, FileText, Activity, Eye,
 } from "lucide-react";
 
 /* ── Types ── */
@@ -70,6 +71,25 @@ interface SeqStat {
   negative_replies: number;
 }
 
+interface TimelineEntry {
+  id: string;
+  step_order: number;
+  message_template: string;
+  sent_at: string;
+  lead_replied: boolean;
+  reply_sentiment: string | null;
+  step_type: string;
+  sequence_name?: string;
+}
+
+interface LeadIntel {
+  intent_score: number;
+  is_hot_lead: boolean;
+  intent_tags: string[];
+  budget_detected: string | null;
+  ai_summary: string;
+}
+
 /* ── Helpers ── */
 const TRIGGER_LABELS: Record<string, string> = {
   call_booked: "Call Booked",
@@ -98,8 +118,18 @@ function fmtDate(d: string | null) {
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+function timeAgo(d: string) {
+  const diff = Date.now() - new Date(d).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
 /* ── Sub-tabs ── */
-type SubTab = "overview" | "sequences" | "enrollments" | "analytics";
+type SubTab = "overview" | "leads" | "sequences" | "enrollments" | "analytics";
 
 /* ── Main Component ── */
 const AdvancedFollowUpSection = () => {
@@ -118,6 +148,14 @@ const AdvancedFollowUpSection = () => {
     { delay_minutes: 0, message_template: "", step_type: "message", ai_context_prompt: "" },
   ]);
   const [creating, setCreating] = useState(false);
+
+  // Leads tab state
+  const [leadSearch, setLeadSearch] = useState("");
+  const [searchResults, setSearchResults] = useState<Enrollment[]>([]);
+  const [selectedLead, setSelectedLead] = useState<{ id: string; name: string } | null>(null);
+  const [leadTimeline, setLeadTimeline] = useState<TimelineEntry[]>([]);
+  const [leadIntel, setLeadIntel] = useState<LeadIntel | null>(null);
+  const [leadLoading, setLeadLoading] = useState(false);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -183,15 +221,47 @@ const AdvancedFollowUpSection = () => {
     finally { setCreating(false); }
   };
 
+  /* ── Lead search & detail ── */
+  const handleLeadSearch = useCallback(() => {
+    if (!leadSearch.trim()) { setSearchResults([]); return; }
+    const q = leadSearch.toLowerCase();
+    const matches = enrollments.filter(e =>
+      (e.lead_name || "").toLowerCase().includes(q) ||
+      e.lead_id.toLowerCase().includes(q)
+    );
+    setSearchResults(matches);
+  }, [leadSearch, enrollments]);
+
+  useEffect(() => { handleLeadSearch(); }, [handleLeadSearch]);
+
+  const loadLeadDetail = async (leadId: string, leadName: string) => {
+    setSelectedLead({ id: leadId, name: leadName });
+    setLeadLoading(true);
+    try {
+      const [timelineRes, intelRes] = await Promise.all([
+        api.getFollowUpTimeline(leadId),
+        api.getLeadIntelligence(leadId).catch(() => null),
+      ]);
+      setLeadTimeline(timelineRes?.data || timelineRes?.timeline || []);
+      if (intelRes) setLeadIntel(intelRes);
+      else setLeadIntel(null);
+    } catch {
+      setLeadTimeline([]);
+      setLeadIntel(null);
+    } finally {
+      setLeadLoading(false);
+    }
+  };
+
   if (loading) return <div className="p-6 flex items-center justify-center"><Loader2 className="animate-spin text-muted-foreground" size={20} /></div>;
 
   return (
     <div className="p-5 space-y-4">
       {/* Sub-tabs */}
       <div className="flex gap-1 bg-secondary rounded-lg p-1">
-        {(["overview", "sequences", "enrollments", "analytics"] as SubTab[]).map(t => (
+        {(["overview", "leads", "sequences", "enrollments", "analytics"] as SubTab[]).map(t => (
           <button key={t} onClick={() => setTab(t)} className={`flex-1 text-xs py-1.5 px-2 rounded-md font-medium transition-colors ${tab === t ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
-            {t === "overview" ? "Overview" : t === "sequences" ? "Sequences" : t === "enrollments" ? "Active" : "Analytics"}
+            {t === "overview" ? "Overview" : t === "leads" ? "Leads" : t === "sequences" ? "Sequences" : t === "enrollments" ? "Active" : "Analytics"}
           </button>
         ))}
       </div>
@@ -199,7 +269,6 @@ const AdvancedFollowUpSection = () => {
       {/* ── OVERVIEW TAB ── */}
       {tab === "overview" && stats && (
         <div className="space-y-4">
-          {/* Stat cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
             <StatCard icon={<Send size={14} />} label="Messages Sent" value={stats.total_messages_sent} />
             <StatCard icon={<TrendingUp size={14} />} label="Reply Rate" value={`${stats.reply_rate}%`} color={stats.reply_rate > 20 ? "text-success" : "text-warning"} />
@@ -212,7 +281,22 @@ const AdvancedFollowUpSection = () => {
             <StatCard icon={<BarChart3 size={14} />} label="Positive" value={stats.positive_replies} color="text-success" />
           </div>
 
-          {/* Quick sequence performance */}
+          {/* AI Reasoning summary */}
+          <div className="bg-purple-500/5 border border-purple-500/20 rounded-lg p-3 space-y-2">
+            <div className="flex items-center gap-1.5">
+              <Brain size={14} className="text-purple-400" />
+              <span className="text-xs font-semibold text-foreground">AI Reasoning</span>
+            </div>
+            <div className="text-xs text-muted-foreground space-y-1">
+              {stats.reply_rate > 30 && <p>High reply rate ({stats.reply_rate}%) — your sequences are resonating well with leads.</p>}
+              {stats.reply_rate <= 30 && stats.reply_rate > 10 && <p>Reply rate at {stats.reply_rate}% — consider using AI-generated steps for more personalized follow-ups.</p>}
+              {stats.reply_rate <= 10 && stats.total_messages_sent > 0 && <p>Low reply rate ({stats.reply_rate}%) — try shorter delays between steps and more conversational messaging.</p>}
+              {stats.escalated_count > 0 && <p>{stats.escalated_count} lead{stats.escalated_count > 1 ? "s" : ""} escalated — review escalated leads in the Leads tab to understand why.</p>}
+              {stats.active_enrollments === 0 && stats.total_messages_sent === 0 && <p>No active follow-ups yet. Create your first sequence in the Sequences tab to start nurturing leads.</p>}
+              {stats.positive_replies > 0 && <p>{stats.positive_replies} positive replies detected — these leads are warm and ready for next steps.</p>}
+            </div>
+          </div>
+
           {seqStats.length > 0 && (
             <div className="space-y-2">
               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sequence Performance</h4>
@@ -230,6 +314,221 @@ const AdvancedFollowUpSection = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── LEADS TAB ── */}
+      {tab === "leads" && (
+        <div className="space-y-3">
+          {/* Search bar */}
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={leadSearch}
+              onChange={e => setLeadSearch(e.target.value)}
+              placeholder="Search leads by name or ID..."
+              className="dark-input w-full pl-9 text-xs"
+            />
+          </div>
+
+          {/* Search results */}
+          {leadSearch.trim() && searchResults.length > 0 && !selectedLead && (
+            <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
+              {searchResults.map(enr => (
+                <button
+                  key={enr.id}
+                  onClick={() => loadLeadDetail(enr.lead_id, enr.lead_name || "Unknown")}
+                  className="w-full flex items-center justify-between bg-secondary/50 rounded-lg px-3 py-2 border border-border/50 hover:border-primary/40 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <User size={12} className="text-muted-foreground shrink-0" />
+                    <span className="text-xs font-medium text-foreground truncate">{enr.lead_name || "Unknown"}</span>
+                    <span className="text-[10px] text-muted-foreground">{enr.sequence_name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {enr.paused && <span className="text-[9px] px-1.5 py-0.5 rounded bg-warning/15 text-warning">Paused</span>}
+                    {enr.escalated && <span className="text-[9px] px-1.5 py-0.5 rounded bg-destructive/15 text-destructive">Escalated</span>}
+                    <Eye size={11} className="text-muted-foreground" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {leadSearch.trim() && searchResults.length === 0 && !selectedLead && (
+            <div className="text-center py-4 text-xs text-muted-foreground">No leads found matching "{leadSearch}"</div>
+          )}
+
+          {/* Lead detail view */}
+          {selectedLead && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <button onClick={() => { setSelectedLead(null); setLeadTimeline([]); setLeadIntel(null); }} className="dark-btn-ghost text-xs h-7 gap-1">
+                  <X size={12} /> Close
+                </button>
+                <span className="text-xs font-semibold text-foreground">{selectedLead.name}</span>
+              </div>
+
+              {leadLoading ? (
+                <div className="flex items-center justify-center py-6"><Loader2 size={16} className="animate-spin text-muted-foreground" /></div>
+              ) : (
+                <>
+                  {/* AI Lead Intelligence */}
+                  {leadIntel && (
+                    <div className="bg-secondary/50 rounded-lg p-3 border border-border/50 space-y-2">
+                      <div className="flex items-center gap-1.5">
+                        <Brain size={12} className="text-purple-400" />
+                        <span className="text-[10px] font-semibold text-foreground uppercase tracking-wider">AI Intelligence</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <div className="text-xs text-muted-foreground">Intent Score</div>
+                          <div className={`text-sm font-bold ${leadIntel.intent_score > 70 ? "text-success" : leadIntel.intent_score > 40 ? "text-warning" : "text-muted-foreground"}`}>
+                            {leadIntel.intent_score}/100
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">Hot Lead</div>
+                          <div className={`text-sm font-bold ${leadIntel.is_hot_lead ? "text-destructive" : "text-muted-foreground"}`}>
+                            {leadIntel.is_hot_lead ? "Yes" : "No"}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">Budget</div>
+                          <div className="text-sm font-bold text-foreground">{leadIntel.budget_detected || "—"}</div>
+                        </div>
+                      </div>
+                      {leadIntel.intent_tags?.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {leadIntel.intent_tags.map((tag, i) => (
+                            <span key={i} className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">{tag}</span>
+                          ))}
+                        </div>
+                      )}
+                      {leadIntel.ai_summary && (
+                        <div className="bg-purple-500/5 border border-purple-500/15 rounded px-2.5 py-2">
+                          <div className="flex items-center gap-1 mb-1">
+                            <Brain size={10} className="text-purple-400" />
+                            <span className="text-[9px] font-medium text-purple-400 uppercase">AI Summary</span>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground leading-relaxed">{leadIntel.ai_summary}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Follow-up Timeline */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <Activity size={12} className="text-primary" />
+                      <span className="text-[10px] font-semibold text-foreground uppercase tracking-wider">Follow-up Log</span>
+                      <span className="text-[10px] text-muted-foreground">({leadTimeline.length} messages)</span>
+                    </div>
+
+                    {leadTimeline.length > 0 ? (
+                      <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
+                        {leadTimeline.map((entry, i) => (
+                          <div key={entry.id || i} className="bg-background rounded-lg px-3 py-2 border border-border/30 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-muted-foreground font-mono">#{entry.step_order}</span>
+                                {entry.step_type === "ai_generated" ? (
+                                  <span className="flex items-center gap-0.5 text-[10px] text-purple-400"><Brain size={9} /> AI</span>
+                                ) : (
+                                  <span className="text-[10px] text-muted-foreground"><FileText size={9} className="inline" /> Template</span>
+                                )}
+                                {entry.sequence_name && <span className="text-[9px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{entry.sequence_name}</span>}
+                              </div>
+                              <span className="text-[10px] text-muted-foreground">{timeAgo(entry.sent_at)}</span>
+                            </div>
+                            <p className="text-xs text-foreground/80 leading-relaxed">{entry.message_template || "AI-generated message"}</p>
+                            <div className="flex items-center gap-2">
+                              {entry.lead_replied ? (
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
+                                  entry.reply_sentiment === "positive" ? "bg-success/15 text-success" :
+                                  entry.reply_sentiment === "negative" ? "bg-destructive/15 text-destructive" :
+                                  "bg-primary/10 text-primary"
+                                }`}>
+                                  Replied{entry.reply_sentiment ? ` (${entry.reply_sentiment})` : ""}
+                                </span>
+                              ) : (
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">No reply</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-xs text-muted-foreground">No follow-up messages sent to this lead yet</div>
+                    )}
+                  </div>
+
+                  {/* AI Reasoning for this lead */}
+                  {leadTimeline.length > 0 && (
+                    <div className="bg-purple-500/5 border border-purple-500/20 rounded-lg p-3 space-y-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <Brain size={12} className="text-purple-400" />
+                        <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider">AI Reasoning</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        {(() => {
+                          const replied = leadTimeline.filter(e => e.lead_replied);
+                          const positive = replied.filter(e => e.reply_sentiment === "positive");
+                          const negative = replied.filter(e => e.reply_sentiment === "negative");
+                          const total = leadTimeline.length;
+                          const replyRate = total > 0 ? Math.round((replied.length / total) * 100) : 0;
+
+                          return (
+                            <>
+                              <p>{total} follow-up{total > 1 ? "s" : ""} sent, {replied.length} replied ({replyRate}% response rate).</p>
+                              {positive.length > 0 && <p>{positive.length} positive response{positive.length > 1 ? "s" : ""} — lead shows interest, consider booking a call.</p>}
+                              {negative.length > 0 && <p>{negative.length} negative response{negative.length > 1 ? "s" : ""} — reduce frequency or change approach.</p>}
+                              {replied.length === 0 && total >= 3 && <p>No replies after {total} attempts — consider escalating or changing the sequence.</p>}
+                              {leadIntel?.is_hot_lead && <p>Hot lead detected — prioritize this lead for faster follow-up cadence.</p>}
+                              {leadIntel?.budget_detected && <p>Budget signal: {leadIntel.budget_detected} — tailor messaging around value and ROI.</p>}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Default state */}
+          {!leadSearch.trim() && !selectedLead && (
+            <div className="space-y-3">
+              <div className="text-center py-4">
+                <Search size={20} className="mx-auto text-muted-foreground mb-2" />
+                <p className="text-xs text-muted-foreground">Search for a lead to view their follow-up history, AI intelligence, and reasoning</p>
+              </div>
+              {/* Recent enrollments quick access */}
+              {enrollments.length > 0 && (
+                <div className="space-y-1.5">
+                  <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Recent Enrollments</h4>
+                  {enrollments.slice(0, 5).map(enr => (
+                    <button
+                      key={enr.id}
+                      onClick={() => loadLeadDetail(enr.lead_id, enr.lead_name || "Unknown")}
+                      className="w-full flex items-center justify-between bg-secondary/50 rounded-lg px-3 py-2 border border-border/50 hover:border-primary/40 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        <User size={11} className="text-muted-foreground" />
+                        <span className="text-xs font-medium text-foreground">{enr.lead_name || "Unknown"}</span>
+                        <span className="text-[10px] text-muted-foreground">{enr.sequence_name}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground">{enr.follow_ups_sent} sent</span>
+                        <Eye size={11} className="text-muted-foreground" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -393,6 +692,7 @@ const AdvancedFollowUpSection = () => {
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
+                <button onClick={() => { setTab("leads"); loadLeadDetail(enr.lead_id, enr.lead_name || "Unknown"); }} className="dark-btn-ghost h-6 w-6 p-0" title="View Lead"><Eye size={11} className="text-primary" /></button>
                 {enr.paused ? (
                   <button onClick={() => handleEnrollmentAction(enr.id, "resume")} className="dark-btn-ghost h-6 w-6 p-0" title="Resume"><Play size={11} className="text-success" /></button>
                 ) : (
@@ -420,7 +720,6 @@ const AdvancedFollowUpSection = () => {
                   {s.reply_rate}%
                 </span>
               </div>
-              {/* Progress bar */}
               <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                 <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${Math.min(100, s.reply_rate)}%` }} />
               </div>
@@ -441,6 +740,20 @@ const AdvancedFollowUpSection = () => {
                   <div className="text-sm font-semibold text-destructive">{s.negative_replies}</div>
                   <div className="text-[9px] text-muted-foreground">Negative</div>
                 </div>
+              </div>
+
+              {/* AI insight per sequence */}
+              <div className="bg-purple-500/5 border border-purple-500/15 rounded px-2.5 py-1.5">
+                <div className="flex items-center gap-1 mb-0.5">
+                  <Brain size={9} className="text-purple-400" />
+                  <span className="text-[9px] text-purple-400 font-medium">AI Insight</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  {s.reply_rate > 30 ? "Strong performance — this sequence converts well. Consider increasing enrollment." :
+                   s.reply_rate > 10 ? "Moderate response. Try adding AI-generated steps for more personalized outreach." :
+                   s.total_messages > 0 ? "Low engagement. Review messaging tone and timing, or try a different trigger event." :
+                   "No data yet — messages will start flowing as leads enter this sequence."}
+                </p>
               </div>
             </div>
           )) : (

@@ -217,7 +217,7 @@ const Conversation = () => {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0 bg-card">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(`/leads/${leadId}`)} className="dark-btn-ghost p-1.5"><ArrowLeft size={16} /></button>
+          <button onClick={() => navigate("/dashboard/leads")} className="dark-btn-ghost p-1.5"><ArrowLeft size={16} /></button>
           <h1 className="text-sm font-semibold">Conversation</h1>
         </div>
         <div className="flex items-center gap-3">
@@ -318,51 +318,27 @@ const Conversation = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Composer / Suggestions */}
+          {/* Composer / Suggestions — hidden in autopilot mode */}
           {operatingMode === "copilot" ? (
             <ReplySuggestions
               leadId={leadId || ""}
               conversationId={conversationId}
               onMessageSent={(content) => {
                 setData((prev) => ({ ...prev, lead_id: prev?.lead_id || leadId || "", messages: [...(prev?.messages || []), { role: "user", content }], parsed_fields: prev?.parsed_fields || {}, current_step: prev?.current_step ?? 0 }));
-                // Re-fetch conversation to get backend state
                 if (leadId) api.getConversation(companyId, leadId).then((convo) => { setData(convo); applyResponseFields(convo); }).catch(() => {});
               }}
               lastMessageCount={messages.length}
             />
           ) : (
-            <div className="shrink-0 p-4 border-t border-border bg-card">
-              <div className="flex gap-2">
-                <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={handleKeyDown} placeholder="Type a message… (Enter to send)" rows={2} className="dark-input flex-1 resize-none" disabled={sending} />
-                <div className="flex flex-col gap-1 self-end">
-                  <button onClick={handleSend} disabled={!draft.trim() || sending} className="dark-btn-primary h-[28px] px-4">
-                    {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                  </button>
-                  <VoiceRecorder onSend={async (blob) => {
-                    const convId = conversationId || leadId || "";
-                    const res = await api.sendVoiceMessage(convId, blob);
-                    if (res?.message || res?.assistant_message) { await applyBackendResponse(res); } else { const convo = await api.getConversation(companyId, leadId!); setData(convo); applyResponseFields(convo); }
-                  }} />
-                  <button onClick={() => { clearTimers(); triggerAiReply(); }} disabled={aiReplying} className="dark-btn bg-secondary text-secondary-foreground hover:bg-secondary/80 h-[28px] px-3">
-                    {aiReplying ? <Loader2 size={14} className="animate-spin" /> : <Bot size={14} />}
-                    <span className="text-xs ml-1">AI</span>
-                  </button>
-                  {picturesRequired && (
-                    <>
-                      <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleImageUpload(e.target.files)} />
-                      <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="dark-btn-ghost h-[28px] px-3 border border-border">
-                        {uploading ? <Loader2 size={14} className="animate-spin" /> : <ImagePlus size={14} />}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
+            <div className="shrink-0 px-4 py-2.5 border-t border-border bg-card flex items-center gap-2 text-xs text-muted-foreground">
+              <Bot size={14} className="text-primary shrink-0" />
+              <span>Autopilot is handling this conversation. Use <button onClick={() => navigate("/dashboard/agent/test")} className="text-primary font-medium hover:underline">Test Chat</button> to test replies.</span>
             </div>
           )}
         </div>
 
         {/* Sidebar */}
-        <aside className="hidden lg:block w-64 shrink-0 overflow-y-auto border-l border-border bg-card p-4 space-y-3">
+        <aside className="hidden lg:block w-80 shrink-0 overflow-y-auto border-l border-border bg-card p-4 space-y-3">
           {leadId && <LeadIntelligence leadId={leadId} />}
           <HighlightsPanel />
           <div className="dark-panel p-3">
