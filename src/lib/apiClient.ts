@@ -1044,8 +1044,11 @@ export const api = {
     request<any>("/api/chatbot/booking-settings", { method: "PUT", body: JSON.stringify(data) }),
 
   // --- Custom Quote Fields ---
-  createCustomQuoteField: (data: { label: string; field_type: string }) =>
+  createCustomQuoteField: (data: { label: string; field_type: string; qualification_prompt?: string }) =>
     request<any>("/api/chatbot/quote-fields/custom", { method: "POST", body: JSON.stringify(data) }),
+
+  updateCustomQuoteField: (id: string, data: { qualification_prompt?: string | null }) =>
+    request<any>(`/api/chatbot/quote-fields/custom/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
 
   deleteQuoteField: (id: string) =>
     request<any>(`/api/chatbot/quote-fields/${id}`, { method: "DELETE" }),
