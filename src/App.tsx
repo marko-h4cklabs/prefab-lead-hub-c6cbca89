@@ -35,6 +35,11 @@ import AccountBillingPage from "./pages/subtopics/AccountBillingPage";
 import LeadDetail from "./pages/LeadDetail";
 import Conversation from "./pages/Conversation";
 import NotFound from "./pages/NotFound";
+import CopilotLayout from "./pages/copilot/CopilotLayout";
+import CopilotConversations from "./pages/copilot/CopilotConversations";
+import CopilotDashboard from "./pages/copilot/CopilotDashboard";
+import CopilotPipeline from "./pages/copilot/CopilotPipeline";
+import CopilotCalendar from "./pages/copilot/CopilotCalendar";
 
 const queryClient = new QueryClient();
 
@@ -128,6 +133,16 @@ const App = () => {
             <Route path="/dashboard/settings/scheduling" element={<Navigate to="/dashboard/settings" replace />} />
             <Route path="/dashboard/settings/analytics" element={<Navigate to="/dashboard/leads/analytics" replace />} />
             <Route path="/dashboard/settings/account" element={<AccountBillingPage />} />
+          </Route>
+
+          {/* Co-Pilot layout */}
+          <Route element={<ModeGate><CopilotLayout /></ModeGate>}>
+            <Route path="/copilot" element={<Navigate to="/copilot/conversations" replace />} />
+            <Route path="/copilot/conversations" element={<CopilotConversations />} />
+            <Route path="/copilot/dashboard" element={<CopilotDashboard />} />
+            <Route path="/copilot/pipeline" element={<CopilotPipeline />} />
+            <Route path="/copilot/calendar" element={<CopilotCalendar />} />
+            <Route path="/copilot/settings" element={<Navigate to="/dashboard/agent" replace />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

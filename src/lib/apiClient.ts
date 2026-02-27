@@ -133,6 +133,25 @@ async function rawRequest<T>(
   return res.json();
 }
 
+/** Upload FormData without Content-Type (browser sets multipart boundary). */
+async function formDataRequest<T>(path: string, body: FormData): Promise<T> {
+  const token = getAuthToken();
+  const companyId = getCompanyId();
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (companyId) headers["x-company-id"] = companyId;
+
+  const res = await fetch(`${API_BASE}${path}`, { method: "POST", headers, body });
+
+  if (res.status === 401) { clearAuth(); window.location.href = "/login"; throw new Error("Unauthorized"); }
+  if (!res.ok) {
+    let message = `API error ${res.status}`;
+    try { const json = await res.json(); message = json?.error || json?.message || message; } catch {}
+    throw new Error(typeof message === "string" ? message : JSON.stringify(message));
+  }
+  return res.json();
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {}
@@ -671,6 +690,27 @@ export const api = {
       body: JSON.stringify({ suggestion_index: suggestionIndex }),
     }),
 
+  sendEditedSuggestion: (conversationId: string, suggestionId: string, text: string) =>
+    request<any>(`/api/conversations/${conversationId}/suggestions/${suggestionId}/send-edited`, {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    }),
+
+  // --- Co-Pilot ---
+  getCopilotActiveDMs: (params?: { sort?: string; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.sort) qs.set("sort", params.sort);
+    if (params?.limit) qs.set("limit", String(params.limit));
+    const suffix = qs.toString() ? `?${qs}` : "";
+    return request<any>(`/api/copilot/active-dms${suffix}`);
+  },
+
+  getCopilotStats: () =>
+    request<any>("/api/copilot/stats"),
+
+  dismissCopilotConversation: (conversationId: string) =>
+    request<any>(`/api/copilot/conversations/${conversationId}/dismiss`, { method: "PATCH" }),
+
   // --- Hot Leads ---
   getHotLeads: () =>
     request<any>("/api/hot-leads/my"),
@@ -992,6 +1032,14 @@ export const api = {
   // --- AI Learning Ground ---
   analyzeStyle: (data: { texts: string[]; images?: string[] }) =>
     request<any>("/api/chatbot/learn-style", { method: "POST", body: JSON.stringify(data) }),
+
+  analyzeStyleWithDocuments: (document: File, texts?: string[], images?: string[]) => {
+    const fd = new FormData();
+    fd.append("document", document);
+    if (texts && texts.length > 0) fd.append("texts", JSON.stringify(texts));
+    if (images && images.length > 0) fd.append("images", JSON.stringify(images));
+    return formDataRequest<any>("/api/chatbot/learn-style/upload", fd);
+  },
 
   // --- Conversation Strategy ---
   getConversationStrategy: () =>

@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { api } from "@/lib/apiClient";
 import { toast } from "@/hooks/use-toast";
 import {
-  Brain, Plus, X, Upload, Loader2, Check, Sparkles, FileText, Image as ImageIcon,
+  Brain, Plus, X, Upload, Loader2, Check, Sparkles, FileText, Image as ImageIcon, FileSpreadsheet,
 } from "lucide-react";
 
 interface AnalysisResult {
@@ -19,10 +19,12 @@ const AILearningGround = ({ onApplied }: { onApplied?: () => void }) => {
   const [scripts, setScripts] = useState<string[]>([""]);
   const [conversations, setConversations] = useState("");
   const [images, setImages] = useState<string[]>([]);
+  const [documents, setDocuments] = useState<File[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [applying, setApplying] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
 
   const addScript = () => setScripts((prev) => [...prev, ""]);
   const updateScript = (i: number, val: string) =>
@@ -49,16 +51,48 @@ const AILearningGround = ({ onApplied }: { onApplied?: () => void }) => {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const handleDocUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    const allowed = [
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
+    ];
+    Array.from(files).forEach((file) => {
+      if (!allowed.includes(file.type) && !file.name.match(/\.(docx|xlsx|xls)$/i)) {
+        toast({ title: "Unsupported file", description: "Only .docx and .xlsx files", variant: "destructive" });
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        toast({ title: "File too large", description: "Max 10MB per document", variant: "destructive" });
+        return;
+      }
+      setDocuments((prev) => [...prev.slice(0, 4), file]);
+    });
+    if (docInputRef.current) docInputRef.current.value = "";
+  };
+
   const handleAnalyze = async () => {
     const allTexts = [...scripts.filter((s) => s.trim()), conversations.trim() ? conversations : ""].filter(Boolean);
-    if (allTexts.length === 0) {
-      toast({ title: "Add at least one script or conversation example", variant: "destructive" });
+    if (allTexts.length === 0 && documents.length === 0) {
+      toast({ title: "Add at least one script, conversation, or document", variant: "destructive" });
       return;
     }
     setAnalyzing(true);
     setResult(null);
     try {
-      const res = await api.analyzeStyle({ texts: allTexts, images: images.length > 0 ? images : undefined });
+      let res;
+      if (documents.length > 0) {
+        // Use document upload endpoint (first document + optional texts/images)
+        res = await api.analyzeStyleWithDocuments(
+          documents[0],
+          allTexts.length > 0 ? allTexts : undefined,
+          images.length > 0 ? images : undefined,
+        );
+      } else {
+        res = await api.analyzeStyle({ texts: allTexts, images: images.length > 0 ? images : undefined });
+      }
       setResult(res);
     } catch (err: any) {
       toast({ title: "Analysis failed", description: err?.message || "Try again", variant: "destructive" });
@@ -186,6 +220,34 @@ const AILearningGround = ({ onApplied }: { onApplied?: () => void }) => {
           {images.length < 10 && (
             <button onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-lg border-2 border-dashed border-border hover:border-primary/50 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors">
               <Upload size={16} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Document Upload */}
+      <div>
+        <label className="text-xs font-medium text-muted-foreground mb-1.5 block flex items-center gap-1.5">
+          <FileSpreadsheet size={12} /> Documents (optional)
+        </label>
+        <p className="text-[10px] text-muted-foreground mb-2">Upload Excel (.xlsx) or Word (.docx) files for deeper learning. Max 10MB each.</p>
+        <input ref={docInputRef} type="file" accept=".xlsx,.docx,.xls" onChange={handleDocUpload} className="hidden" />
+        <div className="flex flex-wrap gap-2">
+          {documents.map((doc, i) => (
+            <div key={i} className="flex items-center gap-2 bg-secondary rounded-lg px-3 py-1.5 border border-border">
+              <FileSpreadsheet size={14} className="text-primary shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-foreground truncate max-w-[150px]">{doc.name}</p>
+                <p className="text-[10px] text-muted-foreground">{(doc.size / 1024).toFixed(0)} KB</p>
+              </div>
+              <button onClick={() => setDocuments((prev) => prev.filter((_, idx) => idx !== i))} className="text-muted-foreground hover:text-destructive shrink-0">
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+          {documents.length < 5 && (
+            <button onClick={() => docInputRef.current?.click()} className="h-[42px] px-4 rounded-lg border-2 border-dashed border-border hover:border-primary/50 flex items-center gap-1.5 text-muted-foreground hover:text-primary transition-colors text-xs">
+              <Upload size={14} /> Upload Document
             </button>
           )}
         </div>
