@@ -2,14 +2,32 @@ import { Outlet, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/apiClient";
 import CopilotNav from "@/components/copilot/CopilotNav";
+import CopilotTopBar from "@/components/copilot/CopilotTopBar";
 import ImpersonationBanner from "@/components/admin/ImpersonationBanner";
 
 const CopilotLayout = () => {
   const navigate = useNavigate();
   const [billingStatus, setBillingStatus] = useState<any>(null);
+  const [activeCount, setActiveCount] = useState(0);
+  const [waitingCount, setWaitingCount] = useState(0);
 
   useEffect(() => {
     api.getBillingStatus().then(setBillingStatus).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const fetch = () => {
+      api.getCopilotActiveDMs({ sort: "recent" })
+        .then((res) => {
+          const dms = Array.isArray(res?.dms) ? res.dms : [];
+          setActiveCount(dms.length);
+          setWaitingCount(dms.filter((d: any) => d.needs_response).length);
+        })
+        .catch(() => {});
+    };
+    fetch();
+    const interval = setInterval(fetch, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const subStatus = billingStatus?.subscription_status || billingStatus?.status;
@@ -38,6 +56,9 @@ const CopilotLayout = () => {
       )}
 
       <ImpersonationBanner />
+
+      {/* Top bar */}
+      <CopilotTopBar activeCount={activeCount} waitingCount={waitingCount} />
 
       {/* Main layout: nav rail + content */}
       <div className="flex flex-1 min-h-0 overflow-hidden">

@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  MessageSquare, BarChart3, TrendingUp, CalendarDays, Settings, LayoutDashboard,
+  MessageSquare, BarChart3, TrendingUp, CalendarDays, Settings, Users, LayoutDashboard,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { icon: TrendingUp, label: "Pipeline", path: "/copilot/pipeline" },
   { icon: CalendarDays, label: "Calendar", path: "/copilot/calendar" },
   { icon: Settings, label: "Settings", path: "/copilot/settings" },
+  { icon: Users, label: "Team", path: "/copilot/team" },
 ];
 
 const CopilotNav = () => {

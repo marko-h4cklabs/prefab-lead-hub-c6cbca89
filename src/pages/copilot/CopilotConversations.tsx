@@ -1,57 +1,69 @@
 import { useState } from "react";
-import ActiveDMList from "@/components/copilot/ActiveDMList";
-import CopilotChat from "@/components/copilot/CopilotChat";
-import CopilotLeadProfile from "@/components/copilot/CopilotLeadProfile";
+import ActiveDMList from "../../components/copilot/ActiveDMList";
+import CopilotLeadSummary from "../../components/copilot/CopilotLeadSummary";
+import CopilotChat from "../../components/copilot/CopilotChat";
 import { MessageSquare } from "lucide-react";
+
+type View = "summary" | "chat";
 
 const CopilotConversations = () => {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
-  const [selectedConvoId, setSelectedConvoId] = useState<string | null>(null);
-  const [selectedName, setSelectedName] = useState<string>("");
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [view, setView] = useState<View>("summary");
 
   const handleSelectLead = (leadId: string, conversationId: string) => {
+    // If selecting a different lead, reset to summary view
+    if (leadId !== selectedLeadId) {
+      setView("summary");
+    }
     setSelectedLeadId(leadId);
-    setSelectedConvoId(conversationId);
+    setSelectedConversationId(conversationId);
   };
 
   return (
-    <div className="flex h-full w-full overflow-hidden">
-      {/* Left: Active DMs */}
+    <div className="flex h-full">
+      {/* Left: Active DM List (300px fixed width, handled internally) */}
       <ActiveDMList
         selectedLeadId={selectedLeadId}
-        onSelectLead={(leadId, convId) => {
-          handleSelectLead(leadId, convId);
-          // Lead name will be shown once loaded in chat
-          setSelectedName("");
-        }}
+        onSelectLead={handleSelectLead}
       />
 
-      {/* Center: Chat + Suggestions */}
-      {selectedLeadId && selectedConvoId ? (
-        <CopilotChat
-          key={selectedLeadId}
-          leadId={selectedLeadId}
-          conversationId={selectedConvoId}
-          leadName={selectedName || "Conversation"}
-        />
-      ) : (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
-              <MessageSquare size={28} className="text-primary" />
+      {/* Center/Right: Lead Summary or Chat */}
+      <div className="flex-1 overflow-hidden">
+        {selectedLeadId && selectedConversationId ? (
+          view === "summary" ? (
+            <CopilotLeadSummary
+              key={selectedLeadId}
+              leadId={selectedLeadId}
+              onOpenChat={() => setView("chat")}
+              onBack={() => {
+                setSelectedLeadId(null);
+                setSelectedConversationId(null);
+                setView("summary");
+              }}
+            />
+          ) : (
+            <CopilotChat
+              key={`chat-${selectedLeadId}`}
+              leadId={selectedLeadId}
+              conversationId={selectedConversationId}
+              leadName="Conversation"
+              onBack={() => setView("summary")}
+            />
+          )
+        ) : (
+          <div className="flex-1 flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                <MessageSquare size={28} className="text-primary" />
+              </div>
+              <p className="text-sm text-muted-foreground max-w-[300px]">
+                Select a conversation from the left to get started
+              </p>
             </div>
-            <h3 className="text-lg font-bold text-foreground mb-1">Co-Pilot Workspace</h3>
-            <p className="text-sm text-muted-foreground max-w-[300px]">
-              Select a conversation from the left panel. AI will prepare response suggestions for you to review, edit, and send.
-            </p>
           </div>
-        </div>
-      )}
-
-      {/* Right: Lead Profile */}
-      {selectedLeadId && (
-        <CopilotLeadProfile key={`profile-${selectedLeadId}`} leadId={selectedLeadId} />
-      )}
+        )}
+      </div>
     </div>
   );
 };

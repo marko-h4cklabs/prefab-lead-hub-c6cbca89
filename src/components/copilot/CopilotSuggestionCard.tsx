@@ -3,12 +3,19 @@ import { Loader2, Send, Pencil, X } from "lucide-react";
 
 interface Suggestion {
   id: string;
-  message: string;
+  text?: string;
+  message?: string;
   label?: string;
   index: number;
 }
 
-const LABELS = [
+const LABEL_STYLES: Record<string, { bg: string; text: string }> = {
+  "Direct Closer": { bg: "bg-info", text: "text-info-foreground" },
+  "Value Builder": { bg: "bg-success", text: "text-success-foreground" },
+  "Curious Qualifier": { bg: "bg-primary", text: "text-primary-foreground" },
+};
+
+const FALLBACK_LABELS = [
   { name: "Direct", bg: "bg-info", text: "text-info-foreground" },
   { name: "Empathetic", bg: "bg-success", text: "text-success-foreground" },
   { name: "Strategic", bg: "bg-primary", text: "text-primary-foreground" },
@@ -19,21 +26,25 @@ interface Props {
   labelIndex: number;
   sending: boolean;
   onSend: (text: string, isEdited: boolean) => void;
+  shortcutKey?: number;
 }
 
-const CopilotSuggestionCard = ({ suggestion, labelIndex, sending, onSend }: Props) => {
+const CopilotSuggestionCard = ({ suggestion, labelIndex, sending, onSend, shortcutKey }: Props) => {
+  const msgText = suggestion.text || suggestion.message || "";
   const [editing, setEditing] = useState(false);
-  const [editText, setEditText] = useState(suggestion.message);
-  const label = LABELS[labelIndex] || LABELS[0];
+  const [editText, setEditText] = useState(msgText);
+
+  const labelName = suggestion.label || FALLBACK_LABELS[labelIndex]?.name || "Option";
+  const style = LABEL_STYLES[suggestion.label || ""] || FALLBACK_LABELS[labelIndex] || FALLBACK_LABELS[0];
 
   const handleEdit = () => {
-    setEditText(suggestion.message);
+    setEditText(msgText);
     setEditing(true);
   };
 
   const handleCancelEdit = () => {
     setEditing(false);
-    setEditText(suggestion.message);
+    setEditText(msgText);
   };
 
   const handleSend = () => {
@@ -42,16 +53,23 @@ const CopilotSuggestionCard = ({ suggestion, labelIndex, sending, onSend }: Prop
       if (!trimmed) return;
       onSend(trimmed, true);
     } else {
-      onSend(suggestion.message, false);
+      onSend(msgText, false);
     }
   };
 
   return (
-    <div className="bg-card border border-border rounded-lg px-4 py-3 transition-all hover:border-primary/30">
+    <div className="bg-card border border-border rounded-lg px-4 py-3 transition-all hover:border-primary/30 group">
       <div className="flex items-center justify-between mb-2">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${label.bg} ${label.text}`}>
-          {label.name}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${style.bg} ${style.text}`}>
+            {labelName}
+          </span>
+          {shortcutKey !== undefined && (
+            <span className="text-[9px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+              Press {shortcutKey} to send
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-1.5">
           {!editing && (
             <button
@@ -88,7 +106,7 @@ const CopilotSuggestionCard = ({ suggestion, labelIndex, sending, onSend }: Prop
           autoFocus
         />
       ) : (
-        <p className="text-sm text-foreground leading-relaxed">{suggestion.message}</p>
+        <p className="text-sm text-foreground leading-relaxed">{msgText}</p>
       )}
     </div>
   );

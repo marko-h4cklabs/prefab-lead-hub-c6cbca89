@@ -697,9 +697,10 @@ export const api = {
     }),
 
   // --- Co-Pilot ---
-  getCopilotActiveDMs: (params?: { sort?: string; limit?: number }) => {
+  getCopilotActiveDMs: (params?: { sort?: string; filter?: string; limit?: number }) => {
     const qs = new URLSearchParams();
     if (params?.sort) qs.set("sort", params.sort);
+    if (params?.filter) qs.set("filter", params.filter);
     if (params?.limit) qs.set("limit", String(params.limit));
     const suffix = qs.toString() ? `?${qs}` : "";
     return request<any>(`/api/copilot/active-dms${suffix}`);
@@ -710,6 +711,72 @@ export const api = {
 
   dismissCopilotConversation: (conversationId: string) =>
     request<any>(`/api/copilot/conversations/${conversationId}/dismiss`, { method: "PATCH" }),
+
+  // Kill Switch
+  getCopilotKillSwitch: () =>
+    request<any>("/api/copilot/kill-switch"),
+
+  setCopilotKillSwitch: (enabled: boolean) =>
+    request<any>("/api/copilot/kill-switch", { method: "PUT", body: JSON.stringify({ enabled }) }),
+
+  // Lead Assignment
+  assignCopilotLead: (leadId: string, userId: string | null) =>
+    request<any>(`/api/copilot/leads/${leadId}/assign`, { method: "PUT", body: JSON.stringify({ user_id: userId }) }),
+
+  bulkAssignLeads: (leadIds: string[], userId: string | null) =>
+    request<any>("/api/copilot/leads/bulk-assign", { method: "POST", body: JSON.stringify({ lead_ids: leadIds, user_id: userId }) }),
+
+  // Batch Operations
+  batchSendSuggestions: (items: Array<{ conversation_id: string; suggestion_id: string; suggestion_index: number }>) =>
+    request<any>("/api/copilot/batch/send", { method: "POST", body: JSON.stringify({ items }) }),
+
+  batchDismissConversations: (conversationIds: string[]) =>
+    request<any>("/api/copilot/batch/dismiss", { method: "POST", body: JSON.stringify({ conversation_ids: conversationIds }) }),
+
+  // Lead Summary
+  getCopilotLeadSummary: (leadId: string) =>
+    request<any>(`/api/copilot/leads/${leadId}/summary`),
+
+  // Copilot Settings (mode-scoped)
+  getCopilotBehavior: () =>
+    request<any>("/api/copilot/settings/behavior"),
+
+  putCopilotBehavior: (data: any) =>
+    request<any>("/api/copilot/settings/behavior", { method: "PUT", body: JSON.stringify(data) }),
+
+  getCopilotIdentity: () =>
+    request<any>("/api/copilot/settings/identity"),
+
+  putCopilotIdentity: (data: any) =>
+    request<any>("/api/copilot/settings/identity", { method: "PUT", body: JSON.stringify(data) }),
+
+  getCopilotFields: () =>
+    request<any>("/api/copilot/settings/fields"),
+
+  putCopilotFields: (data: any) =>
+    request<any>("/api/copilot/settings/fields", { method: "PUT", body: JSON.stringify(data) }),
+
+  getCopilotPersonas: () =>
+    request<any>("/api/copilot/settings/personas"),
+
+  createCopilotPersona: (data: any) =>
+    request<any>("/api/copilot/settings/personas", { method: "POST", body: JSON.stringify(data) }),
+
+  updateCopilotPersona: (id: string, data: any) =>
+    request<any>(`/api/copilot/settings/personas/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+
+  deleteCopilotPersona: (id: string) =>
+    request<any>(`/api/copilot/settings/personas/${id}`, { method: "DELETE" }),
+
+  activateCopilotPersona: (id: string) =>
+    request<any>(`/api/copilot/settings/personas/${id}/activate`, { method: "POST" }),
+
+  // Copilot Team
+  getCopilotTeam: () =>
+    request<any>("/api/copilot/team"),
+
+  getCopilotTeamPerformance: (userId: string) =>
+    request<any>(`/api/copilot/team/${userId}/performance`),
 
   // --- Hot Leads ---
   getHotLeads: () =>
