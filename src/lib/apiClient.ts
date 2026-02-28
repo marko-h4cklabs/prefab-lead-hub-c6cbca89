@@ -778,6 +778,28 @@ export const api = {
   getCopilotTeamPerformance: (userId: string) =>
     request<any>(`/api/copilot/team/${userId}/performance`),
 
+  // Copilot Calendar (Calendly)
+  getCalendlyEvents: (params?: { min_date?: string; max_date?: string; status?: string }) => {
+    const sp = new URLSearchParams();
+    if (params?.min_date) sp.set("min_date", params.min_date);
+    if (params?.max_date) sp.set("max_date", params.max_date);
+    if (params?.status) sp.set("status", params.status);
+    const qs = sp.toString();
+    return request<any>(`/api/copilot/calendar/events${qs ? `?${qs}` : ""}`);
+  },
+
+  getCalendlyStatus: () =>
+    request<any>("/api/copilot/settings/calendly"),
+
+  saveCalendlyToken: (apiToken: string) =>
+    request<any>("/api/copilot/settings/calendly", {
+      method: "PUT",
+      body: JSON.stringify({ api_token: apiToken }),
+    }),
+
+  disconnectCalendly: () =>
+    request<any>("/api/copilot/settings/calendly", { method: "DELETE" }),
+
   // --- Hot Leads ---
   getHotLeads: () =>
     request<any>("/api/hot-leads/my"),

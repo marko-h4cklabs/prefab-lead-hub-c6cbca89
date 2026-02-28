@@ -99,6 +99,12 @@ export default function CopilotTopBar({
   const [isAdminOrOwner, setIsAdminOrOwner] = useState(false);
   const killConfirmRef = useRef<HTMLDivElement>(null);
 
+  // Operating mode state
+  const [operatingMode, setOperatingMode] = useState<string>("");
+  const [modeLoading, setModeLoading] = useState(false);
+  const [showModeWarning, setShowModeWarning] = useState(false);
+  const modeWarningRef = useRef<HTMLDivElement>(null);
+
   // Notifications state
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -112,10 +118,14 @@ export default function CopilotTopBar({
   const [userOpen, setUserOpen] = useState(false);
   const userRef = useRef<HTMLDivElement>(null);
 
-  // Fetch kill switch status & user info on mount
+  // Fetch kill switch status, operating mode & user info on mount
   useEffect(() => {
     api.getCopilotKillSwitch().then((res) => {
       setAiActive(res?.enabled ?? true);
+    }).catch(() => {});
+
+    api.getOperatingMode().then((res) => {
+      setOperatingMode(res?.operating_mode || "");
     }).catch(() => {});
 
     api.getMe().then((res) => {
@@ -157,6 +167,17 @@ export default function CopilotTopBar({
       .catch(() => {})
       .finally(() => setNotifLoading(false));
   }, []);
+
+  // Switch to copilot mode
+  const handleSwitchToCopilot = async () => {
+    setModeLoading(true);
+    setShowModeWarning(false);
+    try {
+      await api.setOperatingMode("copilot");
+      setOperatingMode("copilot");
+    } catch { /* best effort */ }
+    setModeLoading(false);
+  };
 
   // Kill switch toggle
   const handleKillSwitchToggle = () => {
@@ -232,17 +253,67 @@ export default function CopilotTopBar({
       ) {
         setShowKillConfirm(false);
       }
+      if (
+        modeWarningRef.current &&
+        !modeWarningRef.current.contains(e.target as Node)
+      ) {
+        setShowModeWarning(false);
+      }
     };
-    if (notifOpen || userOpen || showKillConfirm) {
+    if (notifOpen || userOpen || showKillConfirm || showModeWarning) {
       document.addEventListener("mousedown", handler);
     }
     return () => document.removeEventListener("mousedown", handler);
-  }, [notifOpen, userOpen, showKillConfirm]);
+  }, [notifOpen, userOpen, showKillConfirm, showModeWarning]);
 
   return (
     <header className="h-14 shrink-0 flex items-center justify-between px-4 border-b border-[hsl(0_0%_13%)] bg-[hsl(0_0%_4%)] z-20">
-      {/* LEFT -- Kill Switch */}
+      {/* LEFT -- Mode Warning + Kill Switch */}
       <div className="flex items-center gap-3">
+        {/* Mode warning: show if NOT in copilot mode */}
+        {isAdminOrOwner && operatingMode && operatingMode !== "copilot" && (
+          <div className="relative" ref={modeWarningRef}>
+            <button
+              onClick={() => setShowModeWarning(true)}
+              className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold bg-[hsl(24_95%_53%/0.15)] text-[hsl(24_95%_53%)] hover:bg-[hsl(24_95%_53%/0.25)] transition-colors"
+            >
+              <Zap size={14} />
+              Autopilot Active
+            </button>
+
+            {showModeWarning && (
+              <div className="absolute left-0 top-full mt-2 w-64 rounded-xl border border-[hsl(0_0%_16%)] bg-[hsl(0_0%_7%)] shadow-lg shadow-black/40 p-3 z-50">
+                <div className="flex items-center gap-2 mb-2">
+                  <Zap size={14} className="text-[hsl(24_95%_53%)]" />
+                  <span className="text-xs font-bold text-foreground">
+                    Wrong Mode
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mb-3">
+                  Your account is in <strong className="text-foreground">Autopilot</strong> mode.
+                  The AI is auto-sending replies instead of generating suggestions for review.
+                  Switch to Co-Pilot mode to use this workspace.
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowModeWarning(false)}
+                    className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-[hsl(0_0%_18%)] text-muted-foreground hover:text-foreground hover:bg-[hsl(0_0%_12%)] transition-all"
+                  >
+                    Dismiss
+                  </button>
+                  <button
+                    onClick={handleSwitchToCopilot}
+                    disabled={modeLoading}
+                    className="flex-1 text-xs px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all font-semibold disabled:opacity-50"
+                  >
+                    {modeLoading ? <Loader2 size={12} className="animate-spin mx-auto" /> : "Switch to Co-Pilot"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {isAdminOrOwner && (
           <div className="relative" ref={killConfirmRef}>
             <button

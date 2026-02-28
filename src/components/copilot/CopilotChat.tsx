@@ -8,7 +8,9 @@ interface Message {
   role: string;
   content: string;
   timestamp?: string;
-  type?: "text" | "voice" | "image";
+  type?: "text" | "voice" | "image" | "audio";
+  is_voice?: boolean;
+  audio_url?: string;
 }
 
 interface Suggestion {
@@ -87,29 +89,41 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack }: Props) => {
   );
 
   // --- Fetch suggestions ---
-  const fetchSuggestions = useCallback(async () => {
+  const fetchSuggestions = useCallback(async (forceRegenerate = false) => {
     setLoadingSuggestions(true);
-    try {
-      // Try existing suggestions first
-      const latest = await api.getLatestSuggestions(leadId);
-      const items = Array.isArray(latest?.suggestions) ? latest.suggestions : [];
-      if (items.length > 0) {
-        setSuggestions(
-          items.slice(0, 3).map((s: any, i: number) => ({ ...s, index: s.index ?? i })),
-        );
-        setLoadingSuggestions(false);
-        return;
+
+    if (!forceRegenerate) {
+      try {
+        // Try existing suggestions first
+        const latest = await api.getLatestSuggestions(leadId);
+        const items = Array.isArray(latest?.suggestions) ? latest.suggestions : [];
+        const rowId = latest?.suggestion_id || latest?.id;
+        if (items.length > 0 && rowId) {
+          setSuggestions(
+            items.slice(0, 3).map((s: any, i: number) => ({ ...s, id: rowId, index: s.index ?? i })),
+          );
+          setLoadingSuggestions(false);
+          return;
+        }
+      } catch {
+        /* no existing suggestions */
       }
-    } catch {
-      /* no existing suggestions */
     }
 
     // Generate new ones
     try {
       const res = await api.generateSuggestions(conversationId);
       const items = Array.isArray(res?.suggestions) ? res.suggestions : [];
+      // After generating, fetch the latest to get the row id
+      let rowId = res?.suggestion_id || res?.id;
+      if (!rowId) {
+        try {
+          const latest = await api.getLatestSuggestions(leadId);
+          rowId = latest?.suggestion_id || latest?.id;
+        } catch { /* ok */ }
+      }
       setSuggestions(
-        items.slice(0, 3).map((s: any, i: number) => ({ ...s, index: s.index ?? i })),
+        items.slice(0, 3).map((s: any, i: number) => ({ ...s, id: rowId, index: s.index ?? i })),
       );
     } catch {
       // silent fail
@@ -165,12 +179,12 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack }: Props) => {
         return;
       }
 
-      // r -> regenerate
+      // r -> regenerate (force new suggestions)
       if (e.key === "r" || e.key === "R") {
         if (!loadingSuggestions) {
           e.preventDefault();
           setSuggestions([]);
-          fetchSuggestions();
+          fetchSuggestions(true);
         }
         return;
       }
@@ -255,7 +269,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack }: Props) => {
 
   // --- Message type icon ---
   const MessageTypeIcon = ({ type }: { type?: string }) => {
-    if (type === "voice") return <Mic size={10} className="shrink-0 opacity-60" />;
+    if (type === "voice" || type === "audio") return <Mic size={10} className="shrink-0 opacity-60" />;
     if (type === "image") return <Image size={10} className="shrink-0 opacity-60" />;
     return null;
   };
@@ -308,17 +322,48 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack }: Props) => {
                       : "bg-primary/15 text-foreground rounded-tr-sm"
                   }`}
                 >
-                  {msg.type && msg.type !== "text" && (
+                  {(msg.type === "voice" || msg.type === "audio" || msg.is_voice) && (
                     <div className="flex items-center gap-1 mb-1">
-                      <MessageTypeIcon type={msg.type} />
+                      <MessageTypeIcon type="voice" />
                       <span className="text-[9px] uppercase tracking-wider text-muted-foreground">
-                        {msg.type}
+                        voice message
                       </span>
                     </div>
                   )}
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                    {msg.content}
-                  </p>
+                  {(msg.type === "voice" || msg.type === "audio" || msg.is_voice) && msg.audio_url ? (
+                    <div className="space-y-1.5">
+                      <audio
+                        controls
+                        preload="metadata"
+                        className="w-full max-w-[280px] h-8 [&::-webkit-media-controls-panel]:bg-secondary"
+                      >
+                        <source src={msg.audio_url} />
+                      </audio>
+                      {msg.content && (
+                        <p className="text-xs text-muted-foreground italic leading-relaxed">
+                          {msg.content}
+                        </p>
+                      )}
+                    </div>
+                  ) : msg.type === "image" ? (
+                    <>
+                      {msg.type && (
+                        <div className="flex items-center gap-1 mb-1">
+                          <MessageTypeIcon type={msg.type} />
+                          <span className="text-[9px] uppercase tracking-wider text-muted-foreground">
+                            {msg.type}
+                          </span>
+                        </div>
+                      )}
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                        {msg.content}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {msg.content}
+                    </p>
+                  )}
                   {msg.timestamp && (
                     <p
                       className={`text-[10px] mt-1 ${
@@ -342,7 +387,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack }: Props) => {
           <button
             onClick={() => {
               setSuggestions([]);
-              fetchSuggestions();
+              fetchSuggestions(true);
             }}
             disabled={loadingSuggestions}
             className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
