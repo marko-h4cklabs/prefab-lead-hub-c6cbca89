@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/apiClient";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
-import { Plus, Pencil, Trash2, Loader2, UserCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, UserCircle, CheckCircle2, Zap } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 function normalizeList(payload: unknown, keys: string[] = []): any[] {
@@ -73,11 +73,12 @@ const PersonasSection = () => {
       ) : (
         <div className="space-y-3">
           {personas.map((p) => (
-            <div key={p.id} className="rounded-lg bg-secondary p-3 space-y-2">
+            <div key={p.id} className={`rounded-lg p-3 space-y-2 transition-all ${p.active ? "bg-success/10 ring-1 ring-success/40" : "bg-secondary"}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
+                  {p.active ? <CheckCircle2 size={16} className="text-success shrink-0" /> : <UserCircle size={16} className="text-muted-foreground shrink-0" />}
                   <span className="text-sm font-bold text-foreground">{p.name}</span>
-                  {p.active && <span className="status-badge text-[10px] bg-success/15 text-success">Active</span>}
+                  {p.active && <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-success/20 text-success"><Zap size={8} /> LIVE</span>}
                 </div>
                 <div className="flex items-center gap-1">
                   {!p.active && <button onClick={() => handleActivate(p.id)} className="dark-btn text-[10px] bg-primary text-primary-foreground px-2 py-0.5">Activate</button>}
@@ -85,8 +86,12 @@ const PersonasSection = () => {
                   <button onClick={() => handleDelete(p.id)} disabled={p.active} className="dark-btn-ghost text-xs p-1 text-destructive disabled:opacity-30"><Trash2 size={12} /></button>
                 </div>
               </div>
-              {p.agent_name && <p className="text-xs text-muted-foreground">Agent: {p.agent_name}</p>}
-              <span className="status-badge text-[10px] bg-secondary text-muted-foreground capitalize">{p.tone || "professional"}</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                {p.agent_name && <span className="text-xs text-muted-foreground">Agent: <span className="text-foreground font-medium">{p.agent_name}</span></span>}
+                <span className="status-badge text-[10px] bg-secondary text-muted-foreground capitalize">{p.tone || "professional"}</span>
+                {p.opener_style && <span className="status-badge text-[10px] bg-secondary text-muted-foreground capitalize">{p.opener_style}</span>}
+              </div>
+              {p.active && p.system_prompt && <p className="text-[11px] text-muted-foreground line-clamp-2 italic">{p.system_prompt.slice(0, 120)}{p.system_prompt.length > 120 ? "..." : ""}</p>}
             </div>
           ))}
         </div>
