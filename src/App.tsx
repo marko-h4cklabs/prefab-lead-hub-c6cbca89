@@ -42,6 +42,7 @@ import CopilotPipeline from "./pages/copilot/CopilotPipeline";
 import CopilotCalendar from "./pages/copilot/CopilotCalendar";
 import CopilotSettings from "./pages/copilot/CopilotSettings";
 import CopilotTeam from "./pages/copilot/CopilotTeam";
+import JoinTeam from "./pages/JoinTeam";
 
 const queryClient = new QueryClient();
 
@@ -96,7 +97,7 @@ const App = () => {
           <Route path="/onboarding" element={<Onboarding />} />
 
           {/* Redirects */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Navigate to="/copilot" replace />} />
           <Route path="/leads" element={<Navigate to="/dashboard/leads/inbox" replace />} />
           <Route path="/pipeline" element={<Navigate to="/dashboard/leads/pipeline" replace />} />
           <Route path="/analytics" element={<Navigate to="/dashboard/leads/analytics" replace />} />
@@ -137,8 +138,11 @@ const App = () => {
             <Route path="/dashboard/settings/account" element={<AccountBillingPage />} />
           </Route>
 
-          {/* Co-Pilot layout */}
-          <Route element={<ModeGate><CopilotLayout /></ModeGate>}>
+          {/* Team join (public) */}
+          <Route path="/join/:code" element={<JoinTeam />} />
+
+          {/* Co-Pilot layout (always accessible) */}
+          <Route element={<CopilotLayout />}>
             <Route path="/copilot" element={<Navigate to="/copilot/conversations" replace />} />
             <Route path="/copilot/conversations" element={<CopilotConversations />} />
             <Route path="/copilot/dashboard" element={<CopilotDashboard />} />
@@ -148,7 +152,7 @@ const App = () => {
             <Route path="/copilot/team" element={<CopilotTeam />} />
           </Route>
 
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/copilot" replace />} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>

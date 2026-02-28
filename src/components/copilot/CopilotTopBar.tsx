@@ -115,8 +115,15 @@ export default function CopilotTopBar({
 
   // User state
   const [userName, setUserName] = useState("");
+  const [userRole, setUserRole] = useState("");
   const [userOpen, setUserOpen] = useState(false);
   const userRef = useRef<HTMLDivElement>(null);
+
+  // Availability state
+  const [setterStatus, setSetterStatus] = useState<string>("offline");
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(false);
+  const statusRef = useRef<HTMLDivElement>(null);
 
   // Fetch kill switch status, operating mode & user info on mount
   useEffect(() => {
@@ -128,14 +135,20 @@ export default function CopilotTopBar({
       setOperatingMode(res?.operating_mode || "");
     }).catch(() => {});
 
-    api.getMe().then((res) => {
+    api.me().then((res: any) => {
       const role = str(res?.role || res?.user?.role || "");
+      setUserRole(role);
       setIsAdminOrOwner(
         role === "owner" || role === "admin" || role === "superadmin"
       );
       setUserName(
-        str(res?.name || res?.user?.name || res?.email || res?.user?.email || "")
+        str(res?.full_name || res?.name || res?.user?.name || res?.email || res?.user?.email || "")
       );
+      setSetterStatus(str(res?.setter_status || "offline"));
+    }).catch(() => {});
+
+    api.getMyStatus().then((res: any) => {
+      if (res?.setter_status) setSetterStatus(res.setter_status);
     }).catch(() => {});
   }, []);
 
@@ -200,6 +213,29 @@ export default function CopilotTopBar({
     setKillSwitchLoading(false);
   };
 
+  // Availability handler
+  const handleStatusChange = async (newStatus: string) => {
+    setStatusLoading(true);
+    setStatusOpen(false);
+    try {
+      await api.setMyStatus(newStatus);
+      setSetterStatus(newStatus);
+    } catch { /* best effort */ }
+    setStatusLoading(false);
+  };
+
+  const statusColors: Record<string, string> = {
+    active: "bg-success",
+    away: "bg-[hsl(48_92%_53%)]",
+    offline: "bg-muted-foreground/50",
+  };
+
+  const statusLabels: Record<string, string> = {
+    active: "Active",
+    away: "Away",
+    offline: "Offline",
+  };
+
   // Notification handlers
   const handleBellClick = () => {
     if (!notifOpen) fetchNotifications();
@@ -259,8 +295,14 @@ export default function CopilotTopBar({
       ) {
         setShowModeWarning(false);
       }
+      if (
+        statusRef.current &&
+        !statusRef.current.contains(e.target as Node)
+      ) {
+        setStatusOpen(false);
+      }
     };
-    if (notifOpen || userOpen || showKillConfirm || showModeWarning) {
+    if (notifOpen || userOpen || showKillConfirm || showModeWarning || statusOpen) {
       document.addEventListener("mousedown", handler);
     }
     return () => document.removeEventListener("mousedown", handler);
@@ -386,8 +428,37 @@ export default function CopilotTopBar({
         )}
       </div>
 
-      {/* RIGHT -- Bell, User, Dashboard link */}
+      {/* RIGHT -- Availability, Bell, User, Dashboard link */}
       <div className="flex items-center gap-2">
+        {/* Availability Toggle */}
+        <div className="relative" ref={statusRef}>
+          <button
+            onClick={() => { setStatusOpen((o) => !o); setNotifOpen(false); setUserOpen(false); }}
+            disabled={statusLoading}
+            className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
+          >
+            <span className={`h-2 w-2 rounded-full ${statusColors[setterStatus] || statusColors.offline}`} />
+            <span className="hidden sm:inline">{statusLabels[setterStatus] || "Offline"}</span>
+          </button>
+
+          {statusOpen && (
+            <div className="absolute right-0 top-full mt-2 w-36 rounded-xl border border-[hsl(0_0%_16%)] bg-[hsl(0_0%_5%)] shadow-xl shadow-black/50 z-50 overflow-hidden">
+              {["active", "away", "offline"].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => handleStatusChange(s)}
+                  className={`w-full text-left px-4 py-2.5 flex items-center gap-2 text-xs hover:bg-[hsl(0_0%_8%)] transition-colors ${
+                    setterStatus === s ? "text-foreground font-medium" : "text-muted-foreground"
+                  }`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${statusColors[s]}`} />
+                  {statusLabels[s]}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Notification Bell */}
         <div className="relative" ref={notifRef}>
           <button
@@ -527,28 +598,32 @@ export default function CopilotTopBar({
                   </p>
                 </div>
               )}
-              <button
-                onClick={() => {
-                  setUserOpen(false);
-                  navigate("/dashboard");
-                }}
-                className="w-full text-left px-4 py-2.5 flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground hover:bg-[hsl(0_0%_8%)] transition-colors"
-              >
-                <LayoutDashboard size={14} />
-                Switch to Dashboard
-              </button>
+              {isAdminOrOwner && (
+                <button
+                  onClick={() => {
+                    setUserOpen(false);
+                    navigate("/dashboard");
+                  }}
+                  className="w-full text-left px-4 py-2.5 flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground hover:bg-[hsl(0_0%_8%)] transition-colors"
+                >
+                  <LayoutDashboard size={14} />
+                  Switch to Dashboard
+                </button>
+              )}
             </div>
           )}
         </div>
 
-        {/* Dashboard link (always visible) */}
-        <button
-          onClick={() => navigate("/dashboard")}
-          title="Switch to Dashboard"
-          className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-        >
-          <LayoutDashboard size={18} />
-        </button>
+        {/* Dashboard link (owner/admin only) */}
+        {isAdminOrOwner && (
+          <button
+            onClick={() => navigate("/dashboard")}
+            title="Switch to Dashboard"
+            className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          >
+            <LayoutDashboard size={18} />
+          </button>
+        )}
       </div>
     </header>
   );

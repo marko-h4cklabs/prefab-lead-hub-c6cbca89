@@ -697,11 +697,12 @@ export const api = {
     }),
 
   // --- Co-Pilot ---
-  getCopilotActiveDMs: (params?: { sort?: string; filter?: string; limit?: number }) => {
+  getCopilotActiveDMs: (params?: { sort?: string; filter?: string; limit?: number; dm_status_filter?: string }) => {
     const qs = new URLSearchParams();
     if (params?.sort) qs.set("sort", params.sort);
     if (params?.filter) qs.set("filter", params.filter);
     if (params?.limit) qs.set("limit", String(params.limit));
+    if (params?.dm_status_filter) qs.set("dm_status_filter", params.dm_status_filter);
     const suffix = qs.toString() ? `?${qs}` : "";
     return request<any>(`/api/copilot/active-dms${suffix}`);
   },
@@ -799,6 +800,66 @@ export const api = {
 
   disconnectCalendly: () =>
     request<any>("/api/copilot/settings/calendly", { method: "DELETE" }),
+
+  // --- Team Invites ---
+  createTeamInvite: (data: { role?: string; max_uses?: number; expires_days?: number }) =>
+    request<any>("/api/copilot/team/invite", { method: "POST", body: JSON.stringify(data) }),
+
+  getTeamInvites: () =>
+    request<any>("/api/copilot/team/invites"),
+
+  revokeTeamInvite: (id: string) =>
+    request<any>(`/api/copilot/team/invites/${id}`, { method: "DELETE" }),
+
+  removeTeamMemberCopilot: (userId: string) =>
+    request<any>(`/api/copilot/team/${userId}`, { method: "DELETE" }),
+
+  setTeamMemberCapacity: (userId: string, maxConcurrentDms: number) =>
+    request<any>(`/api/copilot/team/${userId}/capacity`, { method: "PUT", body: JSON.stringify({ max_concurrent_dms: maxConcurrentDms }) }),
+
+  // --- Setter Availability ---
+  getMyStatus: () =>
+    request<any>("/api/copilot/me/status"),
+
+  setMyStatus: (setterStatus: string) =>
+    request<any>("/api/copilot/me/status", { method: "PUT", body: JSON.stringify({ setter_status: setterStatus }) }),
+
+  // --- DM Disposition ---
+  setDmStatus: (leadId: string, dmStatus: string) =>
+    request<any>(`/api/copilot/leads/${leadId}/dm-status`, { method: "PUT", body: JSON.stringify({ dm_status: dmStatus }) }),
+
+  // --- Assignment Config ---
+  getAssignmentConfig: () =>
+    request<any>("/api/copilot/settings/assignment"),
+
+  updateAssignmentConfig: (data: { assignment_mode?: string; default_max_concurrent_dms?: number }) =>
+    request<any>("/api/copilot/settings/assignment", { method: "PUT", body: JSON.stringify(data) }),
+
+  // --- Invite Validation (public) ---
+  validateInvite: (code: string) =>
+    request<any>(`/api/auth/invite/${code}`),
+
+  joinTeam: (data: { code: string; email: string; password: string; full_name: string }) =>
+    request<any>("/api/auth/join", { method: "POST", body: JSON.stringify(data) }),
+
+  // --- Notification Channels ---
+  getNotificationChannels: () =>
+    request<any>("/api/copilot/me/notification-channels"),
+
+  upsertNotificationChannel: (channelType: string, data: { enabled?: boolean; channel_config?: any }) =>
+    request<any>(`/api/copilot/me/notification-channels/${channelType}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  deleteNotificationChannel: (channelType: string) =>
+    request<any>(`/api/copilot/me/notification-channels/${channelType}`, { method: "DELETE" }),
+
+  testNotificationChannel: (channelType: string, channelConfig: any) =>
+    request<any>("/api/copilot/me/notification-channels/test", {
+      method: "POST",
+      body: JSON.stringify({ channel_type: channelType, channel_config: channelConfig }),
+    }),
 
   // --- Hot Leads ---
   getHotLeads: () =>

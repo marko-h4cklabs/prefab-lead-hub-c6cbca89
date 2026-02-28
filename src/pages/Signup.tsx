@@ -268,8 +268,9 @@ const Signup = () => {
             <button type="submit" disabled={!canSubmit} className="dark-btn-primary w-full">
               {loading ? <><Loader2 size={16} className="animate-spin" /> Creating…</> : "Create account"}
             </button>
-            <div className="text-center">
-              <Link to="/login" className="text-xs text-muted-foreground hover:text-primary transition-colors">Back to login</Link>
+            <div className="text-center space-y-2">
+              <Link to="/login" className="text-xs text-muted-foreground hover:text-primary transition-colors block">Back to login</Link>
+              <p className="text-xs text-muted-foreground">Joining a team? Use your invite link instead.</p>
             </div>
           </form>
         </div>

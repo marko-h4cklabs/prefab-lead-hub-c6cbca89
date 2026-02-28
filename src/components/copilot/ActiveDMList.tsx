@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { api } from "@/lib/apiClient";
-import { Search, Loader2, MessageSquare, Check, Users, Zap, Clock } from "lucide-react";
+import { Search, Loader2, MessageSquare, Check, Users, Zap, Clock, CheckCircle, XCircle, MinusCircle } from "lucide-react";
+import { api as apiClient } from "@/lib/apiClient";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -20,7 +21,13 @@ interface DM {
   needs_response: boolean;
   has_suggestions: boolean;
   assigned_to?: string | null;
+  assigned_to_name?: string | null;
   assigned_name?: string | null;
+  assigned_setter_status?: string | null;
+  dm_status?: string;
+  dm_status_updated_at?: string | null;
+  waiting_seconds?: number;
+  urgency?: string;
 }
 
 interface TeamMember {
@@ -39,7 +46,7 @@ interface Props {
 
 const POLL_INTERVAL = 8_000;
 
-type SortOption = "recent" | "score" | "waiting";
+type SortOption = "recent" | "score" | "waiting" | "urgency";
 type FilterOption = "all" | "mine" | "unassigned";
 
 // ---------------------------------------------------------------------------
@@ -282,7 +289,7 @@ const ActiveDMList = ({ selectedLeadId, onSelectLead }: Props) => {
       <div className="px-3 pt-4 pb-2 shrink-0">
         <h2 className="text-sm font-bold text-foreground flex items-center gap-2 mb-3">
           <MessageSquare size={14} className="text-primary" />
-          Active DMs
+          DMs
           {needsResponseCount > 0 && (
             <span className="ml-auto inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
               {needsResponseCount}
@@ -343,7 +350,7 @@ const ActiveDMList = ({ selectedLeadId, onSelectLead }: Props) => {
 
         {/* Sort pills */}
         <div className="flex gap-1">
-          {(["recent", "score", "waiting"] as SortOption[]).map((s) => (
+          {(["urgency", "recent", "score", "waiting"] as SortOption[]).map((s) => (
             <button
               key={s}
               onClick={() => setSort(s)}
@@ -353,7 +360,7 @@ const ActiveDMList = ({ selectedLeadId, onSelectLead }: Props) => {
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {s === "recent" ? "Recent" : s === "score" ? "Score" : "Waiting"}
+              {s === "urgency" ? "Urgency" : s === "recent" ? "Recent" : s === "score" ? "Score" : "Waiting"}
             </button>
           ))}
         </div>
@@ -465,10 +472,21 @@ const ActiveDMList = ({ selectedLeadId, onSelectLead }: Props) => {
         {!loading &&
           filtered.map((dm) => {
             const isSelected = selectedIds.has(dm.lead_id);
-            const waitMins = dm.needs_response ? minutesSince(dm.last_message_at) : 0;
+            const assignedName = dm.assigned_to_name || dm.assigned_name;
+            const urgency = dm.urgency || "none";
+            const waitingSec = dm.waiting_seconds || 0;
+            const waitMins = Math.floor(waitingSec / 60);
             const waitLabel =
-              waitMins >= 60 ? `waiting ${Math.floor(waitMins / 60)}h` : waitMins > 0 ? `waiting ${waitMins}m` : null;
-            const waitColor = waitMins > 30 ? "text-red-500" : waitMins > 10 ? "text-orange-400" : "text-muted-foreground";
+              waitMins >= 60 ? `${Math.floor(waitMins / 60)}h` : waitMins > 0 ? `${waitMins}m` : null;
+
+            // Urgency-based left border and background
+            const urgencyStyles: Record<string, string> = {
+              critical: "border-l-2 border-l-red-500 bg-red-500/5",
+              warning: "border-l-2 border-l-orange-400 bg-orange-400/5",
+              ok: "border-l-2 border-l-green-500",
+              none: "",
+            };
+            const urgencyBorder = urgencyStyles[urgency] || "";
 
             return (
               <div
@@ -476,7 +494,7 @@ const ActiveDMList = ({ selectedLeadId, onSelectLead }: Props) => {
                 className={`w-full text-left px-3 py-2.5 border-b border-border/50 transition-colors flex items-start gap-2 ${
                   selectedLeadId === dm.lead_id
                     ? "bg-primary/10 border-l-2 border-l-primary"
-                    : "hover:bg-secondary/50"
+                    : urgencyBorder || "hover:bg-secondary/50"
                 }`}
               >
                 {/* Checkbox */}
@@ -525,48 +543,74 @@ const ActiveDMList = ({ selectedLeadId, onSelectLead }: Props) => {
                         {dm.last_message_preview || "..."}
                       </p>
 
-                      {/* Meta row: score, assignment, waiting, AI badge */}
+                      {/* Meta row: urgency, assignment, waiting, AI badge */}
                       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                         {/* Score badge */}
                         {dm.score > 0 && (
-                          <span
-                            className={`inline-flex items-center px-1.5 py-0 rounded-full text-[9px] font-semibold ${getScoreColor(dm.score)}`}
-                          >
+                          <span className={`inline-flex items-center px-1.5 py-0 rounded-full text-[9px] font-semibold ${getScoreColor(dm.score)}`}>
                             {dm.score}
                           </span>
                         )}
 
                         {/* Assignment indicator */}
-                        {dm.assigned_name ? (
+                        {assignedName ? (
                           <span className="inline-flex items-center gap-0.5 text-[9px]">
                             <span className="w-4 h-4 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[8px] font-bold">
-                              {getInitials(dm.assigned_name)}
+                              {getInitials(assignedName)}
                             </span>
                           </span>
                         ) : (
                           <span className="text-[9px] text-muted-foreground/60 italic">Unassigned</span>
                         )}
 
-                        {/* Needs response dot */}
-                        {dm.needs_response && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                        )}
-
-                        {/* Waiting time */}
+                        {/* Waiting time with color */}
                         {dm.needs_response && waitLabel && (
-                          <span className={`inline-flex items-center gap-0.5 text-[9px] font-medium ${waitColor}`}>
+                          <span className={`inline-flex items-center gap-0.5 text-[9px] font-medium ${
+                            urgency === "critical" ? "text-red-500" : urgency === "warning" ? "text-orange-400" : "text-green-500"
+                          }`}>
                             <Clock size={9} />
                             {waitLabel}
                           </span>
                         )}
 
-                        {/* AI Ready badge (enhanced) */}
+                        {/* Waiting for client (no action needed) */}
+                        {!dm.needs_response && dm.last_message_role === "assistant" && (
+                          <span className="text-[9px] text-blue-400/70 italic">Waiting for client</span>
+                        )}
+
+                        {/* AI Ready badge */}
                         {dm.has_suggestions && (
                           <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-primary/15 text-primary text-[9px] font-semibold">
                             <Zap size={9} />
                             AI Ready
                           </span>
                         )}
+                      </div>
+
+                      {/* Disposition buttons */}
+                      <div className="flex items-center gap-1 mt-1.5" onClick={(e) => e.stopPropagation()}>
+                        {[
+                          { status: "booked", icon: CheckCircle, label: "Booked", color: "text-green-500 hover:bg-green-500/10" },
+                          { status: "lost", icon: XCircle, label: "Lost", color: "text-red-400 hover:bg-red-400/10" },
+                          { status: "done", icon: MinusCircle, label: "Done", color: "text-muted-foreground hover:bg-muted/20" },
+                        ].map(({ status, icon: Icon, label, color }) => (
+                          <button
+                            key={status}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                await apiClient.setDmStatus(dm.lead_id, status);
+                                // Remove from list
+                                setDms((prev) => prev.filter((d) => d.lead_id !== dm.lead_id));
+                              } catch { /* handled by api layer */ }
+                            }}
+                            title={label}
+                            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] transition-colors ${color}`}
+                          >
+                            <Icon size={9} />
+                            {label}
+                          </button>
+                        ))}
                       </div>
                     </div>
                   </div>

@@ -1,34 +1,99 @@
 import { Outlet, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { api } from "@/lib/apiClient";
 import CopilotNav from "@/components/copilot/CopilotNav";
 import CopilotTopBar from "@/components/copilot/CopilotTopBar";
 import ImpersonationBanner from "@/components/admin/ImpersonationBanner";
+
+// Notification sound — a short beep using the Web Audio API
+function playNotificationSound() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.frequency.value = 880;
+    oscillator.type = "sine";
+    gain.gain.value = 0.15;
+    oscillator.start();
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    oscillator.stop(ctx.currentTime + 0.3);
+  } catch {
+    // Audio not available
+  }
+}
 
 const CopilotLayout = () => {
   const navigate = useNavigate();
   const [billingStatus, setBillingStatus] = useState<any>(null);
   const [activeCount, setActiveCount] = useState(0);
   const [waitingCount, setWaitingCount] = useState(0);
+  const prevWaitingRef = useRef(0);
 
   useEffect(() => {
     api.getBillingStatus().then(setBillingStatus).catch(() => {});
   }, []);
 
+  // Request browser notification permission on mount if enabled
   useEffect(() => {
-    const fetch = () => {
+    const browserEnabled = localStorage.getItem("notif_browser_enabled");
+    if (browserEnabled === "true" && "Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  const showBrowserNotification = useCallback((title: string, body: string) => {
+    const browserEnabled = localStorage.getItem("notif_browser_enabled");
+    if (browserEnabled !== "true") return;
+
+    // Desktop notification
+    if ("Notification" in window && Notification.permission === "granted") {
+      try {
+        new Notification(title, {
+          body,
+          icon: "/favicon.ico",
+          tag: "copilot-dm",
+        });
+      } catch {
+        // Notification API not available
+      }
+    }
+
+    // Sound
+    const soundEnabled = localStorage.getItem("notif_sound_enabled");
+    if (soundEnabled !== "false") {
+      playNotificationSound();
+    }
+  }, []);
+
+  useEffect(() => {
+    const fetchDMs = () => {
       api.getCopilotActiveDMs({ sort: "recent" })
         .then((res) => {
           const dms = Array.isArray(res?.dms) ? res.dms : [];
-          setActiveCount(dms.length);
-          setWaitingCount(dms.filter((d: any) => d.needs_response).length);
+          const newActiveCount = dms.length;
+          const newWaitingCount = dms.filter((d: any) => d.needs_response).length;
+
+          setActiveCount(newActiveCount);
+          setWaitingCount(newWaitingCount);
+
+          // If waiting count increased, show browser notification
+          if (newWaitingCount > prevWaitingRef.current && prevWaitingRef.current >= 0) {
+            const diff = newWaitingCount - prevWaitingRef.current;
+            showBrowserNotification(
+              "New DM" + (diff > 1 ? "s" : ""),
+              `You have ${diff} new DM${diff > 1 ? "s" : ""} waiting for a response.`
+            );
+          }
+          prevWaitingRef.current = newWaitingCount;
         })
         .catch(() => {});
     };
-    fetch();
-    const interval = setInterval(fetch, 10000);
+    fetchDMs();
+    const interval = setInterval(fetchDMs, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [showBrowserNotification]);
 
   const subStatus = billingStatus?.subscription_status || billingStatus?.status;
   const trialDaysLeft = billingStatus?.trial_days_remaining ?? billingStatus?.days_remaining ?? null;

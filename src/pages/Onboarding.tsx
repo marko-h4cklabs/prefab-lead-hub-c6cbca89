@@ -5,7 +5,7 @@ import { toast } from "@/hooks/use-toast";
 import { Loader2, Check, Copy, ArrowRight, ArrowLeft, CheckCircle2 } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 4;
 
 const QUOTE_PRESETS = [
   { key: 'full_name', label: 'Full Name' },
@@ -17,7 +17,7 @@ const QUOTE_PRESETS = [
   { key: 'notes', label: 'Additional Notes' },
 ];
 
-const STEP_LABELS = ["Business Info", "AI Style", "Data Collection", "ManyChat", "AI Mode"];
+const STEP_LABELS = ["Business Info", "AI Style", "Data Collection", "ManyChat"];
 
 function StepProgress({ step, completedSteps }: { step: number; completedSteps: Set<number> }) {
   return (
@@ -258,18 +258,20 @@ const Onboarding = () => {
   const saveStep1 = async () => { setSaving(true); try { await api.putCompanyInfo({ business_description: bizInfo.description, additional_notes: bizInfo.notes }); if (bizInfo.businessName.trim()) { await api.patchCompany(companyId, { company_name: bizInfo.businessName.trim() }).catch(() => {}); } markComplete(1); setStep(2); } catch (e: any) { toast({ title: "Failed to save", description: e?.message, variant: "destructive" }); } finally { setSaving(false); } };
   const saveStep2 = async () => { setSaving(true); try { await api.putChatbotBehavior({ tone: persona.tone, response_length: persona.responseLength, persona_style: persona.personaStyle, emojis_enabled: persona.emojis }); markComplete(2); setStep(3); } catch (e: any) { toast({ title: "Failed to save", description: e?.message, variant: "destructive" }); } finally { setSaving(false); } };
   const saveStep3 = async () => { setSaving(true); try { const presets = QUOTE_PRESETS.map((p, i) => ({ name: p.key, label: p.label, is_enabled: !!quoteEnabled[p.key], priority: i + 1 })); await api.putQuoteFields({ presets }); markComplete(3); setStep(4); } catch (e: any) { toast({ title: "Failed to save", description: e?.message, variant: "destructive" }); } finally { setSaving(false); } };
-  const saveStep4 = async (skipManychat = false) => { setSaving(true); try { if (!skipManychat && manychat.apiKey.trim()) { await api.saveManychatSettings({ manychat_api_key: manychat.apiKey.trim(), manychat_page_id: manychat.pageId.trim() }); } markComplete(4); setStep(5); } catch (e: any) { toast({ title: "Failed to save ManyChat settings", description: e?.message, variant: "destructive" }); } finally { setSaving(false); } };
-  const finishSetup = async (mode: "autopilot" | "copilot") => {
+  const saveStep4 = async (skipManychat = false) => {
     setSaving(true);
     try {
-      await api.setOperatingMode(mode);
-      markComplete(5);
-      // Call onboarding complete
+      if (!skipManychat && manychat.apiKey.trim()) {
+        await api.saveManychatSettings({ manychat_api_key: manychat.apiKey.trim(), manychat_page_id: manychat.pageId.trim() });
+      }
+      markComplete(4);
+      // Mode is always copilot — set it and finish
+      await api.setOperatingMode("copilot").catch(() => {});
       await api.completeOnboarding().catch(() => {});
       toast({ title: "Setup complete!", description: "Your workspace is ready." });
-      navigate("/dashboard", { replace: true });
+      navigate("/copilot", { replace: true });
     } catch (e: any) {
-      toast({ title: "Failed to set mode", description: e?.message, variant: "destructive" });
+      toast({ title: "Failed to save ManyChat settings", description: e?.message, variant: "destructive" });
     } finally { setSaving(false); }
   };
 
@@ -296,7 +298,6 @@ const Onboarding = () => {
           {step === 2 && <Step2 data={persona} onChange={(d) => setPersona((p) => ({ ...p, ...d }))} onNext={saveStep2} onBack={() => setStep(1)} saving={saving} />}
           {step === 3 && <Step3 enabled={quoteEnabled} onToggle={(key) => setQuoteEnabled((p) => ({ ...p, [key]: !p[key] }))} onNext={saveStep3} onBack={() => setStep(2)} saving={saving} />}
           {step === 4 && <Step4 data={manychat} onChange={(d) => setManychat((p) => ({ ...p, ...d }))} onNext={() => saveStep4(false)} onSkip={() => saveStep4(true)} onBack={() => setStep(3)} saving={saving} />}
-          {step === 5 && <Step5 onSelect={finishSetup} onBack={() => setStep(4)} saving={saving} />}
         </div>
       </div>
     </div>

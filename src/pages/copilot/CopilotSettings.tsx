@@ -29,6 +29,10 @@ import {
   Play,
   Pause,
   SkipForward,
+  Bell,
+  Send,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -74,6 +78,7 @@ const TABS = [
   { key: "personas", label: "Personas", icon: Users },
   { key: "followups", label: "Follow-ups", icon: CalendarClock },
   { key: "integrations", label: "Integrations", icon: Link2 },
+  { key: "notifications", label: "Notifications", icon: Bell },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -179,6 +184,7 @@ const CopilotSettings = () => {
           {activeTab === "personas" && <PersonasTab />}
           {activeTab === "followups" && <FollowUpsTab />}
           {activeTab === "integrations" && <IntegrationsTab />}
+          {activeTab === "notifications" && <NotificationsTab />}
         </div>
       </div>
     </div>
@@ -1661,6 +1667,320 @@ function IntegrationsTab() {
 }
 
 // ===========================================================================
+// NOTIFICATIONS TAB
+// ===========================================================================
+
+interface ChannelState {
+  slack: { enabled: boolean; webhook_url: string };
+  telegram: { enabled: boolean; bot_token: string; chat_id: string };
+  browser: { enabled: boolean; sound: boolean };
+}
+
+const CHANNEL_DEFAULTS: ChannelState = {
+  slack: { enabled: false, webhook_url: "" },
+  telegram: { enabled: false, bot_token: "", chat_id: "" },
+  browser: { enabled: false, sound: true },
+};
+
+function NotificationsTab() {
+  const [channels, setChannels] = useState<ChannelState>(CHANNEL_DEFAULTS);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [testing, setTesting] = useState<string | null>(null);
+  const [showSlackUrl, setShowSlackUrl] = useState(false);
+  const [showBotToken, setShowBotToken] = useState(false);
+
+  useEffect(() => {
+    api.getNotificationChannels()
+      .then((res: any) => {
+        const list = Array.isArray(res?.channels) ? res.channels : [];
+        const state = { ...CHANNEL_DEFAULTS };
+        for (const ch of list) {
+          const config = typeof ch.channel_config === "string"
+            ? JSON.parse(ch.channel_config)
+            : (ch.channel_config || {});
+          if (ch.channel_type === "slack") {
+            state.slack = { enabled: ch.enabled, webhook_url: config.webhook_url || "" };
+          } else if (ch.channel_type === "telegram") {
+            state.telegram = { enabled: ch.enabled, bot_token: config.bot_token || "", chat_id: config.chat_id || "" };
+          } else if (ch.channel_type === "browser") {
+            state.browser = { enabled: ch.enabled, sound: config.sound !== false };
+          }
+        }
+        setChannels(state);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSave = async (channelType: "slack" | "telegram" | "browser") => {
+    setSaving(channelType);
+    try {
+      const ch = channels[channelType];
+      let channelConfig: any = {};
+      if (channelType === "slack") channelConfig = { webhook_url: (ch as any).webhook_url };
+      else if (channelType === "telegram") channelConfig = { bot_token: (ch as any).bot_token, chat_id: (ch as any).chat_id };
+      else if (channelType === "browser") channelConfig = { sound: (ch as any).sound };
+
+      await api.upsertNotificationChannel(channelType, { enabled: ch.enabled, channel_config: channelConfig });
+      // Also save browser sound preference to localStorage for client-side access
+      if (channelType === "browser") {
+        localStorage.setItem("notif_browser_enabled", String(ch.enabled));
+        localStorage.setItem("notif_sound_enabled", String((ch as any).sound));
+      }
+      toast({ title: `${channelType.charAt(0).toUpperCase() + channelType.slice(1)} settings saved` });
+    } catch (err) {
+      toast({ title: `Failed to save ${channelType}`, description: getErrorMessage(err), variant: "destructive" });
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const handleTest = async (channelType: "slack" | "telegram") => {
+    setTesting(channelType);
+    try {
+      const ch = channels[channelType];
+      let channelConfig: any = {};
+      if (channelType === "slack") channelConfig = { webhook_url: (ch as any).webhook_url };
+      else if (channelType === "telegram") channelConfig = { bot_token: (ch as any).bot_token, chat_id: (ch as any).chat_id };
+
+      await api.testNotificationChannel(channelType, channelConfig);
+      toast({ title: "Test notification sent" });
+    } catch (err) {
+      toast({ title: "Test failed", description: getErrorMessage(err), variant: "destructive" });
+    } finally {
+      setTesting(null);
+    }
+  };
+
+  if (loading) return <LoadingSkeleton lines={4} />;
+
+  return (
+    <div className="space-y-6">
+      <SectionCard
+        title="Notification Channels"
+        description="Configure how you receive notifications when new DMs arrive or you get assigned leads."
+      >
+        <div className="space-y-3">
+          {[
+            { name: "Browser", key: "browser" as const, desc: "In-app + desktop notifications", enabled: channels.browser.enabled },
+            { name: "Slack", key: "slack" as const, desc: "Receive alerts via Slack webhook", enabled: channels.slack.enabled },
+            { name: "Telegram", key: "telegram" as const, desc: "Receive alerts via Telegram bot", enabled: channels.telegram.enabled },
+          ].map((ch) => (
+            <div key={ch.key} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border">
+              <div className="flex items-center gap-3">
+                <div className={`w-2 h-2 rounded-full ${ch.enabled ? "bg-green-500" : "bg-muted-foreground"}`} />
+                <div>
+                  <p className="text-sm font-medium text-foreground">{ch.name}</p>
+                  <p className="text-xs text-muted-foreground">{ch.desc}</p>
+                </div>
+              </div>
+              <span className={`text-xs font-semibold ${ch.enabled ? "text-green-500" : "text-muted-foreground"}`}>
+                {ch.enabled ? "Enabled" : "Disabled"}
+              </span>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      {/* Browser Notifications */}
+      <SectionCard
+        title="Browser Notifications"
+        description="Receive desktop notifications when new DMs arrive. Sound alerts play when you get assigned a new lead."
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-foreground">Desktop Notifications</p>
+              <p className="text-xs text-muted-foreground">Show browser push notifications for new DMs and assignments.</p>
+            </div>
+            <Switch
+              checked={channels.browser.enabled}
+              onCheckedChange={(checked) => {
+                setChannels((prev) => ({ ...prev, browser: { ...prev.browser, enabled: checked } }));
+                // Request browser permission if enabling
+                if (checked && "Notification" in window && Notification.permission === "default") {
+                  Notification.requestPermission();
+                }
+              }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {channels.browser.sound ? <Volume2 size={16} className="text-foreground" /> : <VolumeX size={16} className="text-muted-foreground" />}
+              <div>
+                <p className="text-sm font-medium text-foreground">Sound Alerts</p>
+                <p className="text-xs text-muted-foreground">Play a notification sound when a new DM arrives.</p>
+              </div>
+            </div>
+            <Switch
+              checked={channels.browser.sound}
+              onCheckedChange={(checked) =>
+                setChannels((prev) => ({ ...prev, browser: { ...prev.browser, sound: checked } }))
+              }
+            />
+          </div>
+
+          <button
+            onClick={() => handleSave("browser")}
+            disabled={saving === "browser"}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            {saving === "browser" ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {saving === "browser" ? "Saving..." : "Save Browser Settings"}
+          </button>
+        </div>
+      </SectionCard>
+
+      {/* Slack */}
+      <SectionCard
+        title="Slack Notifications"
+        description="Send notifications to a Slack channel via incoming webhook. Create a webhook in your Slack workspace settings."
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-foreground">Enable Slack</p>
+              <p className="text-xs text-muted-foreground">Forward notifications to your Slack channel.</p>
+            </div>
+            <Switch
+              checked={channels.slack.enabled}
+              onCheckedChange={(checked) =>
+                setChannels((prev) => ({ ...prev, slack: { ...prev.slack, enabled: checked } }))
+              }
+            />
+          </div>
+
+          {channels.slack.enabled && (
+            <FieldGroup label="Webhook URL" required hint="Paste your Slack Incoming Webhook URL.">
+              <div className="relative">
+                <input
+                  type={showSlackUrl ? "text" : "password"}
+                  value={channels.slack.webhook_url}
+                  onChange={(e) =>
+                    setChannels((prev) => ({ ...prev, slack: { ...prev.slack, webhook_url: e.target.value } }))
+                  }
+                  placeholder="https://hooks.slack.com/services/..."
+                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors pr-10"
+                />
+                <button
+                  onClick={() => setShowSlackUrl(!showSlackUrl)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showSlackUrl ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+            </FieldGroup>
+          )}
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => handleSave("slack")}
+              disabled={saving === "slack"}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {saving === "slack" ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              {saving === "slack" ? "Saving..." : "Save Slack Settings"}
+            </button>
+
+            {channels.slack.enabled && channels.slack.webhook_url && (
+              <button
+                onClick={() => handleTest("slack")}
+                disabled={testing === "slack"}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary text-foreground text-sm font-medium hover:bg-secondary/80 transition-colors disabled:opacity-50"
+              >
+                {testing === "slack" ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                {testing === "slack" ? "Sending..." : "Send Test"}
+              </button>
+            )}
+          </div>
+        </div>
+      </SectionCard>
+
+      {/* Telegram */}
+      <SectionCard
+        title="Telegram Notifications"
+        description="Send notifications to a Telegram chat via a bot. Create a bot with @BotFather and get your chat ID."
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-foreground">Enable Telegram</p>
+              <p className="text-xs text-muted-foreground">Forward notifications to your Telegram chat.</p>
+            </div>
+            <Switch
+              checked={channels.telegram.enabled}
+              onCheckedChange={(checked) =>
+                setChannels((prev) => ({ ...prev, telegram: { ...prev.telegram, enabled: checked } }))
+              }
+            />
+          </div>
+
+          {channels.telegram.enabled && (
+            <>
+              <FieldGroup label="Bot Token" required hint="Token from @BotFather (e.g. 123456:ABC-DEF...).">
+                <div className="relative">
+                  <input
+                    type={showBotToken ? "text" : "password"}
+                    value={channels.telegram.bot_token}
+                    onChange={(e) =>
+                      setChannels((prev) => ({ ...prev, telegram: { ...prev.telegram, bot_token: e.target.value } }))
+                    }
+                    placeholder="123456789:ABCdefGHIjklMNO..."
+                    className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors pr-10"
+                  />
+                  <button
+                    onClick={() => setShowBotToken(!showBotToken)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showBotToken ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </FieldGroup>
+
+              <FieldGroup label="Chat ID" required hint="Your personal or group chat ID. Use @userinfobot or @RawDataBot to find it.">
+                <input
+                  type="text"
+                  value={channels.telegram.chat_id}
+                  onChange={(e) =>
+                    setChannels((prev) => ({ ...prev, telegram: { ...prev.telegram, chat_id: e.target.value } }))
+                  }
+                  placeholder="e.g. 123456789"
+                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+                />
+              </FieldGroup>
+            </>
+          )}
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => handleSave("telegram")}
+              disabled={saving === "telegram"}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {saving === "telegram" ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              {saving === "telegram" ? "Saving..." : "Save Telegram Settings"}
+            </button>
+
+            {channels.telegram.enabled && channels.telegram.bot_token && channels.telegram.chat_id && (
+              <button
+                onClick={() => handleTest("telegram")}
+                disabled={testing === "telegram"}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary text-foreground text-sm font-medium hover:bg-secondary/80 transition-colors disabled:opacity-50"
+              >
+                {testing === "telegram" ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                {testing === "telegram" ? "Sending..." : "Send Test"}
+              </button>
+            )}
+          </div>
+        </div>
+      </SectionCard>
+    </div>
+  );
+}
+
+// ===========================================================================
 // SHARED UI COMPONENTS
 // ===========================================================================
 
@@ -1698,7 +2018,7 @@ function FieldGroup({
   children,
 }: {
   label: string;
-  hint?: string;
+  hint?: React.ReactNode;
   required?: boolean;
   children: React.ReactNode;
 }) {

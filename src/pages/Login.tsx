@@ -54,7 +54,7 @@ const Login = () => {
       } catch {
         // If check fails, go to dashboard anyway
       }
-      navigate("/dashboard", { replace: true });
+      navigate("/copilot", { replace: true });
     } catch (err: unknown) {
       if (err instanceof TypeError) {
         setError("Backend unreachable. Please try again or contact support.");
