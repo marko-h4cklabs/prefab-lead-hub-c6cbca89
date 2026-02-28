@@ -43,6 +43,28 @@ interface Intelligence {
   conversation_summary: string[];
 }
 
+/** Normalize the raw API intelligence object so arrays are always arrays and nulls are safe defaults. */
+function normalizeIntelligence(raw: any): Intelligence {
+  const cs = raw?.conversation_summary;
+  let summaryArr: string[] = [];
+  if (Array.isArray(cs)) summaryArr = cs;
+  else if (typeof cs === 'string' && cs.trim()) summaryArr = [cs];
+
+  const tags = raw?.intent_tags;
+  let tagsArr: string[] = [];
+  if (Array.isArray(tags)) tagsArr = tags;
+  else if (typeof tags === 'string' && tags.trim()) tagsArr = tags.split(',').map((t: string) => t.trim());
+
+  return {
+    intent_score: Number(raw?.intent_score) || 0,
+    intent_tags: tagsArr,
+    budget_detected: raw?.budget_detected ?? null,
+    urgency_level: raw?.urgency_level || 'low',
+    is_hot_lead: !!raw?.is_hot_lead,
+    conversation_summary: summaryArr,
+  };
+}
+
 interface ActivityEvent {
   event_type: string;
   metadata: Record<string, any>;
@@ -245,8 +267,17 @@ const CopilotLeadSummary = ({ leadId, onOpenChat, onBack }: CopilotLeadSummaryPr
         api.getCopilotFields().catch(() => ({ fields: [] })),
         api.getCopilotTeam().catch(() => ({ members: [] })),
       ]);
-      setSummary(summaryRes);
-      setLocalNotes(Array.isArray(summaryRes?.notes) ? summaryRes.notes : []);
+      // Normalize API response: map recent_activity->activity, normalize intelligence
+      const normalized: SummaryResponse = {
+        lead: summaryRes?.lead || {},
+        parsed_fields: summaryRes?.parsed_fields || {},
+        intelligence: normalizeIntelligence(summaryRes?.intelligence),
+        activity: summaryRes?.recent_activity || summaryRes?.activity || [],
+        notes: Array.isArray(summaryRes?.notes) ? summaryRes.notes : [],
+        pending_suggestions: summaryRes?.pending_suggestions || 0,
+      };
+      setSummary(normalized);
+      setLocalNotes(normalized.notes);
       const allFields = Array.isArray(fieldsRes?.fields)
         ? fieldsRes.fields
         : Array.isArray(fieldsRes?.presets)
