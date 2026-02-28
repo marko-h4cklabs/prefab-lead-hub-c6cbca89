@@ -20,6 +20,15 @@ import {
   CheckCircle2,
   GripVertical,
   ChevronDown,
+  CalendarClock,
+  Link2,
+  Eye,
+  EyeOff,
+  Copy,
+  ExternalLink,
+  Play,
+  Pause,
+  SkipForward,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -63,6 +72,8 @@ const TABS = [
   { key: "behavior", label: "Behavior", icon: MessageSquare },
   { key: "fields", label: "Fields", icon: Settings },
   { key: "personas", label: "Personas", icon: Users },
+  { key: "followups", label: "Follow-ups", icon: CalendarClock },
+  { key: "integrations", label: "Integrations", icon: Link2 },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -166,6 +177,8 @@ const CopilotSettings = () => {
           {activeTab === "behavior" && <BehaviorTab />}
           {activeTab === "fields" && <FieldsTab />}
           {activeTab === "personas" && <PersonasTab />}
+          {activeTab === "followups" && <FollowUpsTab />}
+          {activeTab === "integrations" && <IntegrationsTab />}
         </div>
       </div>
     </div>
@@ -910,6 +923,628 @@ function PersonasTab() {
             ))}
           </div>
         )}
+      </SectionCard>
+    </div>
+  );
+}
+
+// ===========================================================================
+// FOLLOW-UPS TAB
+// ===========================================================================
+
+interface SequenceStep {
+  type: "template" | "ai_generated";
+  delay_minutes: number;
+  message_template?: string;
+  ai_context_prompt?: string;
+}
+
+interface Sequence {
+  id: string;
+  name: string;
+  trigger_event: string;
+  max_follow_ups: number;
+  escalation_action: string;
+  is_active: boolean;
+  steps: SequenceStep[];
+}
+
+interface Enrollment {
+  id: string;
+  lead_id: string;
+  lead_name?: string;
+  sequence_name?: string;
+  current_step: number;
+  follow_ups_sent: number;
+  next_send_at: string | null;
+  status: string;
+}
+
+const TRIGGER_EVENTS = [
+  { value: "no_reply_72h", label: "No reply (72h)" },
+  { value: "post_quote", label: "After quote sent" },
+  { value: "call_booked", label: "Call booked" },
+  { value: "no_show_detected", label: "No-show detected" },
+  { value: "re_engagement", label: "Re-engagement" },
+  { value: "custom", label: "Custom" },
+];
+
+const ESCALATION_ACTIONS = [
+  { value: "none", label: "None" },
+  { value: "tag_cold", label: "Tag as Cold" },
+  { value: "notify_owner", label: "Notify Owner" },
+  { value: "move_pipeline", label: "Move Pipeline Stage" },
+  { value: "pause", label: "Pause" },
+];
+
+function FollowUpsTab() {
+  const [sequences, setSequences] = useState<Sequence[]>([]);
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [subTab, setSubTab] = useState<"overview" | "sequences" | "active">("overview");
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newSeq, setNewSeq] = useState({
+    name: "",
+    trigger_event: "no_reply_72h",
+    max_follow_ups: 5,
+    escalation_action: "none",
+    steps: [{ type: "ai_generated" as const, delay_minutes: 1440, message_template: "", ai_context_prompt: "" }],
+  });
+  const [creating, setCreating] = useState(false);
+
+  const fetchAll = useCallback(async () => {
+    try {
+      const [seqRes, enrollRes, statsRes] = await Promise.allSettled([
+        api.getWarmingSequences(),
+        api.getWarmingEnrollments("active"),
+        api.getFollowUpDashboard(),
+      ]);
+      if (seqRes.status === "fulfilled") {
+        setSequences(normalizeList(seqRes.value, ["sequences", "data", "items"]));
+      }
+      if (enrollRes.status === "fulfilled") {
+        setEnrollments(normalizeList(enrollRes.value, ["enrollments", "data", "items"]));
+      }
+      if (statsRes.status === "fulfilled") {
+        setStats(statsRes.value);
+      }
+    } catch (_) {}
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const handleCreateSequence = async () => {
+    if (!newSeq.name.trim()) {
+      toast({ title: "Sequence name is required", variant: "destructive" });
+      return;
+    }
+    setCreating(true);
+    try {
+      await api.createWarmingSequence(newSeq);
+      toast({ title: "Sequence created" });
+      setShowCreateForm(false);
+      setNewSeq({
+        name: "",
+        trigger_event: "no_reply_72h",
+        max_follow_ups: 5,
+        escalation_action: "none",
+        steps: [{ type: "ai_generated", delay_minutes: 1440, message_template: "", ai_context_prompt: "" }],
+      });
+      fetchAll();
+    } catch (err) {
+      toast({ title: "Failed to create sequence", description: getErrorMessage(err), variant: "destructive" });
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const toggleSequence = async (seq: Sequence) => {
+    try {
+      await api.updateWarmingSequence(seq.id, { is_active: !seq.is_active });
+      toast({ title: seq.is_active ? "Sequence paused" : "Sequence activated" });
+      fetchAll();
+    } catch (err) {
+      toast({ title: "Failed to update sequence", description: getErrorMessage(err), variant: "destructive" });
+    }
+  };
+
+  const handleEnrollmentAction = async (id: string, action: "pause" | "resume" | "skip" | "cancel") => {
+    try {
+      if (action === "pause") await api.pauseEnrollment(id);
+      else if (action === "resume") await api.resumeEnrollment(id);
+      else if (action === "skip") await api.skipEnrollmentStep(id);
+      else if (action === "cancel") await api.cancelEnrollment(id);
+      toast({ title: `Enrollment ${action}d` });
+      fetchAll();
+    } catch (err) {
+      toast({ title: `Failed to ${action} enrollment`, description: getErrorMessage(err), variant: "destructive" });
+    }
+  };
+
+  if (loading) return <LoadingSkeleton lines={5} />;
+
+  const subTabs = [
+    { key: "overview", label: "Overview" },
+    { key: "sequences", label: `Sequences (${sequences.length})` },
+    { key: "active", label: `Active (${enrollments.length})` },
+  ] as const;
+
+  return (
+    <div className="space-y-6">
+      {/* Sub-tab nav */}
+      <div className="flex gap-1 bg-secondary/50 rounded-lg p-1">
+        {subTabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setSubTab(t.key)}
+            className={`flex-1 text-center px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              subTab === t.key
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Overview */}
+      {subTab === "overview" && (
+        <SectionCard
+          title="Follow-up Overview"
+          description="Automated follow-up sequences for the copilot workflow. In copilot mode, follow-ups generate suggestions for setter review instead of auto-sending."
+        >
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-secondary/50 rounded-lg p-4">
+              <p className="text-xs text-muted-foreground">Active Sequences</p>
+              <p className="text-2xl font-bold text-foreground mt-1">{sequences.filter(s => s.is_active).length}</p>
+            </div>
+            <div className="bg-secondary/50 rounded-lg p-4">
+              <p className="text-xs text-muted-foreground">Active Enrollments</p>
+              <p className="text-2xl font-bold text-foreground mt-1">{enrollments.length}</p>
+            </div>
+            <div className="bg-secondary/50 rounded-lg p-4">
+              <p className="text-xs text-muted-foreground">Messages Sent</p>
+              <p className="text-2xl font-bold text-foreground mt-1">{stats?.messages_sent ?? 0}</p>
+            </div>
+            <div className="bg-secondary/50 rounded-lg p-4">
+              <p className="text-xs text-muted-foreground">Reply Rate</p>
+              <p className="text-2xl font-bold text-foreground mt-1">{stats?.reply_rate ?? 0}%</p>
+            </div>
+          </div>
+
+          <div className="mt-4 p-3 rounded-lg bg-primary/5 border border-primary/20">
+            <p className="text-xs text-primary font-medium">Copilot Mode Behavior</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              In copilot mode, follow-up messages appear as suggestions for setters to review and send manually.
+              This ensures human oversight over all automated follow-ups.
+            </p>
+          </div>
+        </SectionCard>
+      )}
+
+      {/* Sequences */}
+      {subTab === "sequences" && (
+        <SectionCard
+          title="Follow-up Sequences"
+          description="Create and manage automated follow-up sequences."
+          headerAction={
+            <button
+              onClick={() => setShowCreateForm(!showCreateForm)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors"
+            >
+              <Plus size={12} /> New Sequence
+            </button>
+          }
+        >
+          {/* Create form */}
+          {showCreateForm && (
+            <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4 space-y-4 mb-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-foreground">New Sequence</h3>
+                <button onClick={() => setShowCreateForm(false)} className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FieldGroup label="Name" required>
+                  <input
+                    type="text"
+                    value={newSeq.name}
+                    onChange={(e) => setNewSeq(s => ({ ...s, name: e.target.value }))}
+                    placeholder="e.g. No-reply follow-up"
+                    className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+                  />
+                </FieldGroup>
+                <FieldGroup label="Trigger Event">
+                  <div className="relative">
+                    <select
+                      value={newSeq.trigger_event}
+                      onChange={(e) => setNewSeq(s => ({ ...s, trigger_event: e.target.value }))}
+                      className="w-full appearance-none bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors pr-8"
+                    >
+                      {TRIGGER_EVENTS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  </div>
+                </FieldGroup>
+                <FieldGroup label="Max Follow-ups">
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={newSeq.max_follow_ups}
+                    onChange={(e) => setNewSeq(s => ({ ...s, max_follow_ups: Number(e.target.value) || 5 }))}
+                    className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+                  />
+                </FieldGroup>
+                <FieldGroup label="Escalation Action">
+                  <div className="relative">
+                    <select
+                      value={newSeq.escalation_action}
+                      onChange={(e) => setNewSeq(s => ({ ...s, escalation_action: e.target.value }))}
+                      className="w-full appearance-none bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors pr-8"
+                    >
+                      {ESCALATION_ACTIONS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  </div>
+                </FieldGroup>
+              </div>
+
+              {/* Steps */}
+              <FieldGroup label="Steps" hint="Each step fires after a delay. AI-generated steps create reply suggestions.">
+                <div className="space-y-2">
+                  {newSeq.steps.map((step, idx) => (
+                    <div key={idx} className="flex items-start gap-2 p-2 rounded-md bg-secondary/80 border border-border">
+                      <span className="text-[10px] font-bold text-muted-foreground mt-2 w-6 shrink-0 text-center">#{idx + 1}</span>
+                      <div className="flex-1 grid grid-cols-2 gap-2">
+                        <div className="relative">
+                          <select
+                            value={step.type}
+                            onChange={(e) => {
+                              const s = [...newSeq.steps];
+                              s[idx] = { ...s[idx], type: e.target.value as "template" | "ai_generated" };
+                              setNewSeq(prev => ({ ...prev, steps: s }));
+                            }}
+                            className="w-full appearance-none bg-secondary border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:outline-none pr-6"
+                          >
+                            <option value="ai_generated">AI Generated</option>
+                            <option value="template">Template</option>
+                          </select>
+                          <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                        </div>
+                        <input
+                          type="number"
+                          min={1}
+                          value={step.delay_minutes}
+                          onChange={(e) => {
+                            const s = [...newSeq.steps];
+                            s[idx] = { ...s[idx], delay_minutes: Number(e.target.value) || 60 };
+                            setNewSeq(prev => ({ ...prev, steps: s }));
+                          }}
+                          placeholder="Delay (min)"
+                          className="w-full bg-secondary border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:outline-none"
+                        />
+                      </div>
+                      <button
+                        onClick={() => {
+                          const s = newSeq.steps.filter((_, i) => i !== idx);
+                          setNewSeq(prev => ({ ...prev, steps: s.length ? s : [{ type: "ai_generated", delay_minutes: 1440, message_template: "", ai_context_prompt: "" }] }));
+                        }}
+                        className="mt-1 p-1 text-muted-foreground hover:text-destructive rounded-md transition-colors"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => setNewSeq(prev => ({ ...prev, steps: [...prev.steps, { type: "ai_generated", delay_minutes: 1440, message_template: "", ai_context_prompt: "" }] }))}
+                    className="w-full flex items-center justify-center gap-1 py-1.5 rounded-md border border-dashed border-border text-xs text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
+                  >
+                    <Plus size={12} /> Add Step
+                  </button>
+                </div>
+              </FieldGroup>
+
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  onClick={handleCreateSequence}
+                  disabled={creating || !newSeq.name.trim()}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {creating ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  {creating ? "Creating..." : "Create Sequence"}
+                </button>
+                <button onClick={() => setShowCreateForm(false)} className="px-4 py-2 rounded-lg bg-secondary text-foreground text-sm font-medium hover:bg-secondary/80 transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Sequence list */}
+          {sequences.length === 0 && !showCreateForm ? (
+            <div className="text-center py-10">
+              <CalendarClock size={32} className="mx-auto text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">No follow-up sequences yet.</p>
+              <p className="text-xs text-muted-foreground mt-1">Create a sequence to automate follow-ups with AI-generated suggestions.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {sequences.map((seq) => (
+                <div key={seq.id} className={`rounded-lg p-4 transition-all ${seq.is_active ? "bg-primary/5 ring-1 ring-primary/40" : "bg-secondary/50 border border-border"}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-sm font-bold text-foreground">{seq.name}</span>
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${seq.is_active ? "bg-green-500/15 text-green-500" : "bg-secondary text-muted-foreground"}`}>
+                        {seq.is_active ? "Active" : "Paused"}
+                      </span>
+                    </div>
+                    <Switch checked={seq.is_active} onCheckedChange={() => toggleSequence(seq)} />
+                  </div>
+                  <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                    <span>Trigger: {TRIGGER_EVENTS.find(t => t.value === seq.trigger_event)?.label || seq.trigger_event}</span>
+                    <span>Steps: {seq.steps?.length || 0}</span>
+                    <span>Max: {seq.max_follow_ups}</span>
+                    <span>Escalation: {ESCALATION_ACTIONS.find(a => a.value === seq.escalation_action)?.label || seq.escalation_action}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+      )}
+
+      {/* Active Enrollments */}
+      {subTab === "active" && (
+        <SectionCard
+          title="Active Enrollments"
+          description="Leads currently enrolled in follow-up sequences."
+        >
+          {enrollments.length === 0 ? (
+            <div className="text-center py-10">
+              <Users size={32} className="mx-auto text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">No active enrollments.</p>
+              <p className="text-xs text-muted-foreground mt-1">Leads will be enrolled automatically when they match a sequence trigger.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {enrollments.map((e) => (
+                <div key={e.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{e.lead_name || `Lead ${e.lead_id?.slice(0, 8)}`}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {e.sequence_name || "Sequence"} &middot; Step {e.current_step} &middot; {e.follow_ups_sent} sent
+                      {e.next_send_at && ` &middot; Next: ${new Date(e.next_send_at).toLocaleString()}`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {e.status === "paused" ? (
+                      <button onClick={() => handleEnrollmentAction(e.id, "resume")} className="p-1.5 rounded-md text-muted-foreground hover:text-green-500 hover:bg-green-500/10 transition-colors" title="Resume">
+                        <Play size={13} />
+                      </button>
+                    ) : (
+                      <button onClick={() => handleEnrollmentAction(e.id, "pause")} className="p-1.5 rounded-md text-muted-foreground hover:text-yellow-500 hover:bg-yellow-500/10 transition-colors" title="Pause">
+                        <Pause size={13} />
+                      </button>
+                    )}
+                    <button onClick={() => handleEnrollmentAction(e.id, "skip")} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors" title="Skip step">
+                      <SkipForward size={13} />
+                    </button>
+                    <button onClick={() => handleEnrollmentAction(e.id, "cancel")} className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors" title="Cancel">
+                      <X size={13} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+      )}
+    </div>
+  );
+}
+
+// ===========================================================================
+// INTEGRATIONS TAB
+// ===========================================================================
+
+function IntegrationsTab() {
+  const [mcApiKey, setMcApiKey] = useState("");
+  const [mcPageId, setMcPageId] = useState("");
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [calendlyUrl, setCalendlyUrl] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [mcSaving, setMcSaving] = useState(false);
+  const [mcStatus, setMcStatus] = useState<"idle" | "saved" | "error">("idle");
+
+  useEffect(() => {
+    const loadAll = async () => {
+      try {
+        const [mcRes, whRes, bookRes] = await Promise.allSettled([
+          api.getManychatSettings(),
+          api.getWebhookUrl(),
+          api.getBookingSettings(),
+        ]);
+        if (mcRes.status === "fulfilled") {
+          const mc = mcRes.value as any;
+          setMcApiKey(mc?.api_key || mc?.manychat_api_key || "");
+          setMcPageId(mc?.page_id || mc?.manychat_page_id || "");
+        }
+        if (whRes.status === "fulfilled") {
+          const wh = whRes.value as any;
+          setWebhookUrl(wh?.url || wh?.webhook_url || "");
+        }
+        if (bookRes.status === "fulfilled") {
+          const b = bookRes.value as any;
+          setCalendlyUrl(b?.calendly_url || b?.booking_url || "");
+        }
+      } catch (_) {}
+      setLoading(false);
+    };
+    loadAll();
+  }, []);
+
+  const handleSaveManychat = async () => {
+    setMcSaving(true);
+    setMcStatus("idle");
+    try {
+      await api.saveManychatSettings({ manychat_api_key: mcApiKey, manychat_page_id: mcPageId });
+      setMcStatus("saved");
+      toast({ title: "ManyChat settings saved" });
+      setTimeout(() => setMcStatus("idle"), 2000);
+    } catch (err) {
+      setMcStatus("error");
+      toast({ title: "Failed to save ManyChat settings", description: getErrorMessage(err), variant: "destructive" });
+    } finally {
+      setMcSaving(false);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast({ title: "Copied to clipboard" });
+    }).catch(() => {});
+  };
+
+  if (loading) return <LoadingSkeleton lines={4} />;
+
+  const mcConnected = !!(mcApiKey && mcPageId);
+  const whConnected = !!webhookUrl;
+  const calConnected = !!calendlyUrl;
+
+  return (
+    <div className="space-y-6">
+      {/* Status overview */}
+      <SectionCard title="Connection Status" description="Overview of your active integrations.">
+        <div className="space-y-3">
+          {[
+            { name: "ManyChat", desc: "Instagram DM automation", connected: mcConnected },
+            { name: "Webhook", desc: "Receive DMs via webhook", connected: whConnected },
+            { name: "Calendly", desc: "Booking link integration", connected: calConnected },
+          ].map((int) => (
+            <div key={int.name} className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border">
+              <div className="flex items-center gap-3">
+                <div className={`w-2 h-2 rounded-full ${int.connected ? "bg-green-500" : "bg-muted-foreground"}`} />
+                <div>
+                  <p className="text-sm font-medium text-foreground">{int.name}</p>
+                  <p className="text-xs text-muted-foreground">{int.desc}</p>
+                </div>
+              </div>
+              <span className={`text-xs font-semibold ${int.connected ? "text-green-500" : "text-muted-foreground"}`}>
+                {int.connected ? "Connected" : "Not connected"}
+              </span>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      {/* ManyChat Connection */}
+      <SectionCard
+        title="ManyChat Connection"
+        description="Connect your ManyChat account to receive and respond to Instagram DMs through the copilot."
+      >
+        <div className="space-y-4">
+          <FieldGroup label="ManyChat API Key" required hint="Found in ManyChat > Settings > API.">
+            <div className="relative">
+              <input
+                type={showApiKey ? "text" : "password"}
+                value={mcApiKey}
+                onChange={(e) => setMcApiKey(e.target.value)}
+                placeholder="Enter your ManyChat API key"
+                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors pr-20"
+              />
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                <button
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                  title={showApiKey ? "Hide" : "Show"}
+                >
+                  {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+            </div>
+          </FieldGroup>
+
+          <FieldGroup label="Page ID" required hint="Your ManyChat Page ID (found in ManyChat settings).">
+            <input
+              type="text"
+              value={mcPageId}
+              onChange={(e) => setMcPageId(e.target.value)}
+              placeholder="Enter your ManyChat Page ID"
+              className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+            />
+          </FieldGroup>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleSaveManychat}
+              disabled={mcSaving}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {mcSaving ? <Loader2 size={14} className="animate-spin" /> : mcStatus === "saved" ? <Check size={14} /> : <Save size={14} />}
+              {mcSaving ? "Saving..." : mcStatus === "saved" ? "Saved" : "Save ManyChat Settings"}
+            </button>
+            {mcConnected && (
+              <span className="text-xs text-green-500 flex items-center gap-1">
+                <Check size={12} /> Connected
+              </span>
+            )}
+          </div>
+        </div>
+      </SectionCard>
+
+      {/* Webhook URL */}
+      <SectionCard
+        title="Webhook URL"
+        description="Your unique webhook URL for receiving DMs. Share this with ManyChat or other automation tools."
+      >
+        {webhookUrl ? (
+          <div className="flex items-center gap-2">
+            <div className="flex-1 bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground font-mono truncate">
+              {webhookUrl}
+            </div>
+            <button
+              onClick={() => copyToClipboard(webhookUrl)}
+              className="shrink-0 p-2 rounded-lg bg-secondary border border-border text-muted-foreground hover:text-foreground transition-colors"
+              title="Copy URL"
+            >
+              <Copy size={14} />
+            </button>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Webhook URL will be generated when you connect ManyChat.</p>
+        )}
+      </SectionCard>
+
+      {/* Calendly */}
+      <SectionCard
+        title="Booking Integration"
+        description="Calendly or booking link used when the AI suggests scheduling a call."
+      >
+        <div className="flex items-center gap-2">
+          <div className="flex-1 bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground truncate">
+            {calendlyUrl || <span className="text-muted-foreground">Not configured</span>}
+          </div>
+          {calendlyUrl && (
+            <a
+              href={calendlyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 p-2 rounded-lg bg-secondary border border-border text-muted-foreground hover:text-foreground transition-colors"
+              title="Open booking link"
+            >
+              <ExternalLink size={14} />
+            </a>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Configure your booking link in the main Dashboard settings under Integrations.
+        </p>
       </SectionCard>
     </div>
   );
