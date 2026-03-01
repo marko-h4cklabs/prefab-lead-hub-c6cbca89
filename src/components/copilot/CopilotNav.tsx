@@ -15,7 +15,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { icon: MessageSquare, label: "DMs", path: "/copilot/conversations" },
   { icon: BarChart3, label: "Dashboard", path: "/copilot/dashboard" },
-  { icon: TrendingUp, label: "Pipeline", path: "/copilot/pipeline", roles: ["owner", "admin"] },
+  { icon: TrendingUp, label: "Pipeline", path: "/copilot/pipeline" },
   { icon: CalendarDays, label: "Calendar", path: "/copilot/calendar" },
   { icon: Settings, label: "Settings", path: "/copilot/settings", roles: ["owner", "admin"] },
   { icon: Users, label: "Team", path: "/copilot/team", roles: ["owner", "admin"] },
