@@ -1,19 +1,17 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { api } from "@/lib/apiClient";
-import { Mail, Loader2, CheckCircle, ArrowRight } from "lucide-react";
+import { Mail, Loader2, CheckCircle } from "lucide-react";
 
 const RESEND_COOLDOWN = 30;
 
 const VerifyEmailPending = () => {
   const location = useLocation();
-  const navigate = useNavigate();
   const email = (location.state as any)?.email || "";
   const [resending, setResending] = useState(false);
   const [sent, setSent] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [error, setError] = useState("");
-  const [emailNotConfigured, setEmailNotConfigured] = useState(false);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -26,13 +24,9 @@ const VerifyEmailPending = () => {
     setResending(true);
     setError("");
     try {
-      const res = await api.resendVerification();
-      if (res?.email_not_configured) {
-        setEmailNotConfigured(true);
-      } else {
-        setSent(true);
-        setCooldown(RESEND_COOLDOWN);
-      }
+      await api.resendVerification();
+      setSent(true);
+      setCooldown(RESEND_COOLDOWN);
     } catch (err: any) {
       setError(err?.message || "Failed to resend. Please try again.");
     } finally {
@@ -60,48 +54,25 @@ const VerifyEmailPending = () => {
           </p>
 
           <div className="space-y-3">
-            {emailNotConfigured ? (
-              <div className="rounded-lg bg-secondary p-4 text-left">
-                <p className="text-xs text-muted-foreground mb-3">
-                  Email service is not configured yet. You can continue to the dashboard and verify later.
-                </p>
-                <button
-                  onClick={() => navigate("/copilot", { replace: true })}
-                  className="dark-btn-primary w-full"
-                >
-                  Continue to Dashboard <ArrowRight size={14} />
-                </button>
-              </div>
-            ) : (
-              <>
-                <p className="text-xs text-muted-foreground">Didn't get it? Check spam, or:</p>
+            <p className="text-xs text-muted-foreground">Didn't get it? Check spam, or:</p>
 
-                <button
-                  onClick={handleResend}
-                  disabled={cooldown > 0 || resending}
-                  className="dark-btn-primary w-full"
-                >
-                  {resending ? (
-                    <><Loader2 size={16} className="animate-spin" /> Sending…</>
-                  ) : sent && cooldown > 0 ? (
-                    <><CheckCircle size={16} className="text-success" /> Sent! Resend in {cooldown}s</>
-                  ) : (
-                    "Resend verification email"
-                  )}
-                </button>
-              </>
-            )}
+            <button
+              onClick={handleResend}
+              disabled={cooldown > 0 || resending}
+              className="dark-btn-primary w-full"
+            >
+              {resending ? (
+                <><Loader2 size={16} className="animate-spin" /> Sending…</>
+              ) : sent && cooldown > 0 ? (
+                <><CheckCircle size={16} className="text-success" /> Sent! Resend in {cooldown}s</>
+              ) : (
+                "Resend verification email"
+              )}
+            </button>
 
             {error && <p className="text-xs text-destructive">{error}</p>}
 
-            <button
-              onClick={() => navigate("/copilot", { replace: true })}
-              className="block w-full text-sm text-muted-foreground hover:text-primary transition-colors pt-2"
-            >
-              Skip for now
-            </button>
-
-            <Link to="/signup" className="block text-xs text-muted-foreground hover:text-primary transition-colors">
+            <Link to="/signup" className="block text-xs text-muted-foreground hover:text-primary transition-colors pt-2">
               Wrong email? Go back
             </Link>
           </div>

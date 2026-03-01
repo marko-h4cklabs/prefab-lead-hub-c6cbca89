@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/apiClient";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, CheckCircle } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
@@ -22,6 +22,7 @@ const Login = () => {
   const [searchParams] = useSearchParams();
 
   const urlError = searchParams.get("error");
+  const emailVerified = searchParams.get("verified") === "true";
 
   useEffect(() => {
     if (urlError && errorMessages[urlError]) {
@@ -78,6 +79,13 @@ const Login = () => {
             <h1 className="text-xl font-bold text-foreground">Welcome back</h1>
             <p className="text-sm text-muted-foreground mt-1">Sign in to your account</p>
           </div>
+
+          {emailVerified && (
+            <div className="mb-4 flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-4 py-3">
+              <CheckCircle size={16} className="text-emerald-500 shrink-0" />
+              <p className="text-sm text-emerald-500">Email verified! Please sign in.</p>
+            </div>
+          )}
 
           {/* Google Sign In */}
           <a
