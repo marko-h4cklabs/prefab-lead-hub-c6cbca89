@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "@/lib/apiClient";
-import { getAuthToken } from "@/lib/apiClient";
+import { api, getAuthToken, invalidateCache } from "@/lib/apiClient";
 import { toast } from "@/hooks/use-toast";
 import { Loader2, Check, ArrowRight, ArrowLeft } from "lucide-react";
 
@@ -115,7 +114,7 @@ function Step1({ data, onChange, onNext, saving }: {
           value={data.notes}
           onChange={(e) => onChange({ notes: e.target.value })}
           className="dark-input w-full min-h-[60px] resize-y"
-          placeholder="Anything else we should know \u2014 pricing, specialties, etc."
+          placeholder="Anything else we should know — pricing, specialties, etc."
         />
       </div>
       <div className="flex justify-end">
@@ -245,6 +244,8 @@ const Onboarding = () => {
         monthly_lead_volume: business.dmVolume,
       });
 
+      // Clear cached api.me() so ModeGate sees the updated status (active)
+      invalidateCache("/api/auth/me");
       toast({ title: "Setup complete!", description: "Welcome to EightPath." });
       navigate("/copilot", { replace: true });
     } catch (err: unknown) {
