@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { api } from "@/lib/apiClient";
 import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
@@ -49,21 +49,37 @@ const queryClient = new QueryClient();
 const ModeGate = ({ children }: { children: React.ReactNode }) => {
   const [checking, setChecking] = useState(true);
   const [needsMode, setNeedsMode] = useState(false);
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
+  const navigate = useNavigate();
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token") || localStorage.getItem("plcs_token");
     if (!token) { setChecking(false); return; }
     api.me()
-      .then((res) => {
+      .then((res: any) => {
         if (res.company_id) localStorage.setItem("plcs_company_id", res.company_id);
-        const mode = (res as any).operating_mode ?? (res.user as any)?.operating_mode ?? null;
+        // Check email verification
+        if (res.email_verified === false) {
+          setUserEmail(res.email || "");
+          setNeedsVerification(true);
+          return;
+        }
+        const mode = res.operating_mode ?? res.user?.operating_mode ?? null;
         setNeedsMode(mode === null || mode === undefined);
       })
       .catch(() => {})
       .finally(() => setChecking(false));
   }, []);
 
+  useEffect(() => {
+    if (needsVerification) {
+      navigate("/verify-email-pending", { replace: true, state: { email: userEmail } });
+    }
+  }, [needsVerification, userEmail, navigate]);
+
   if (checking) return null;
+  if (needsVerification) return null;
   if (needsMode) return <ModeSelectionScreen onModeSet={() => setNeedsMode(false)} />;
   return <>{children}</>;
 };
@@ -141,8 +157,8 @@ const App = () => {
           {/* Team join (public) */}
           <Route path="/join/:code" element={<JoinTeam />} />
 
-          {/* Co-Pilot layout (always accessible) */}
-          <Route element={<CopilotLayout />}>
+          {/* Co-Pilot layout */}
+          <Route element={<ModeGate><CopilotLayout /></ModeGate>}>
             <Route path="/copilot" element={<Navigate to="/copilot/conversations" replace />} />
             <Route path="/copilot/conversations" element={<CopilotConversations />} />
             <Route path="/copilot/dashboard" element={<CopilotDashboard />} />

@@ -107,11 +107,18 @@ async function rawRequest<T>(
 
   if (res.status === 403) {
     let message = "Not authorized";
-    try { const json = await res.json(); message = json.error || json.message || message; } catch {}
+    let code = "";
+    let email = "";
+    try { const json = await res.json(); code = json.error?.code || ""; email = json.email || ""; message = json.error?.message || json.error || json.message || message; } catch {}
+    // Let caller handle email verification errors (don't clear auth / redirect)
+    if (code === "EMAIL_NOT_VERIFIED") {
+      const err = Object.assign(new Error(typeof message === "string" ? message : "Email not verified"), { code, email });
+      throw err;
+    }
     clearAuth();
     window.location.href = "/login";
-    toast({ title: "Access denied", description: message, variant: "destructive" });
-    throw new Error(message);
+    toast({ title: "Access denied", description: typeof message === "string" ? message : "Not authorized", variant: "destructive" });
+    throw new Error(typeof message === "string" ? message : "Not authorized");
   }
 
   if (!res.ok) {
@@ -1288,6 +1295,12 @@ export const api = {
   // --- Verification ---
   resendVerification: () =>
     request<any>("/api/auth/resend-verification", { method: "POST" }),
+
+  resendVerificationPublic: (email: string) =>
+    request<any>("/api/auth/resend-verification-public", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
 
   sendPhoneCode: (phone_number: string) =>
     request<any>("/api/auth/send-phone-code", { method: "POST", body: JSON.stringify({ phone_number }) }),

@@ -24,7 +24,15 @@ const VerifyEmailPending = () => {
     setResending(true);
     setError("");
     try {
-      await api.resendVerification();
+      const hasToken = !!localStorage.getItem("auth_token");
+      if (hasToken) {
+        await api.resendVerification();
+      } else if (email) {
+        await api.resendVerificationPublic(email);
+      } else {
+        setError("No email address available. Please go back and try again.");
+        return;
+      }
       setSent(true);
       setCooldown(RESEND_COOLDOWN);
     } catch (err: any) {
@@ -72,8 +80,8 @@ const VerifyEmailPending = () => {
 
             {error && <p className="text-xs text-destructive">{error}</p>}
 
-            <Link to="/signup" className="block text-xs text-muted-foreground hover:text-primary transition-colors pt-2">
-              Wrong email? Go back
+            <Link to="/login" className="block text-xs text-muted-foreground hover:text-primary transition-colors pt-2">
+              Back to login
             </Link>
           </div>
         </div>

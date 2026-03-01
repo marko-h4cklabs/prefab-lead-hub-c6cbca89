@@ -59,6 +59,10 @@ const Login = () => {
     } catch (err: unknown) {
       if (err instanceof TypeError) {
         setError("Backend unreachable. Please try again or contact support.");
+      } else if ((err as any)?.code === "EMAIL_NOT_VERIFIED") {
+        // Redirect to verification pending page
+        navigate("/verify-email-pending", { replace: true, state: { email: (err as any).email || trimmedEmail } });
+        return;
       } else {
         const message = err instanceof Error ? err.message : "Login failed";
         setError(typeof message === "string" ? message : "Login failed");
