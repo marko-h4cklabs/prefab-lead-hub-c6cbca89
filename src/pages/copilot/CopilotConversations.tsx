@@ -73,6 +73,10 @@ const CopilotConversations = () => {
     if (event.type === "lead_updated") {
       bumpDMRefresh();
     }
+
+    if (event.type === "new_lead") {
+      bumpDMRefresh();
+    }
   }, [bumpDMRefresh]);
 
   const { connected } = useSSE(handleSSEEvent);
@@ -127,6 +131,12 @@ const CopilotConversations = () => {
                 setSelectedLeadId(null);
                 setSelectedConversationId(null);
                 setView("summary");
+              }}
+              onLeadDeleted={() => {
+                setSelectedLeadId(null);
+                setSelectedConversationId(null);
+                setView("summary");
+                bumpDMRefresh();
               }}
               refreshTrigger={summaryRefreshTrigger}
             />

@@ -23,6 +23,8 @@ interface CopilotLeadSummaryProps {
   leadId: string;
   onOpenChat: () => void;
   onBack: () => void;
+  /** Called after a lead is successfully deleted — parent should clear selection + refresh DM list */
+  onLeadDeleted?: () => void;
   /** Increment to trigger an immediate data refresh (e.g. from SSE events) */
   refreshTrigger?: number;
 }
@@ -239,7 +241,7 @@ const LoadingSkeleton = () => (
 
 // ---------- Main component ----------
 
-const CopilotLeadSummary = ({ leadId, onOpenChat, onBack, refreshTrigger }: CopilotLeadSummaryProps) => {
+const CopilotLeadSummary = ({ leadId, onOpenChat, onBack, onLeadDeleted, refreshTrigger }: CopilotLeadSummaryProps) => {
   const companyId = requireCompanyId();
 
   const [summary, setSummary] = useState<SummaryResponse | null>(null);
@@ -397,7 +399,7 @@ const CopilotLeadSummary = ({ leadId, onOpenChat, onBack, refreshTrigger }: Copi
     try {
       await api.deleteCopilotLead(leadId);
       toast({ title: "Lead deleted" });
-      onBack();
+      onLeadDeleted ? onLeadDeleted() : onBack();
     } catch {
       toast({ title: "Failed to delete lead", variant: "destructive" });
     } finally {
