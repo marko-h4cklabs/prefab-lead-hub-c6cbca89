@@ -79,6 +79,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [regeneratingRef] = useState(() => ({ current: false })); // tracks active regenerate
   const [sendingIndex, setSendingIndex] = useState<number | null>(null);
+  const sendingRef = useRef(false); // ref-based guard — updates instantly unlike state
   const [customDraft, setCustomDraft] = useState("");
   const [sendingCustom, setSendingCustom] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -314,7 +315,8 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
     isEditedMsg: boolean,
   ) => {
     const s = suggestions[index];
-    if (!s) return;
+    if (!s || sendingRef.current) return;
+    sendingRef.current = true;
     setSendingIndex(index);
     const rowId = s.suggestionRowId || s.id;
     try {
@@ -335,6 +337,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
       toast({ title: "Failed to send message", variant: "destructive" });
     } finally {
       setSendingIndex(null);
+      sendingRef.current = false;
     }
   };
 
