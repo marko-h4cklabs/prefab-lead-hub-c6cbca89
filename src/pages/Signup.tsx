@@ -89,7 +89,7 @@ const Signup = () => {
 
   const passwordsMatch = password === confirmPassword;
   const strength = getPasswordStrength(password);
-  const canSubmit = companyName.trim() && email.trim() && countryCode && password && confirmPassword && passwordsMatch;
+  const canSubmit = companyName.trim() && email.trim() && countryCode && phoneLocal.trim() && password && confirmPassword && passwordsMatch;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,18 +98,20 @@ const Signup = () => {
     if (!trimmedCompany) { setError("Company name is required"); return; }
     if (!trimmedEmail) { setError("Email is required"); return; }
     if (!countryCode) { setError("Country is required"); return; }
+    if (!phoneLocal.trim()) { setError("Phone number is required"); return; }
     if (!password) { setError("Password is required"); return; }
-    if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
+    if (password.length < 8) { setError("Password must be at least 8 characters"); return; }
     if (!confirmPassword) { setError("Please confirm your password"); return; }
     if (!passwordsMatch) { setError("Passwords do not match"); return; }
 
-    const fullPhone = phoneLocal && selectedCountry ? selectedCountry.dialCode + phoneLocal : undefined;
+    if (!selectedCountry) { setError("Country is required"); return; }
+    const fullPhone = selectedCountry.dialCode + phoneLocal.trim();
     sessionStorage.setItem("signup_data", JSON.stringify({
       companyName: trimmedCompany,
       email: trimmedEmail,
       password,
       countryCode,
-      phoneNumber: fullPhone || null,
+      phoneNumber: fullPhone,
     }));
     navigate("/onboarding");
   };
@@ -223,7 +225,7 @@ const Signup = () => {
             {/* Phone Number */}
             {selectedCountry && (
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Phone Number <span className="text-muted-foreground/60">(optional)</span></label>
+                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Phone Number <span className="text-destructive">*</span></label>
                 <div className="flex gap-2">
                   <div className="dark-input px-3 py-2 text-sm text-muted-foreground w-20 shrink-0 flex items-center justify-center">
                     {selectedCountry.dialCode}
@@ -273,7 +275,7 @@ const Signup = () => {
               Continue
             </button>
             <div className="text-center space-y-2">
-              <Link to="/login" className="text-xs text-muted-foreground hover:text-primary transition-colors block">Back to login</Link>
+              <Link to="/login" className="text-sm text-muted-foreground hover:text-primary transition-colors block">Already have an account? <span className="text-primary">Login here</span></Link>
               <p className="text-xs text-muted-foreground">Joining a team? Use your invite link instead.</p>
             </div>
           </form>

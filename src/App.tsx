@@ -97,7 +97,7 @@ const App = () => {
           <Route path="/onboarding" element={<Onboarding />} />
 
           {/* Redirects */}
-          <Route path="/" element={<Navigate to="/copilot" replace />} />
+          <Route path="/" element={<Navigate to="/signup" replace />} />
           <Route path="/leads" element={<Navigate to="/dashboard/leads/inbox" replace />} />
           <Route path="/pipeline" element={<Navigate to="/dashboard/leads/pipeline" replace />} />
           <Route path="/analytics" element={<Navigate to="/dashboard/leads/analytics" replace />} />
@@ -152,7 +152,7 @@ const App = () => {
             <Route path="/copilot/team" element={<CopilotTeam />} />
           </Route>
 
-          <Route path="*" element={<Navigate to="/copilot" replace />} />
+          <Route path="*" element={<Navigate to="/signup" replace />} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
