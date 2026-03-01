@@ -15,6 +15,7 @@ interface Message {
 
 interface Suggestion {
   id: string;
+  suggestionRowId?: string; // the actual DB row id for API calls
   message: string;
   text?: string;
   label?: string;
@@ -58,6 +59,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, messageTrigger,
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [regeneratingRef] = useState(() => ({ current: false })); // tracks active regenerate
   const [sendingIndex, setSendingIndex] = useState<number | null>(null);
   const [customDraft, setCustomDraft] = useState("");
   const [sendingCustom, setSendingCustom] = useState(false);
@@ -98,7 +100,14 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, messageTrigger,
 
   // --- Fetch suggestions ---
   const fetchSuggestions = useCallback(async (forceRegenerate = false) => {
+    // If a regeneration is in-flight and this is an SSE-triggered fetch, skip to avoid duplicates
+    if (!forceRegenerate && regeneratingRef.current) return;
+
     setLoadingSuggestions(true);
+    if (forceRegenerate) regeneratingRef.current = true;
+
+    const mapSuggestions = (items: any[], rowId: string) =>
+      items.slice(0, 3).map((s: any, i: number) => ({ ...s, id: `${rowId}-${s.index ?? i}`, suggestionRowId: rowId, index: s.index ?? i }));
 
     if (!forceRegenerate) {
       try {
@@ -107,9 +116,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, messageTrigger,
         const items = Array.isArray(latest?.suggestions) ? latest.suggestions : [];
         const rowId = latest?.suggestion_id || latest?.id;
         if (items.length > 0 && rowId) {
-          setSuggestions(
-            items.slice(0, 3).map((s: any, i: number) => ({ ...s, id: rowId, index: s.index ?? i })),
-          );
+          setSuggestions(mapSuggestions(items, rowId));
           setLoadingSuggestions(false);
           return;
         }
@@ -122,7 +129,6 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, messageTrigger,
     try {
       const res = await api.generateSuggestions(conversationId);
       const items = Array.isArray(res?.suggestions) ? res.suggestions : [];
-      // After generating, fetch the latest to get the row id
       let rowId = res?.suggestion_id || res?.id;
       if (!rowId) {
         try {
@@ -130,13 +136,12 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, messageTrigger,
           rowId = latest?.suggestion_id || latest?.id;
         } catch { /* ok */ }
       }
-      setSuggestions(
-        items.slice(0, 3).map((s: any, i: number) => ({ ...s, id: rowId, index: s.index ?? i })),
-      );
+      setSuggestions(mapSuggestions(items, rowId || "gen"));
     } catch {
       // silent fail
     } finally {
       setLoadingSuggestions(false);
+      regeneratingRef.current = false;
     }
   }, [leadId, conversationId]);
 
@@ -232,11 +237,12 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, messageTrigger,
     const s = suggestions[index];
     if (!s) return;
     setSendingIndex(index);
+    const rowId = s.suggestionRowId || s.id;
     try {
       if (isEditedMsg) {
-        await api.sendEditedSuggestion(conversationId, s.id, text);
+        await api.sendEditedSuggestion(conversationId, rowId, text);
       } else {
-        await api.sendSuggestion(conversationId, s.id, s.index);
+        await api.sendSuggestion(conversationId, rowId, s.index);
       }
       // Optimistically add to messages
       setMessages((prev) => [
@@ -259,15 +265,16 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, messageTrigger,
     if (!text) return;
     setSendingCustom(true);
     try {
-      // Use the first suggestion's ID if available, or generate+send
+      // Use the first suggestion's row ID if available, or generate+send
       if (suggestions.length > 0) {
-        await api.sendEditedSuggestion(conversationId, suggestions[0].id, text);
+        const rowId = suggestions[0].suggestionRowId || suggestions[0].id;
+        await api.sendEditedSuggestion(conversationId, rowId, text);
       } else {
         // Generate then send edited
         const res = await api.generateSuggestions(conversationId);
-        const items = Array.isArray(res?.suggestions) ? res.suggestions : [];
-        if (items.length > 0) {
-          await api.sendEditedSuggestion(conversationId, items[0].id, text);
+        const rowId = res?.suggestion_id || res?.id;
+        if (rowId) {
+          await api.sendEditedSuggestion(conversationId, rowId, text);
         }
       }
       setMessages((prev) => [

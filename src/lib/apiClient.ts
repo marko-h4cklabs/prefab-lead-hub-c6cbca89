@@ -110,13 +110,13 @@ async function rawRequest<T>(
     let code = "";
     let email = "";
     try { const json = await res.json(); code = json.error?.code || ""; email = json.email || ""; message = json.error?.message || json.error || json.message || message; } catch {}
-    // Let caller handle email verification errors (don't clear auth / redirect)
+    // Let caller handle email verification errors
     if (code === "EMAIL_NOT_VERIFIED" || code === "EMAIL_UNVERIFIED") {
       const err = Object.assign(new Error(typeof message === "string" ? message : "Email not verified"), { code, email });
       throw err;
     }
-    clearAuth();
-    window.location.href = "/login";
+    // 403 = forbidden (role/permission issue), NOT an auth failure.
+    // Don't clear auth or redirect — just show the error and let the caller handle it.
     toast({ title: "Access denied", description: typeof message === "string" ? message : "Not authorized", variant: "destructive" });
     throw new Error(typeof message === "string" ? message : "Not authorized");
   }
