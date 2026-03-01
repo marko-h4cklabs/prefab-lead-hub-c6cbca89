@@ -1430,7 +1430,7 @@ function IntegrationsTab() {
   if (loading) return <LoadingSkeleton lines={4} />;
 
   const mcConnected = !!(mcApiKey && mcPageId);
-  const whConnected = !!webhookUrl;
+  const whConnected = mcConnected && !!webhookUrl;
   const calConnected = calStatus?.connected || !!calendlyUrl;
 
   return (

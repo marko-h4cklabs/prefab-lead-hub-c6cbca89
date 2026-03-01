@@ -25,10 +25,11 @@ const IntegrationsPage = () => {
       api.getWebhookUrl().catch(() => null),
       api.getBookingSettings().catch(() => null),
     ]).then(([mc, wh, booking]) => {
+      const mcConnected = !!(mc?.manychat_api_key && mc?.manychat_page_id);
       setStatus({
-        manychat: !!(mc?.manychat_api_key && mc?.manychat_page_id),
+        manychat: mcConnected,
         calendly: !!(booking?.calendly_url),
-        webhook: !!(wh?.webhook_url || wh?.url),
+        webhook: mcConnected && !!(wh?.webhook_url || wh?.url),
       });
     }).finally(() => setLoading(false));
   }, []);
