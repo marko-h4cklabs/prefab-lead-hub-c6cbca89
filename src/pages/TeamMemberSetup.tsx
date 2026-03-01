@@ -75,7 +75,9 @@ const TeamMemberSetup = () => {
   const [countryOpen, setCountryOpen] = useState(false);
   const [phoneLocal, setPhoneLocal] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -92,7 +94,8 @@ const TeamMemberSetup = () => {
     return COUNTRIES.filter(c => c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || c.dialCode.includes(q));
   }, [countrySearch]);
 
-  const canSubmit = fullName.trim() && email.trim() && countryCode && phoneLocal.trim() && password.length >= 8;
+  const passwordsMatch = password === confirmPassword;
+  const canSubmit = fullName.trim() && email.trim() && countryCode && phoneLocal.trim() && password.length >= 8 && confirmPassword && passwordsMatch;
 
   // Validate invite code
   useEffect(() => {
@@ -124,6 +127,8 @@ const TeamMemberSetup = () => {
     if (!countryCode) { setError("Country is required"); return; }
     if (!phoneLocal.trim()) { setError("Phone number is required"); return; }
     if (!password || password.length < 8) { setError("Password must be at least 8 characters"); return; }
+    if (!confirmPassword) { setError("Please confirm your password"); return; }
+    if (!passwordsMatch) { setError("Passwords do not match"); return; }
     if (!selectedCountry) { setError("Country is required"); return; }
 
     const fullPhone = selectedCountry.dialCode + phoneLocal.trim();
@@ -422,6 +427,23 @@ const TeamMemberSetup = () => {
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Confirm Password</label>
+              <div className="relative">
+                <input
+                  type={showConfirm ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => { setConfirmPassword(e.target.value); setError(""); }}
+                  placeholder="Re-enter password"
+                  className="dark-input w-full pr-10"
+                  disabled={loading}
+                />
+                <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" tabIndex={-1}>
+                  {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              {confirmPassword && !passwordsMatch && <p className="mt-1.5 text-xs text-destructive">Passwords do not match</p>}
             </div>
 
             {error && <p className="text-xs text-destructive">{error}</p>}
