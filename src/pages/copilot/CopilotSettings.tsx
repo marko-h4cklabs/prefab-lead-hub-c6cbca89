@@ -503,7 +503,7 @@ function FieldsTab() {
     setSaveStatus("saving");
     setSaveError("");
     try {
-      await api.putCopilotFields(fields);
+      await api.putCopilotFields({ presets: fields });
       initialRef.current = JSON.stringify(fields);
       setIsDirty(false);
       setSaveStatus("saved");
