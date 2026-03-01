@@ -288,12 +288,18 @@ const CopilotLeadSummary = ({ leadId, onOpenChat, onBack, refreshTrigger }: Copi
             ? fieldsRes
             : [];
       setFields(allFields.filter((f: FieldDef) => f.is_enabled !== false));
-      const members = Array.isArray(teamRes?.members)
+      const mapMember = (m: any): TeamMember => ({
+        id: m.id ?? m.user_id,
+        name: m.full_name ?? m.name ?? m.display_name ?? m.email ?? "Unknown",
+        email: m.email,
+        role: m.role,
+      });
+      const rawMembers = Array.isArray(teamRes?.members)
         ? teamRes.members
         : Array.isArray(teamRes)
           ? teamRes
           : [];
-      setTeam(members);
+      setTeam(rawMembers.map(mapMember));
     } catch (err: any) {
       setError(err?.message || "Failed to load lead summary");
     } finally {
@@ -628,7 +634,7 @@ const CopilotLeadSummary = ({ leadId, onOpenChat, onBack, refreshTrigger }: Copi
           <div className="space-y-2">
             {fields.map((field) => {
               const key = field.variable_name || field.name;
-              const val = parsed_fields[key] || parsed_fields[field.name];
+              const val = parsed_fields[key] || parsed_fields[field.name] || (field.label ? parsed_fields[field.label] : undefined);
               const collected = val !== undefined && val !== null && val !== "";
               return (
                 <div key={key} className="flex items-start gap-2.5">

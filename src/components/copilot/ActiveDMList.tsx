@@ -169,10 +169,14 @@ const ActiveDMList = ({ selectedLeadId, onSelectLead, refreshTrigger, sseConnect
       try {
         const res = await api.getCopilotTeam();
         if (!cancelled) {
+          const mapMember = (m: any): TeamMember => ({
+            id: m.id ?? m.user_id,
+            name: m.full_name ?? m.name ?? m.display_name ?? m.email ?? "Unknown",
+          });
           const members: TeamMember[] = Array.isArray(res?.members)
-            ? res.members.map((m: any) => ({ id: m.id ?? m.user_id, name: m.name ?? m.display_name ?? "Unknown" }))
+            ? res.members.map(mapMember)
             : Array.isArray(res)
-              ? res.map((m: any) => ({ id: m.id ?? m.user_id, name: m.name ?? m.display_name ?? "Unknown" }))
+              ? res.map(mapMember)
               : [];
           setTeamMembers(members);
         }
