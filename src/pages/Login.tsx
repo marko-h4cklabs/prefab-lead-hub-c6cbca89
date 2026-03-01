@@ -41,27 +41,24 @@ const Login = () => {
       const res = await api.login(trimmedEmail, password);
       const token = res.token;
       if (!token) { setError("Login response missing token"); return; }
-      const companyId = res.user?.companyId || res.company_id || (res as any).companyId;
+
+      const companyId = res.user?.companyId || (res as any).company_id || (res as any).companyId;
       localStorage.setItem("auth_token", token);
       if (companyId) localStorage.setItem("company_id", companyId);
-      if (res.role) localStorage.setItem("user_role", res.role);
-      console.log("[auth] stored token key=auth_token tokenLen=" + token.length);
-      try {
-        const onboarding = await api.getOnboardingStatus();
-        if (!onboarding?.completed) {
-          navigate("/onboarding", { replace: true });
-          return;
-        }
-      } catch {
-        // If check fails, go to dashboard anyway
+      if ((res as any).role) localStorage.setItem("user_role", (res as any).role);
+
+      // Status-based redirect
+      if (res.redirect === "/onboarding") {
+        navigate("/onboarding", { replace: true });
+        return;
       }
+
       navigate("/copilot", { replace: true });
     } catch (err: unknown) {
       if (err instanceof TypeError) {
         setError("Backend unreachable. Please try again or contact support.");
-      } else if ((err as any)?.code === "EMAIL_NOT_VERIFIED") {
-        // Redirect to verification pending page
-        navigate("/verify-email-pending", { replace: true, state: { email: (err as any).email || trimmedEmail } });
+      } else if ((err as any)?.code === "EMAIL_UNVERIFIED" || (err as any)?.code === "EMAIL_NOT_VERIFIED") {
+        setError("Please verify your email first. Check your inbox for the verification code.");
         return;
       } else {
         const message = err instanceof Error ? err.message : "Login failed";
@@ -77,9 +74,7 @@ const Login = () => {
       <div className="w-full max-w-sm px-6">
         <div className="dark-card p-8">
           <div className="mb-8 text-center">
-            <div className="mx-auto mb-4 h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-lg">P</span>
-            </div>
+            <img src="/favicon.ico" alt="EightPath" className="mx-auto mb-4 h-10 w-10 rounded-lg" />
             <h1 className="text-xl font-bold text-foreground">Welcome back</h1>
             <p className="text-sm text-muted-foreground mt-1">Sign in to your account</p>
           </div>
@@ -130,7 +125,7 @@ const Login = () => {
             </div>
             {error && <p className="text-xs text-destructive">{error}</p>}
             <button type="submit" disabled={loading} className="dark-btn-primary w-full">
-              {loading ? <><Loader2 size={16} className="animate-spin" /> Signing in…</> : "Sign in"}
+              {loading ? <><Loader2 size={16} className="animate-spin" /> Signing in...</> : "Sign in"}
             </button>
             <div className="text-center">
               <Link to="/signup" className="text-sm text-muted-foreground hover:text-primary transition-colors">

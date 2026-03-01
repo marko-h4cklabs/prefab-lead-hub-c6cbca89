@@ -10,7 +10,6 @@ import { toast } from "@/hooks/use-toast";
 import { getErrorMessage } from "@/lib/errorUtils";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
-import VerifyEmailPending from "./pages/VerifyEmailPending";
 import AuthCallback from "./pages/AuthCallback";
 import AdminPanel from "./pages/AdminPanel";
 import Onboarding from "./pages/Onboarding";
@@ -42,15 +41,27 @@ import CopilotPipeline from "./pages/copilot/CopilotPipeline";
 import CopilotCalendar from "./pages/copilot/CopilotCalendar";
 import CopilotSettings from "./pages/copilot/CopilotSettings";
 import CopilotTeam from "./pages/copilot/CopilotTeam";
-import JoinTeam from "./pages/JoinTeam";
+import TeamMemberSetup from "./pages/TeamMemberSetup";
+import { clearAuth } from "@/lib/apiClient";
 
 const queryClient = new QueryClient();
+
+/** Redirect old /join/:code to /team-member-setup/:code */
+const JoinTeamRedirect = () => {
+  const path = window.location.pathname;
+  const code = path.split("/join/")[1] || "";
+  return <Navigate to={`/team-member-setup/${code}`} replace />;
+};
+
+/** Redirect root: authenticated → /copilot, otherwise → /login */
+const RootRedirect = () => {
+  const token = localStorage.getItem("auth_token") || localStorage.getItem("plcs_token");
+  return <Navigate to={token ? "/copilot" : "/login"} replace />;
+};
 
 const ModeGate = ({ children }: { children: React.ReactNode }) => {
   const [checking, setChecking] = useState(true);
   const [needsMode, setNeedsMode] = useState(false);
-  const [needsVerification, setNeedsVerification] = useState(false);
-  const [userEmail, setUserEmail] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -59,27 +70,28 @@ const ModeGate = ({ children }: { children: React.ReactNode }) => {
     api.me()
       .then((res: any) => {
         if (res.company_id) localStorage.setItem("plcs_company_id", res.company_id);
-        // Check email verification
-        if (res.email_verified === false) {
-          setUserEmail(res.email || "");
-          setNeedsVerification(true);
+
+        const status = res.status;
+        // Users that haven't completed verification — clear auth, send to login
+        if (status === "email_unverified" || status === "team_pending") {
+          clearAuth();
+          navigate("/login", { replace: true });
           return;
         }
+        // Users still in onboarding
+        if (status === "pending_onboarding") {
+          navigate("/onboarding", { replace: true });
+          return;
+        }
+        // active / team_active — check operating mode
         const mode = res.operating_mode ?? res.user?.operating_mode ?? null;
         setNeedsMode(mode === null || mode === undefined);
       })
       .catch(() => {})
       .finally(() => setChecking(false));
-  }, []);
-
-  useEffect(() => {
-    if (needsVerification) {
-      navigate("/verify-email-pending", { replace: true, state: { email: userEmail } });
-    }
-  }, [needsVerification, userEmail, navigate]);
+  }, [navigate]);
 
   if (checking) return null;
-  if (needsVerification) return null;
   if (needsMode) return <ModeSelectionScreen onModeSet={() => setNeedsMode(false)} />;
   return <>{children}</>;
 };
@@ -106,14 +118,14 @@ const App = () => {
           {/* Public routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-          <Route path="/verify-email-pending" element={<VerifyEmailPending />} />
+          <Route path="/verify-email-pending" element={<Navigate to="/login" replace />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/admin" element={<AdminPanel />} />
           <Route path="/dashboard/admin" element={<AdminPanel />} />
           <Route path="/onboarding" element={<Onboarding />} />
 
-          {/* Redirects */}
-          <Route path="/" element={<Navigate to="/signup" replace />} />
+          {/* Root redirect */}
+          <Route path="/" element={<RootRedirect />} />
           <Route path="/leads" element={<Navigate to="/dashboard/leads/inbox" replace />} />
           <Route path="/pipeline" element={<Navigate to="/dashboard/leads/pipeline" replace />} />
           <Route path="/analytics" element={<Navigate to="/dashboard/leads/analytics" replace />} />
@@ -154,8 +166,10 @@ const App = () => {
             <Route path="/dashboard/settings/account" element={<AccountBillingPage />} />
           </Route>
 
-          {/* Team join (public) */}
-          <Route path="/join/:code" element={<JoinTeam />} />
+          {/* Team member setup (public) */}
+          <Route path="/team-member-setup/:code" element={<TeamMemberSetup />} />
+          {/* Backward compat: old /join/:code redirects */}
+          <Route path="/join/:code" element={<JoinTeamRedirect />} />
 
           {/* Co-Pilot layout */}
           <Route element={<ModeGate><CopilotLayout /></ModeGate>}>
@@ -168,7 +182,7 @@ const App = () => {
             <Route path="/copilot/team" element={<CopilotTeam />} />
           </Route>
 
-          <Route path="*" element={<Navigate to="/signup" replace />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>

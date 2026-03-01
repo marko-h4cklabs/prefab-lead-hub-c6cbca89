@@ -111,7 +111,7 @@ async function rawRequest<T>(
     let email = "";
     try { const json = await res.json(); code = json.error?.code || ""; email = json.email || ""; message = json.error?.message || json.error || json.message || message; } catch {}
     // Let caller handle email verification errors (don't clear auth / redirect)
-    if (code === "EMAIL_NOT_VERIFIED") {
+    if (code === "EMAIL_NOT_VERIFIED" || code === "EMAIL_UNVERIFIED") {
       const err = Object.assign(new Error(typeof message === "string" ? message : "Email not verified"), { code, email });
       throw err;
     }
@@ -201,19 +201,37 @@ export const api = {
 
   // --- Auth ---
   login: (email: string, password: string) =>
-    request<{ token: string; company_id?: string; user?: { companyId: string }; role?: string }>("/api/auth/login", {
+    request<{ token: string; company_id?: string; user?: { companyId: string; status?: string }; role?: string; redirect?: string }>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
 
   signup: (companyName: string, email: string, password: string, extra?: Record<string, unknown>) =>
-    request<{ token: string; companyId?: string; company_id?: string; company?: { id: string } }>("/api/auth/signup", {
+    request<{ success: boolean; email: string; requires_verification: boolean }>("/api/auth/signup", {
       method: "POST",
       body: JSON.stringify({ companyName, email, password, ...extra }),
     }),
 
+  verifyCode: (email: string, code: string) =>
+    request<{ token: string; user: { id: string; email: string; role: string; status: string }; company: { id: string; name: string } }>("/api/auth/verify-code", {
+      method: "POST",
+      body: JSON.stringify({ email, code }),
+    }),
+
+  verifyTeamCode: (email: string, code: string) =>
+    request<{ token: string; user: { id: string; email: string; role: string; status: string }; company: { id: string; name: string } }>("/api/auth/verify-team-code", {
+      method: "POST",
+      body: JSON.stringify({ email, code }),
+    }),
+
+  resendCode: (email: string) =>
+    request<{ success: boolean }>("/api/auth/resend-code", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
   me: () =>
-    request<{ user: any; company_id: string }>("/api/auth/me"),
+    request<{ user: any; company_id: string; status?: string }>("/api/auth/me"),
 
   // --- Company ---
   getCompany: (companyId: string) =>

@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useState, useEffect, useMemo } from "react";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import { api, setAuthToken, setCompanyId } from "@/lib/apiClient";
-import { Eye, EyeOff, Search, ChevronDown, Loader2, ArrowLeft, Mail } from "lucide-react";
+import { Eye, EyeOff, Loader2, Users, AlertCircle, Search, ChevronDown, ArrowLeft, Mail } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
@@ -54,39 +54,28 @@ const COUNTRIES = [
   { code: 'MY', name: 'Malaysia', flag: '\u{1F1F2}\u{1F1FE}', dialCode: '+60' },
 ];
 
-function getPasswordStrength(password: string): { label: string; color: string; width: string } {
-  if (!password) return { label: "", color: "", width: "0%" };
-  let score = 0;
-  if (password.length >= 6) score++;
-  if (password.length >= 10) score++;
-  if (/[A-Z]/.test(password)) score++;
-  if (/[0-9]/.test(password)) score++;
-  if (/[^A-Za-z0-9]/.test(password)) score++;
-  if (score <= 1) return { label: "Weak", color: "bg-destructive", width: "25%" };
-  if (score <= 3) return { label: "Medium", color: "bg-warning", width: "60%" };
-  return { label: "Strong", color: "bg-success", width: "100%" };
-}
-
 const RESEND_COOLDOWN = 30;
 
-const Signup = () => {
+const TeamMemberSetup = () => {
+  const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
+
+  const [validating, setValidating] = useState(true);
+  const [invite, setInvite] = useState<{ valid: boolean; company_name?: string; role?: string; reason?: string } | null>(null);
 
   // Phase: 'form' or 'verify'
   const [phase, setPhase] = useState<"form" | "verify">("form");
   const [submittedEmail, setSubmittedEmail] = useState("");
 
   // Form state
-  const [companyName, setCompanyName] = useState("");
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [countryCode, setCountryCode] = useState("");
   const [countrySearch, setCountrySearch] = useState("");
   const [countryOpen, setCountryOpen] = useState(false);
   const [phoneLocal, setPhoneLocal] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -96,8 +85,27 @@ const Signup = () => {
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
 
-  // Clear leftover sessionStorage from old flow
-  useEffect(() => { sessionStorage.removeItem("signup_data"); }, []);
+  const selectedCountry = COUNTRIES.find(c => c.code === countryCode);
+  const filteredCountries = useMemo(() => {
+    if (!countrySearch) return COUNTRIES;
+    const q = countrySearch.toLowerCase();
+    return COUNTRIES.filter(c => c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || c.dialCode.includes(q));
+  }, [countrySearch]);
+
+  const canSubmit = fullName.trim() && email.trim() && countryCode && phoneLocal.trim() && password.length >= 8;
+
+  // Validate invite code
+  useEffect(() => {
+    if (!code) {
+      setInvite({ valid: false });
+      setValidating(false);
+      return;
+    }
+    api.validateInvite(code)
+      .then((res) => setInvite(res))
+      .catch(() => setInvite({ valid: false }))
+      .finally(() => setValidating(false));
+  }, [code]);
 
   // Resend cooldown timer
   useEffect(() => {
@@ -106,63 +114,52 @@ const Signup = () => {
     return () => clearInterval(t);
   }, [resendCooldown]);
 
-  const selectedCountry = COUNTRIES.find(c => c.code === countryCode);
-  const filteredCountries = useMemo(() => {
-    if (!countrySearch) return COUNTRIES;
-    const q = countrySearch.toLowerCase();
-    return COUNTRIES.filter(c => c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || c.dialCode.includes(q));
-  }, [countrySearch]);
-
-  const passwordsMatch = password === confirmPassword;
-  const strength = getPasswordStrength(password);
-  const canSubmit = companyName.trim() && email.trim() && countryCode && password && confirmPassword && passwordsMatch && !loading;
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmedCompany = companyName.trim();
+    if (!code) return;
+    const trimmedName = fullName.trim();
     const trimmedEmail = email.trim().toLowerCase();
-    if (!trimmedCompany) { setError("Company name is required"); return; }
+    if (!trimmedName) { setError("Full name is required"); return; }
     if (!trimmedEmail) { setError("Email is required"); return; }
     if (!countryCode) { setError("Country is required"); return; }
-    if (!password) { setError("Password is required"); return; }
-    if (password.length < 8) { setError("Password must be at least 8 characters"); return; }
-    if (!confirmPassword) { setError("Please confirm your password"); return; }
-    if (!passwordsMatch) { setError("Passwords do not match"); return; }
+    if (!phoneLocal.trim()) { setError("Phone number is required"); return; }
+    if (!password || password.length < 8) { setError("Password must be at least 8 characters"); return; }
+    if (!selectedCountry) { setError("Country is required"); return; }
 
+    const fullPhone = selectedCountry.dialCode + phoneLocal.trim();
     setLoading(true);
     setError("");
     try {
-      const fullPhone = selectedCountry ? selectedCountry.dialCode + phoneLocal.trim() : undefined;
-      await api.signup(trimmedCompany, trimmedEmail, password, {
+      await api.joinTeam({
+        code,
+        email: trimmedEmail,
+        password,
+        full_name: trimmedName,
         country_code: countryCode,
-        phone_number: fullPhone || undefined,
+        phone_number: fullPhone,
       });
+      // joinTeam now returns { success, email, requires_verification } — no token
       setSubmittedEmail(trimmedEmail);
       setPhase("verify");
       setResendCooldown(RESEND_COOLDOWN);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Signup failed";
-      if (typeof message === "string" && message.toLowerCase().includes("already")) {
-        setError("An account with this email already exists. Try logging in instead.");
-      } else {
-        setError(typeof message === "string" ? message : "Signup failed. Please try again.");
-      }
+      const message = err instanceof Error ? err.message : "Failed to join team";
+      setError(typeof message === "string" ? message : "Failed to join team");
     } finally {
       setLoading(false);
     }
   };
 
   const handleVerify = async () => {
-    const code = verifyCode.trim();
-    if (code.length !== 6) { setVerifyError("Enter the 6-digit code"); return; }
+    const codeVal = verifyCode.trim();
+    if (codeVal.length !== 6) { setVerifyError("Enter the 6-digit code"); return; }
     setVerifyLoading(true);
     setVerifyError("");
     try {
-      const res = await api.verifyCode(submittedEmail, code);
+      const res = await api.verifyTeamCode(submittedEmail, codeVal);
       setAuthToken(res.token);
-      const companyId = res.company?.id;
-      if (companyId) setCompanyId(companyId);
-      navigate("/onboarding", { replace: true });
+      if (res.company?.id) setCompanyId(res.company.id);
+      navigate("/copilot", { replace: true });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Verification failed";
       setVerifyError(typeof message === "string" ? message : "Invalid code");
@@ -181,6 +178,33 @@ const Signup = () => {
       setVerifyError("Failed to resend code. Try again.");
     }
   };
+
+  if (validating) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 size={24} className="animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!invite?.valid) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="w-full max-w-sm px-6">
+          <div className="dark-card p-8 text-center">
+            <AlertCircle size={40} className="mx-auto mb-4 text-destructive" />
+            <h1 className="text-lg font-bold text-foreground mb-2">Invalid Invite</h1>
+            <p className="text-sm text-muted-foreground mb-6">
+              {invite?.reason === "expired" ? "This invite link has expired." :
+               invite?.reason === "max_uses_reached" ? "This invite has reached its maximum uses." :
+               "This invite link is invalid or no longer active."}
+            </p>
+            <Link to="/login" className="dark-btn-primary inline-flex">Go to Login</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Phase 2: Code verification
   if (phase === "verify") {
@@ -244,14 +268,18 @@ const Signup = () => {
       <div className="w-full max-w-sm px-6">
         <div className="dark-card p-8">
           <div className="mb-8 text-center">
-            <img src="/favicon.ico" alt="EightPath" className="mx-auto mb-4 h-10 w-10 rounded-lg" />
-            <h1 className="text-xl font-bold text-foreground">Get Started</h1>
-            <p className="text-sm text-muted-foreground mt-1">Create your agency account</p>
+            <div className="mx-auto mb-4 h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
+              <Users size={20} className="text-primary-foreground" />
+            </div>
+            <h1 className="text-xl font-bold text-foreground">Join Team</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              You've been invited to join <span className="text-foreground font-medium">{invite.company_name}</span> as a <span className="text-foreground font-medium">{invite.role}</span>
+            </p>
           </div>
 
           {/* Google Sign Up */}
           <a
-            href={`${API_BASE}/api/auth/google`}
+            href={`${API_BASE}/api/auth/google?invite=${code}`}
             className="flex items-center justify-center gap-3 w-full border border-border rounded-lg px-4 py-3 text-sm font-medium text-foreground hover:bg-secondary transition-colors"
           >
             <svg width="18" height="18" viewBox="0 0 18 18">
@@ -274,12 +302,27 @@ const Signup = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Company Name</label>
-              <input type="text" value={companyName} onChange={(e) => { setCompanyName(e.target.value); setError(""); }} placeholder="Acme Inc." className="dark-input w-full" autoFocus disabled={loading} />
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Full Name</label>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => { setFullName(e.target.value); setError(""); }}
+                placeholder="Your full name"
+                className="dark-input w-full"
+                autoFocus
+                disabled={loading}
+              />
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Email</label>
-              <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }} placeholder="you@company.com" className="dark-input w-full" disabled={loading} />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                placeholder="you@email.com"
+                className="dark-input w-full"
+                disabled={loading}
+              />
             </div>
 
             {/* Country */}
@@ -347,7 +390,7 @@ const Signup = () => {
             {/* Phone Number */}
             {selectedCountry && (
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Phone Number</label>
+                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Phone Number <span className="text-destructive">*</span></label>
                 <div className="flex gap-2">
                   <div className="dark-input px-3 py-2 text-sm text-muted-foreground w-20 shrink-0 flex items-center justify-center">
                     {selectedCountry.dialCode}
@@ -367,38 +410,28 @@ const Signup = () => {
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Password</label>
               <div className="relative">
-                <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }} placeholder="••••••••" className="dark-input w-full pr-10" disabled={loading} />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                  placeholder="Min. 8 characters"
+                  className="dark-input w-full pr-10"
+                  disabled={loading}
+                />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" tabIndex={-1}>
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-              {password && (
-                <div className="mt-2 space-y-1">
-                  <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
-                    <div className={`h-full rounded-full transition-all duration-300 ${strength.color}`} style={{ width: strength.width }} />
-                  </div>
-                  <p className={`text-[10px] font-medium ${strength.label === "Weak" ? "text-destructive" : strength.label === "Medium" ? "text-warning" : "text-success"}`}>
-                    {strength.label}
-                  </p>
-                </div>
-              )}
             </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Confirm Password</label>
-              <div className="relative">
-                <input type={showConfirm ? "text" : "password"} value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setError(""); }} placeholder="••••••••" className="dark-input w-full pr-10" disabled={loading} />
-                <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" tabIndex={-1}>
-                  {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-              {confirmPassword && !passwordsMatch && <p className="mt-1.5 text-xs text-destructive">Passwords do not match</p>}
-            </div>
-            {error && <p className="mt-1.5 text-xs text-destructive">{error}</p>}
-            <button type="submit" disabled={!canSubmit} className="dark-btn-primary w-full">
-              {loading ? <><Loader2 size={16} className="animate-spin" /> Creating account...</> : "Continue"}
+
+            {error && <p className="text-xs text-destructive">{error}</p>}
+
+            <button type="submit" disabled={loading || !canSubmit} className="dark-btn-primary w-full">
+              {loading ? <><Loader2 size={16} className="animate-spin" /> Joining...</> : "Join Team"}
             </button>
+
             <div className="text-center">
-              <Link to="/login" className="text-sm text-muted-foreground hover:text-primary transition-colors block">Already have an account? <span className="text-primary">Login here</span></Link>
+              <Link to="/login" className="text-sm text-muted-foreground hover:text-primary transition-colors">Already have an account? <span className="text-primary">Sign in</span></Link>
             </div>
           </form>
         </div>
@@ -407,4 +440,4 @@ const Signup = () => {
   );
 };
 
-export default Signup;
+export default TeamMemberSetup;
