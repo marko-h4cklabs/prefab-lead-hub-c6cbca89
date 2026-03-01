@@ -22,13 +22,20 @@ interface Suggestion {
   index: number;
 }
 
+interface SSEMessage {
+  leadId: string;
+  role: string;
+  content: string;
+  timestamp: string;
+}
+
 interface Props {
   leadId: string;
   conversationId: string;
   leadName: string;
   onBack?: () => void;
-  /** Increment to trigger an immediate message refresh (e.g. from SSE new_message event) */
-  messageTrigger?: number;
+  /** Direct SSE message push — append immediately without refetch */
+  sseMessage?: SSEMessage | null;
   /** Increment to trigger an immediate suggestion refresh (e.g. from SSE suggestion_ready event) */
   suggestionTrigger?: number;
   /** When SSE is connected, use longer polling interval */
@@ -36,6 +43,7 @@ interface Props {
 }
 
 const POLL_INTERVAL = 5_000;
+const POLL_INTERVAL_SSE = 60_000; // Much slower polling when SSE is active — just a safety net
 
 const formatTime = (ts?: string) => {
   if (!ts) return "";
@@ -51,9 +59,7 @@ const formatTime = (ts?: string) => {
   return `${date}, ${time}`;
 };
 
-const POLL_INTERVAL_SSE = 30_000; // Slower polling when SSE is active
-
-const CopilotChat = ({ leadId, conversationId, leadName, onBack, messageTrigger, suggestionTrigger, sseConnected }: Props) => {
+const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, suggestionTrigger, sseConnected }: Props) => {
   const companyId = requireCompanyId();
   const [messages, setMessages] = useState<Message[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -66,33 +72,50 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, messageTrigger,
   const [isEditing, setIsEditing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const prevCountRef = useRef(0);
   const customInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch deduplication: prevent concurrent fetches for the same data
+  const fetchInFlightRef = useRef(false);
+  const fetchQueuedRef = useRef(false);
+
+  // Track the last processed SSE message to avoid re-processing on re-render
+  const lastProcessedSSERef = useRef<string | null>(null);
 
   const scrollToBottom = () =>
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
 
-  // --- Fetch conversation messages ---
+  // --- Fetch conversation messages (with deduplication) ---
   const fetchMessages = useCallback(
     async (silent = false) => {
+      // If a fetch is already in flight, queue one more (coalesce rapid triggers)
+      if (fetchInFlightRef.current) {
+        fetchQueuedRef.current = true;
+        return;
+      }
+      fetchInFlightRef.current = true;
       if (!silent) setLoadingMessages(true);
       try {
         const convo = await api.getConversation(companyId, leadId);
-        const msgs = Array.isArray(convo?.messages) ? convo.messages : [];
+        const msgs: Message[] = Array.isArray(convo?.messages) ? convo.messages : [];
         setMessages(msgs);
-        // If new messages arrived, auto-fetch suggestions
-        if (msgs.length > prevCountRef.current && msgs.length > 0) {
+        // If last message is from user and we have no suggestions, auto-fetch
+        if (msgs.length > 0) {
           const last = msgs[msgs.length - 1];
           if (last.role === "user") {
             fetchSuggestions();
           }
         }
-        prevCountRef.current = msgs.length;
       } catch {
         if (!silent)
           toast({ title: "Failed to load conversation", variant: "destructive" });
       } finally {
         if (!silent) setLoadingMessages(false);
+        fetchInFlightRef.current = false;
+        // If another fetch was requested while we were in flight, do one more
+        if (fetchQueuedRef.current) {
+          fetchQueuedRef.current = false;
+          fetchMessages(true);
+        }
       }
     },
     [companyId, leadId],
@@ -147,12 +170,11 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, messageTrigger,
 
   // --- Initial load ---
   useEffect(() => {
-    prevCountRef.current = 0;
     fetchMessages();
     fetchSuggestions();
   }, [leadId, conversationId]);
 
-  // --- Poll for new messages ---
+  // --- Poll for new messages (safety net) ---
   useEffect(() => {
     const interval = sseConnected ? POLL_INTERVAL_SSE : POLL_INTERVAL;
     pollRef.current = setInterval(() => fetchMessages(true), interval);
@@ -161,13 +183,40 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, messageTrigger,
     };
   }, [fetchMessages, sseConnected]);
 
-  // Immediate refresh when SSE triggers it
+  // --- SSE-pushed message: append instantly without refetch ---
   useEffect(() => {
-    if (messageTrigger && messageTrigger > 0) {
-      fetchMessages(true);
-    }
-  }, [messageTrigger]);
+    if (!sseMessage || sseMessage.leadId !== leadId) return;
 
+    // Deduplicate: don't process the same SSE message twice
+    const msgKey = `${sseMessage.role}:${sseMessage.content}:${sseMessage.timestamp}`;
+    if (lastProcessedSSERef.current === msgKey) return;
+    lastProcessedSSERef.current = msgKey;
+
+    const newMsg: Message = {
+      role: sseMessage.role,
+      content: sseMessage.content,
+      timestamp: sseMessage.timestamp,
+    };
+
+    setMessages((prev) => {
+      // Dedup: skip if last message has same content + role (prevents double from optimistic + SSE)
+      const last = prev[prev.length - 1];
+      if (last && last.role === newMsg.role && last.content === newMsg.content) {
+        return prev;
+      }
+      return [...prev, newMsg];
+    });
+
+    // If the new message is from the user, auto-fetch suggestions
+    if (sseMessage.role === "user") {
+      fetchSuggestions();
+    }
+
+    // Background reconciliation fetch after a short delay to get canonical data
+    setTimeout(() => fetchMessages(true), 2_000);
+  }, [sseMessage, leadId]);
+
+  // SSE suggestion trigger
   useEffect(() => {
     if (suggestionTrigger && suggestionTrigger > 0) {
       fetchSuggestions();

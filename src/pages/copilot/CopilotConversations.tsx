@@ -14,8 +14,24 @@ const CopilotConversations = () => {
 
   // SSE-driven refresh triggers (increment to trigger immediate refetch)
   const [dmRefreshTrigger, setDmRefreshTrigger] = useState(0);
-  const [messageTrigger, setMessageTrigger] = useState(0);
   const [suggestionTrigger, setSuggestionTrigger] = useState(0);
+
+  // Direct SSE message push for instant chat updates (no refetch needed)
+  const [sseMessage, setSSEMessage] = useState<{
+    leadId: string;
+    role: string;
+    content: string;
+    timestamp: string;
+  } | null>(null);
+
+  // Debounce DM list refreshes — batch rapid SSE events into one refetch
+  const dmDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bumpDMRefresh = useCallback(() => {
+    if (dmDebounceRef.current) clearTimeout(dmDebounceRef.current);
+    dmDebounceRef.current = setTimeout(() => {
+      setDmRefreshTrigger((n) => n + 1);
+    }, 300);
+  }, []);
 
   // Track selected lead in a ref so the SSE callback can read it without re-subscribing
   const selectedLeadRef = useRef<string | null>(null);
@@ -25,11 +41,17 @@ const CopilotConversations = () => {
     if (event.type === "connected") return;
 
     if (event.type === "new_message") {
-      // Always refresh the DM list (new message updates preview, ordering)
-      setDmRefreshTrigger((n) => n + 1);
-      // If this message is for the currently-selected lead, refresh the chat too
-      if (event.leadId === selectedLeadRef.current) {
-        setMessageTrigger((n) => n + 1);
+      // Always refresh the DM list (new message updates preview, ordering) — debounced
+      bumpDMRefresh();
+
+      // If this message is for the currently-selected lead, push it directly to the chat
+      if (event.leadId === selectedLeadRef.current && event.role && event.content) {
+        setSSEMessage({
+          leadId: event.leadId,
+          role: event.role,
+          content: event.content,
+          timestamp: event.messageTimestamp || event.timestamp || new Date().toISOString(),
+        });
       }
     }
 
@@ -40,13 +62,13 @@ const CopilotConversations = () => {
     }
 
     if (event.type === "dm_assigned") {
-      setDmRefreshTrigger((n) => n + 1);
+      bumpDMRefresh();
     }
 
     if (event.type === "lead_updated") {
-      setDmRefreshTrigger((n) => n + 1);
+      bumpDMRefresh();
     }
-  }, []);
+  }, [bumpDMRefresh]);
 
   const { connected } = useSSE(handleSSEEvent);
 
@@ -109,7 +131,7 @@ const CopilotConversations = () => {
               conversationId={selectedConversationId}
               leadName="Conversation"
               onBack={() => setView("summary")}
-              messageTrigger={messageTrigger}
+              sseMessage={sseMessage}
               suggestionTrigger={suggestionTrigger}
               sseConnected={connected}
             />

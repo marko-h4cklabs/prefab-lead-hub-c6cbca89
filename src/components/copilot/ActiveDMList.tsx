@@ -105,7 +105,7 @@ const getInitials = (name: string): string => {
 // Component
 // ---------------------------------------------------------------------------
 
-const POLL_INTERVAL_SSE = 30_000; // Slower polling when SSE is active
+const POLL_INTERVAL_SSE = 60_000; // Much slower polling when SSE is active — just a safety net
 
 const ActiveDMList = ({ selectedLeadId, onSelectLead, refreshTrigger, sseConnected }: Props) => {
   // Data
