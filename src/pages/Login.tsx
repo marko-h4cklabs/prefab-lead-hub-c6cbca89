@@ -18,6 +18,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [accountType, setAccountType] = useState<"owner" | "member">("owner");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -76,7 +77,37 @@ const Login = () => {
               <span className="text-primary-foreground font-bold text-lg">P</span>
             </div>
             <h1 className="text-xl font-bold text-foreground">Welcome back</h1>
-            <p className="text-sm text-muted-foreground mt-1">Sign in to your account</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {accountType === "owner"
+                ? "Sign in to your agency account"
+                : "Sign in to your team account"}
+            </p>
+          </div>
+
+          {/* Account Type Toggle */}
+          <div className="flex rounded-lg bg-secondary p-1 mb-6">
+            <button
+              type="button"
+              onClick={() => setAccountType("owner")}
+              className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-all ${
+                accountType === "owner"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Agency Owner
+            </button>
+            <button
+              type="button"
+              onClick={() => setAccountType("member")}
+              className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-all ${
+                accountType === "member"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Team Member
+            </button>
           </div>
 
           {/* Google Sign In */}
@@ -121,7 +152,16 @@ const Login = () => {
               {loading ? <><Loader2 size={16} className="animate-spin" /> Signing in…</> : "Sign in"}
             </button>
             <div className="text-center">
-              <Link to="/signup" className="text-xs text-muted-foreground hover:text-primary transition-colors">Create account</Link>
+              {accountType === "owner" ? (
+                <Link to="/signup" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+                  Don't have an account? Sign up
+                </Link>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Need to join a team?{" "}
+                  <span className="text-foreground">Ask your agency owner for an invite link.</span>
+                </p>
+              )}
             </div>
           </form>
         </div>
