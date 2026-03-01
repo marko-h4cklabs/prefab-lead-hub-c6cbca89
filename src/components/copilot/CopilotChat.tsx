@@ -84,7 +84,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
   const scrollToBottom = () =>
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
 
-  // --- Fetch conversation messages (with deduplication) ---
+  // --- Fetch conversation messages (with deduplication + smart merge) ---
   const fetchMessages = useCallback(
     async (silent = false) => {
       // If a fetch is already in flight, queue one more (coalesce rapid triggers)
@@ -96,15 +96,17 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
       if (!silent) setLoadingMessages(true);
       try {
         const convo = await api.getConversation(companyId, leadId);
-        const msgs: Message[] = Array.isArray(convo?.messages) ? convo.messages : [];
-        setMessages(msgs);
-        // If last message is from user and we have no suggestions, auto-fetch
-        if (msgs.length > 0) {
-          const last = msgs[msgs.length - 1];
-          if (last.role === "user") {
-            fetchSuggestions();
+        const serverMsgs: Message[] = Array.isArray(convo?.messages) ? convo.messages : [];
+        // Smart merge: only accept server data if it has at least as many messages
+        // as current state. This prevents wiping optimistic/SSE-pushed messages
+        // when the server is slightly behind.
+        setMessages((prev) => {
+          if (!silent || serverMsgs.length >= prev.length) {
+            return serverMsgs;
           }
-        }
+          // Server is behind — keep current state
+          return prev;
+        });
       } catch {
         if (!silent)
           toast({ title: "Failed to load conversation", variant: "destructive" });
@@ -207,13 +209,8 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
       return [...prev, newMsg];
     });
 
-    // If the new message is from the user, auto-fetch suggestions
-    if (sseMessage.role === "user") {
-      fetchSuggestions();
-    }
-
-    // Background reconciliation fetch after a short delay to get canonical data
-    setTimeout(() => fetchMessages(true), 2_000);
+    // No reconciliation fetch here — the 60s polling safety net handles it.
+    // Fetching at 2s was wiping optimistic messages when the server was behind.
   }, [sseMessage, leadId]);
 
   // SSE suggestion trigger
