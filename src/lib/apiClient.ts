@@ -839,7 +839,7 @@ export const api = {
   validateInvite: (code: string) =>
     request<any>(`/api/auth/invite/${code}`),
 
-  joinTeam: (data: { code: string; email: string; password: string; full_name: string }) =>
+  joinTeam: (data: { code: string; email: string; password: string; full_name: string; country_code?: string; phone_number?: string }) =>
     request<any>("/api/auth/join", { method: "POST", body: JSON.stringify(data) }),
 
   // --- Notification Channels ---
