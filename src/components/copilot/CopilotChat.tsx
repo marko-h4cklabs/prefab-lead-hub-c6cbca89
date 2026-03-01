@@ -209,8 +209,12 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
       return [...prev, newMsg];
     });
 
-    // No reconciliation fetch here — the 60s polling safety net handles it.
-    // Fetching at 2s was wiping optimistic messages when the server was behind.
+    // When a new user (lead) message arrives, auto-generate fresh suggestions
+    if (sseMessage.role === "user") {
+      setSuggestions([]);
+      fetchSuggestions(true);
+    }
+    // No reconciliation fetch — the 60s polling safety net handles canonical sync.
   }, [sseMessage, leadId]);
 
   // SSE suggestion trigger

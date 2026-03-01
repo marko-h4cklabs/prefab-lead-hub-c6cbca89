@@ -15,6 +15,7 @@ const CopilotConversations = () => {
   // SSE-driven refresh triggers (increment to trigger immediate refetch)
   const [dmRefreshTrigger, setDmRefreshTrigger] = useState(0);
   const [suggestionTrigger, setSuggestionTrigger] = useState(0);
+  const [summaryRefreshTrigger, setSummaryRefreshTrigger] = useState(0);
 
   // Direct SSE message push for instant chat updates (no refetch needed)
   const [sseMessage, setSSEMessage] = useState<{
@@ -45,13 +46,17 @@ const CopilotConversations = () => {
       bumpDMRefresh();
 
       // If this message is for the currently-selected lead, push it directly to the chat
-      if (event.leadId === selectedLeadRef.current && event.role && event.content) {
-        setSSEMessage({
-          leadId: event.leadId,
-          role: event.role,
-          content: event.content,
-          timestamp: event.messageTimestamp || event.timestamp || new Date().toISOString(),
-        });
+      if (event.leadId === selectedLeadRef.current) {
+        if (event.role && event.content) {
+          setSSEMessage({
+            leadId: event.leadId,
+            role: event.role,
+            content: event.content,
+            timestamp: event.messageTimestamp || event.timestamp || new Date().toISOString(),
+          });
+        }
+        // Also refresh lead summary (parsed_fields, intelligence update after each message)
+        setSummaryRefreshTrigger((n) => n + 1);
       }
     }
 
@@ -123,6 +128,7 @@ const CopilotConversations = () => {
                 setSelectedConversationId(null);
                 setView("summary");
               }}
+              refreshTrigger={summaryRefreshTrigger}
             />
           ) : (
             <CopilotChat

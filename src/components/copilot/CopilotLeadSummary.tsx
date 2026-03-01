@@ -22,6 +22,8 @@ interface CopilotLeadSummaryProps {
   leadId: string;
   onOpenChat: () => void;
   onBack: () => void;
+  /** Increment to trigger an immediate data refresh (e.g. from SSE events) */
+  refreshTrigger?: number;
 }
 
 interface LeadData {
@@ -236,7 +238,7 @@ const LoadingSkeleton = () => (
 
 // ---------- Main component ----------
 
-const CopilotLeadSummary = ({ leadId, onOpenChat, onBack }: CopilotLeadSummaryProps) => {
+const CopilotLeadSummary = ({ leadId, onOpenChat, onBack, refreshTrigger }: CopilotLeadSummaryProps) => {
   const companyId = requireCompanyId();
 
   const [summary, setSummary] = useState<SummaryResponse | null>(null);
@@ -302,6 +304,13 @@ const CopilotLeadSummary = ({ leadId, onOpenChat, onBack }: CopilotLeadSummaryPr
   useEffect(() => {
     fetchData();
   }, [leadId, companyId]);
+
+  // Re-fetch when SSE triggers a refresh (new messages update parsed_fields/intelligence)
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger > 0 && !loading) {
+      fetchData();
+    }
+  }, [refreshTrigger]);
 
   // Close dropdowns on outside click
   useEffect(() => {
