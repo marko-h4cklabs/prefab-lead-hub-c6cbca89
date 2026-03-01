@@ -55,7 +55,8 @@ interface QuoteField {
   id?: string;
   name: string;
   type: string;
-  priority: string;
+  is_enabled: boolean;
+  qualification_prompt: string;
 }
 
 interface Persona {
@@ -455,7 +456,8 @@ function FieldsTab() {
           id: f.id || f._id || crypto.randomUUID(),
           name: f.name || f.label || "",
           type: f.type || "text",
-          priority: f.priority || "optional",
+          is_enabled: f.is_enabled !== false,
+          qualification_prompt: f.qualification_prompt || "",
         }));
         setFields(mapped);
         initialRef.current = JSON.stringify(mapped);
@@ -478,7 +480,7 @@ function FieldsTab() {
 
   const addField = () => {
     setFields((prev) => {
-      const next = [...prev, { id: crypto.randomUUID(), name: "", type: "text", priority: "optional" }];
+      const next = [...prev, { id: crypto.randomUUID(), name: "", type: "text", is_enabled: true, qualification_prompt: "" }];
       markDirty(next);
       return next;
     });
@@ -534,67 +536,49 @@ function FieldsTab() {
             fields.map((field, idx) => (
               <div
                 key={field.id || idx}
-                className="flex items-start gap-3 p-3 rounded-lg bg-secondary/50 border border-border"
+                className={`flex items-start gap-3 p-3 rounded-lg border border-border transition-colors ${field.is_enabled ? "bg-secondary/50" : "bg-secondary/20 opacity-60"}`}
               >
                 <div className="pt-2 text-muted-foreground/50">
                   <GripVertical size={14} />
                 </div>
-                <div className="flex-1 grid grid-cols-3 gap-3">
-                  {/* Name */}
+                <div className="flex-1 grid grid-cols-[1fr_2fr] gap-3">
+                  {/* Field Name */}
                   <div>
                     <label className="block text-[11px] font-medium text-muted-foreground mb-1">Field Name</label>
                     <input
                       type="text"
                       value={field.name}
                       onChange={(e) => updateField(idx, { name: e.target.value })}
-                      placeholder="e.g. Budget"
+                      placeholder="e.g. Person Age"
                       className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
                     />
                   </div>
 
-                  {/* Type */}
+                  {/* What to search for */}
                   <div>
-                    <label className="block text-[11px] font-medium text-muted-foreground mb-1">Type</label>
-                    <div className="relative">
-                      <select
-                        value={field.type}
-                        onChange={(e) => updateField(idx, { type: e.target.value })}
-                        className="w-full appearance-none bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors pr-8"
-                      >
-                        {FIELD_TYPES.map((t) => (
-                          <option key={t} value={t}>
-                            {t.charAt(0).toUpperCase() + t.slice(1)}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                    </div>
+                    <label className="block text-[11px] font-medium text-muted-foreground mb-1">What to search for</label>
+                    <input
+                      type="text"
+                      value={field.qualification_prompt}
+                      onChange={(e) => updateField(idx, { qualification_prompt: e.target.value })}
+                      placeholder="e.g. I want to know how old the client is"
+                      className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+                    />
                   </div>
+                </div>
 
-                  {/* Priority */}
-                  <div>
-                    <label className="block text-[11px] font-medium text-muted-foreground mb-1">Priority</label>
-                    <div className="relative">
-                      <select
-                        value={field.priority}
-                        onChange={(e) => updateField(idx, { priority: e.target.value })}
-                        className="w-full appearance-none bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors pr-8"
-                      >
-                        {FIELD_PRIORITIES.map((p) => (
-                          <option key={p.value} value={p.value}>
-                            {p.label}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                    </div>
-                  </div>
+                {/* Toggle ON/OFF */}
+                <div className="pt-5 shrink-0">
+                  <Switch
+                    checked={field.is_enabled}
+                    onCheckedChange={(checked: boolean) => updateField(idx, { is_enabled: checked })}
+                  />
                 </div>
 
                 {/* Remove */}
                 <button
                   onClick={() => removeField(idx)}
-                  className="mt-6 p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  className="mt-5 p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                   title="Remove field"
                 >
                   <Trash2 size={14} />
@@ -998,13 +982,16 @@ function FollowUpsTab() {
     steps: [{ type: "ai_generated" as const, delay_minutes: 1440, message_template: "", ai_context_prompt: "" }],
   });
   const [creating, setCreating] = useState(false);
+  const [followUpsEnabled, setFollowUpsEnabled] = useState(true);
+  const [togglingFollowUps, setTogglingFollowUps] = useState(false);
 
   const fetchAll = useCallback(async () => {
     try {
-      const [seqRes, enrollRes, statsRes] = await Promise.allSettled([
+      const [seqRes, enrollRes, statsRes, behaviorRes] = await Promise.allSettled([
         api.getWarmingSequences(),
         api.getWarmingEnrollments("active"),
         api.getFollowUpDashboard(),
+        api.getCopilotBehavior(),
       ]);
       if (seqRes.status === "fulfilled") {
         setSequences(normalizeList(seqRes.value, ["sequences", "data", "items"]));
@@ -1015,11 +1002,28 @@ function FollowUpsTab() {
       if (statsRes.status === "fulfilled") {
         setStats(statsRes.value);
       }
+      if (behaviorRes.status === "fulfilled") {
+        const b = behaviorRes.value;
+        setFollowUpsEnabled(b?.follow_ups_enabled !== false);
+      }
     } catch (_) {}
     setLoading(false);
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const handleToggleFollowUps = async (enabled: boolean) => {
+    setTogglingFollowUps(true);
+    try {
+      await api.putCopilotBehavior({ follow_ups_enabled: enabled });
+      setFollowUpsEnabled(enabled);
+      toast({ title: enabled ? "Follow-ups enabled" : "Follow-ups disabled" });
+    } catch (err) {
+      toast({ title: "Failed to update", description: getErrorMessage(err), variant: "destructive" });
+    } finally {
+      setTogglingFollowUps(false);
+    }
+  };
 
   const handleCreateSequence = async () => {
     if (!newSeq.name.trim()) {
@@ -1079,7 +1083,23 @@ function FollowUpsTab() {
 
   return (
     <div className="space-y-6">
+      {/* Master toggle */}
+      <div className="flex items-center justify-between rounded-lg border border-border bg-secondary/30 px-4 py-3">
+        <div>
+          <p className="text-sm font-semibold text-foreground">Follow-ups</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {followUpsEnabled ? "Follow-up sequences are active and processing." : "All follow-up processing is paused."}
+          </p>
+        </div>
+        <Switch
+          checked={followUpsEnabled}
+          onCheckedChange={handleToggleFollowUps}
+          disabled={togglingFollowUps}
+        />
+      </div>
+
       {/* Sub-tab nav */}
+      <div className={`space-y-6 transition-opacity ${followUpsEnabled ? "" : "opacity-50 pointer-events-none"}`}>
       <div className="flex gap-1 bg-secondary/50 rounded-lg p-1">
         {subTabs.map((t) => (
           <button
@@ -1350,6 +1370,7 @@ function FollowUpsTab() {
           )}
         </SectionCard>
       )}
+      </div>
     </div>
   );
 }
