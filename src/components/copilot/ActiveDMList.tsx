@@ -38,6 +38,10 @@ interface TeamMember {
 interface Props {
   selectedLeadId: string | null;
   onSelectLead: (leadId: string, conversationId: string) => void;
+  /** Increment to trigger an immediate DM list refresh (e.g. from SSE events) */
+  refreshTrigger?: number;
+  /** When SSE is connected, use longer polling interval */
+  sseConnected?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -101,7 +105,9 @@ const getInitials = (name: string): string => {
 // Component
 // ---------------------------------------------------------------------------
 
-const ActiveDMList = ({ selectedLeadId, onSelectLead }: Props) => {
+const POLL_INTERVAL_SSE = 30_000; // Slower polling when SSE is active
+
+const ActiveDMList = ({ selectedLeadId, onSelectLead, refreshTrigger, sseConnected }: Props) => {
   // Data
   const [dms, setDms] = useState<DM[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,11 +146,19 @@ const ActiveDMList = ({ selectedLeadId, onSelectLead }: Props) => {
 
   useEffect(() => {
     fetchDMs();
-    pollRef.current = setInterval(() => fetchDMs(true), POLL_INTERVAL);
+    const interval = sseConnected ? POLL_INTERVAL_SSE : POLL_INTERVAL;
+    pollRef.current = setInterval(() => fetchDMs(true), interval);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [fetchDMs]);
+  }, [fetchDMs, sseConnected]);
+
+  // Immediate refresh when SSE event triggers it
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger > 0) {
+      fetchDMs(true);
+    }
+  }, [refreshTrigger]);
 
   // Fetch team members when bulk-assign dropdown opens
   useEffect(() => {

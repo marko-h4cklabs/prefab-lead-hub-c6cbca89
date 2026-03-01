@@ -26,6 +26,12 @@ interface Props {
   conversationId: string;
   leadName: string;
   onBack?: () => void;
+  /** Increment to trigger an immediate message refresh (e.g. from SSE new_message event) */
+  messageTrigger?: number;
+  /** Increment to trigger an immediate suggestion refresh (e.g. from SSE suggestion_ready event) */
+  suggestionTrigger?: number;
+  /** When SSE is connected, use longer polling interval */
+  sseConnected?: boolean;
 }
 
 const POLL_INTERVAL = 5_000;
@@ -44,7 +50,9 @@ const formatTime = (ts?: string) => {
   return `${date}, ${time}`;
 };
 
-const CopilotChat = ({ leadId, conversationId, leadName, onBack }: Props) => {
+const POLL_INTERVAL_SSE = 30_000; // Slower polling when SSE is active
+
+const CopilotChat = ({ leadId, conversationId, leadName, onBack, messageTrigger, suggestionTrigger, sseConnected }: Props) => {
   const companyId = requireCompanyId();
   const [messages, setMessages] = useState<Message[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -141,11 +149,25 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack }: Props) => {
 
   // --- Poll for new messages ---
   useEffect(() => {
-    pollRef.current = setInterval(() => fetchMessages(true), POLL_INTERVAL);
+    const interval = sseConnected ? POLL_INTERVAL_SSE : POLL_INTERVAL;
+    pollRef.current = setInterval(() => fetchMessages(true), interval);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [fetchMessages]);
+  }, [fetchMessages, sseConnected]);
+
+  // Immediate refresh when SSE triggers it
+  useEffect(() => {
+    if (messageTrigger && messageTrigger > 0) {
+      fetchMessages(true);
+    }
+  }, [messageTrigger]);
+
+  useEffect(() => {
+    if (suggestionTrigger && suggestionTrigger > 0) {
+      fetchSuggestions();
+    }
+  }, [suggestionTrigger]);
 
   // --- Auto-scroll on new messages ---
   useEffect(() => {
