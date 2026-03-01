@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { api } from "@/lib/apiClient";
-import { Eye, EyeOff, Loader2, Search, ChevronDown } from "lucide-react";
+import { Eye, EyeOff, Search, ChevronDown } from "lucide-react";
 
 const COUNTRIES = [
   { code: 'US', name: 'United States', flag: '🇺🇸', dialCode: '+1' },
@@ -77,7 +76,6 @@ const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const selectedCountry = COUNTRIES.find(c => c.code === countryCode);
@@ -89,9 +87,9 @@ const Signup = () => {
 
   const passwordsMatch = password === confirmPassword;
   const strength = getPasswordStrength(password);
-  const canSubmit = companyName.trim() && email.trim() && countryCode && password && confirmPassword && passwordsMatch && !loading;
+  const canSubmit = companyName.trim() && email.trim() && countryCode && password && confirmPassword && passwordsMatch;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedCompany = companyName.trim();
     const trimmedEmail = email.trim().toLowerCase();
@@ -102,33 +100,16 @@ const Signup = () => {
     if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
     if (!confirmPassword) { setError("Please confirm your password"); return; }
     if (!passwordsMatch) { setError("Passwords do not match"); return; }
-    setLoading(true);
-    setError("");
-    try {
-      const fullPhone = phoneLocal && selectedCountry ? selectedCountry.dialCode + phoneLocal : undefined;
-      const res = await api.signup(trimmedCompany, trimmedEmail, password, {
-        phone_number: fullPhone,
-        country_code: countryCode,
-      });
-      localStorage.setItem("auth_token", res.token);
-      if (res.companyId) {
-        localStorage.setItem("company_id", res.companyId);
-        localStorage.setItem("plcs_company_id", res.companyId);
-      }
-      localStorage.setItem("plcs_company_name", trimmedCompany);
-      navigate("/verify-email-pending", { replace: true, state: { email: trimmedEmail } });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Signup failed";
-      if (typeof message === "string" && message.toLowerCase().includes("already")) {
-        setError("An account with this email already exists. Try logging in instead.");
-      } else if (typeof message === "string" && message.toLowerCase().includes("weak")) {
-        setError("Password is too weak. Use at least 6 characters with a mix of letters and numbers.");
-      } else {
-        setError(typeof message === "string" ? message : "Signup failed. Please try again.");
-      }
-    } finally {
-      setLoading(false);
-    }
+
+    const fullPhone = phoneLocal && selectedCountry ? selectedCountry.dialCode + phoneLocal : undefined;
+    sessionStorage.setItem("signup_data", JSON.stringify({
+      companyName: trimmedCompany,
+      email: trimmedEmail,
+      password,
+      countryCode,
+      phoneNumber: fullPhone || null,
+    }));
+    navigate("/onboarding");
   };
 
   return (
@@ -139,8 +120,8 @@ const Signup = () => {
             <div className="mx-auto mb-4 h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-lg">P</span>
             </div>
-            <h1 className="text-xl font-bold text-foreground">Create Account</h1>
-            <p className="text-sm text-muted-foreground mt-1">Set up your workspace</p>
+            <h1 className="text-xl font-bold text-foreground">Get Started</h1>
+            <p className="text-sm text-muted-foreground mt-1">Create your agency account</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -161,8 +142,7 @@ const Signup = () => {
                   type="button"
                   onClick={() => setCountryOpen(!countryOpen)}
                   className="dark-input w-full text-left flex items-center justify-between"
-                  disabled={loading}
-                >
+                                 >
                   {selectedCountry ? (
                     <span className="flex items-center gap-2">
                       <span>{selectedCountry.flag}</span>
@@ -229,8 +209,7 @@ const Signup = () => {
                     onChange={e => setPhoneLocal(e.target.value.replace(/[^0-9]/g, ''))}
                     placeholder="912345678"
                     className="dark-input flex-1"
-                    disabled={loading}
-                  />
+                                     />
                 </div>
               </div>
             )}
@@ -266,7 +245,7 @@ const Signup = () => {
             </div>
             {error && <p className="mt-1.5 text-xs text-destructive">{error}</p>}
             <button type="submit" disabled={!canSubmit} className="dark-btn-primary w-full">
-              {loading ? <><Loader2 size={16} className="animate-spin" /> Creating…</> : "Create account"}
+              Continue
             </button>
             <div className="text-center space-y-2">
               <Link to="/login" className="text-xs text-muted-foreground hover:text-primary transition-colors block">Back to login</Link>

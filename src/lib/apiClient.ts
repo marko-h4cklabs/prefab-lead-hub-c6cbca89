@@ -199,8 +199,8 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
 
-  signup: (companyName: string, email: string, password: string, extra?: { phone_number?: string; country_code?: string }) =>
-    request<{ token: string; companyId: string }>("/api/auth/signup", {
+  signup: (companyName: string, email: string, password: string, extra?: Record<string, unknown>) =>
+    request<{ token: string; companyId?: string; company_id?: string; company?: { id: string } }>("/api/auth/signup", {
       method: "POST",
       body: JSON.stringify({ companyName, email, password, ...extra }),
     }),
