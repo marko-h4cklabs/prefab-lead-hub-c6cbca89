@@ -134,12 +134,13 @@ function Step1({ data, onChange, onNext, saving }: {
   );
 }
 
-function Step2({ data, onChange, onBack, onSubmit, saving }: {
+function Step2({ data, onChange, onBack, onSubmit, saving, submitLabel = "Create Account" }: {
   data: { businessType: string; teamSize: string; dmVolume: string };
   onChange: (d: Partial<typeof data>) => void;
   onBack: () => void;
   onSubmit: () => void;
   saving: boolean;
+  submitLabel?: string;
 }) {
   const valid = data.businessType && data.teamSize && data.dmVolume;
   return (
@@ -196,7 +197,7 @@ function Step2({ data, onChange, onBack, onSubmit, saving }: {
           <ArrowLeft size={14} /> Back
         </button>
         <button onClick={onSubmit} disabled={!valid || saving} className="dark-btn-primary w-auto">
-          {saving ? <><Loader2 size={14} className="animate-spin" /> Creating…</> : "Create Account"}
+          {saving ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : submitLabel}
         </button>
       </div>
     </div>
@@ -210,28 +211,42 @@ const Onboarding = () => {
   const [error, setError] = useState("");
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [signupData, setSignupData] = useState<SignupData | null>(null);
+  const [ready, setReady] = useState(false);
+
+  // "oauth" mode = account already created (Google OAuth), just need profile
+  // "signup" mode = account not yet created, need to call api.signup()
+  const [mode, setMode] = useState<"signup" | "oauth" | null>(null);
 
   const [profile, setProfile] = useState({ businessName: "", description: "", notes: "" });
   const [business, setBusiness] = useState({ businessType: "", teamSize: "", dmVolume: "" });
 
-  // Load signup data from sessionStorage
+  // Determine mode: sessionStorage = signup, auth token = oauth
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem("signup_data");
-      if (!raw) {
-        navigate("/signup", { replace: true });
-        return;
-      }
-      const parsed = JSON.parse(raw) as SignupData;
-      if (!parsed.email || !parsed.password) {
-        navigate("/signup", { replace: true });
-        return;
-      }
-      setSignupData(parsed);
-      setProfile((p) => ({ ...p, businessName: parsed.companyName || "" }));
-    } catch {
-      navigate("/signup", { replace: true });
+    const raw = sessionStorage.getItem("signup_data");
+    const hasToken = !!localStorage.getItem("auth_token");
+
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as SignupData;
+        if (parsed.email && parsed.password) {
+          setSignupData(parsed);
+          setProfile((p) => ({ ...p, businessName: parsed.companyName || "" }));
+          setMode("signup");
+          setReady(true);
+          return;
+        }
+      } catch { /* invalid JSON, fall through */ }
     }
+
+    if (hasToken) {
+      // Google OAuth flow — account already created, collect profile info
+      setMode("oauth");
+      setReady(true);
+      return;
+    }
+
+    // No signup data and no token — redirect to signup
+    navigate("/signup", { replace: true });
   }, [navigate]);
 
   const handleNext = () => {
@@ -239,50 +254,74 @@ const Onboarding = () => {
     setStep(2);
   };
 
-  const handleCreateAccount = async () => {
-    if (!signupData) return;
+  const handleSubmit = async () => {
     setSaving(true);
     setError("");
-    try {
-      const res = await api.signup(
-        profile.businessName.trim() || signupData.companyName,
-        signupData.email,
-        signupData.password,
-        {
-          country_code: signupData.countryCode,
-          phone_number: signupData.phoneNumber,
+
+    if (mode === "signup") {
+      // Email signup flow — create account
+      if (!signupData) return;
+      try {
+        const res = await api.signup(
+          profile.businessName.trim() || signupData.companyName,
+          signupData.email,
+          signupData.password,
+          {
+            country_code: signupData.countryCode,
+            phone_number: signupData.phoneNumber,
+            business_description: profile.description.trim(),
+            additional_notes: profile.notes.trim() || undefined,
+            business_type: business.businessType,
+            team_size: business.teamSize,
+            monthly_lead_volume: business.dmVolume,
+          }
+        );
+
+        sessionStorage.removeItem("signup_data");
+        localStorage.setItem("auth_token", res.token);
+        const companyId = res.company?.id || res.companyId || res.company_id;
+        if (companyId) {
+          localStorage.setItem("company_id", companyId);
+          localStorage.setItem("plcs_company_id", companyId);
+        }
+        localStorage.setItem("plcs_company_name", profile.businessName.trim() || signupData.companyName);
+
+        toast({ title: "Account created!", description: "Welcome to EightPath." });
+        navigate("/verify-email-pending", { replace: true, state: { email: signupData.email } });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Signup failed";
+        if (typeof message === "string" && message.toLowerCase().includes("already")) {
+          setError("An account with this email already exists. Try logging in instead.");
+        } else {
+          setError(typeof message === "string" ? message : "Signup failed. Please try again.");
+        }
+      } finally {
+        setSaving(false);
+      }
+    } else {
+      // Google OAuth flow — save profile to existing account
+      try {
+        await api.saveOnboardingProfile({
+          business_name: profile.businessName.trim(),
           business_description: profile.description.trim(),
           additional_notes: profile.notes.trim() || undefined,
           business_type: business.businessType,
           team_size: business.teamSize,
           monthly_lead_volume: business.dmVolume,
-        }
-      );
+        });
 
-      sessionStorage.removeItem("signup_data");
-      localStorage.setItem("auth_token", res.token);
-      const companyId = res.company?.id || res.companyId || res.company_id;
-      if (companyId) {
-        localStorage.setItem("company_id", companyId);
-        localStorage.setItem("plcs_company_id", companyId);
+        toast({ title: "Setup complete!", description: "Welcome to EightPath." });
+        navigate("/copilot", { replace: true });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Failed to save profile";
+        setError(typeof message === "string" ? message : "Failed to save. Please try again.");
+      } finally {
+        setSaving(false);
       }
-      localStorage.setItem("plcs_company_name", profile.businessName.trim() || signupData.companyName);
-
-      toast({ title: "Account created!", description: "Welcome to EightPath." });
-      navigate("/verify-email-pending", { replace: true, state: { email: signupData.email } });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Signup failed";
-      if (typeof message === "string" && message.toLowerCase().includes("already")) {
-        setError("An account with this email already exists. Try logging in instead.");
-      } else {
-        setError(typeof message === "string" ? message : "Signup failed. Please try again.");
-      }
-    } finally {
-      setSaving(false);
     }
   };
 
-  if (!signupData) {
+  if (!ready) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 size={24} className="animate-spin text-primary" />
@@ -314,8 +353,9 @@ const Onboarding = () => {
               data={business}
               onChange={(d) => setBusiness((p) => ({ ...p, ...d }))}
               onBack={() => setStep(1)}
-              onSubmit={handleCreateAccount}
+              onSubmit={handleSubmit}
               saving={saving}
+              submitLabel={mode === "oauth" ? "Complete Setup" : "Create Account"}
             />
           )}
           {error && <p className="mt-4 text-xs text-destructive text-center">{error}</p>}

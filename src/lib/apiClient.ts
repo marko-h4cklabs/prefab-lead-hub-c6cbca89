@@ -1261,6 +1261,16 @@ export const api = {
   completeOnboarding: () =>
     request<any>("/api/onboarding/complete", { method: "POST" }),
 
+  saveOnboardingProfile: (data: {
+    business_name: string;
+    business_description: string;
+    additional_notes?: string;
+    business_type?: string;
+    team_size?: string;
+    monthly_lead_volume?: string;
+  }) =>
+    request<any>("/api/onboarding/profile", { method: "POST", body: JSON.stringify(data) }),
+
   // --- Webhook URL ---
   getWebhookUrl: () =>
     request<any>("/api/settings/webhook-url"),
