@@ -745,6 +745,10 @@ export const api = {
   setCopilotKillSwitch: (enabled: boolean) =>
     request<any>("/api/copilot/kill-switch", { method: "PUT", body: JSON.stringify({ enabled }) }),
 
+  // Lead Management
+  deleteCopilotLead: (leadId: string) =>
+    request<any>(`/api/copilot/leads/${leadId}`, { method: "DELETE" }),
+
   // Lead Assignment
   assignCopilotLead: (leadId: string, userId: string | null) =>
     request<any>(`/api/copilot/leads/${leadId}/assign`, { method: "PUT", body: JSON.stringify({ user_id: userId }) }),

@@ -14,6 +14,7 @@ import {
   Plus,
   Loader2,
   ChevronDown,
+  Trash2,
 } from "lucide-react";
 
 // ---------- Types ----------
@@ -256,9 +257,10 @@ const CopilotLeadSummary = ({ leadId, onOpenChat, onBack, refreshTrigger }: Copi
   const [addingNote, setAddingNote] = useState(false);
   const [localNotes, setLocalNotes] = useState<Note[]>([]);
 
-  // Assign / stage mutation loading
+  // Assign / stage / delete mutation loading
   const [assigning, setAssigning] = useState(false);
   const [changingStage, setChangingStage] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -386,6 +388,20 @@ const CopilotLeadSummary = ({ leadId, onOpenChat, onBack, refreshTrigger }: Copi
       toast({ title: "Failed to add note", variant: "destructive" });
     } finally {
       setAddingNote(false);
+    }
+  };
+
+  const handleDeleteLead = async () => {
+    if (!confirm("Delete this lead and all its conversations? This cannot be undone.")) return;
+    setDeleting(true);
+    try {
+      await api.deleteCopilotLead(leadId);
+      toast({ title: "Lead deleted" });
+      onBack();
+    } catch {
+      toast({ title: "Failed to delete lead", variant: "destructive" });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -602,6 +618,16 @@ const CopilotLeadSummary = ({ leadId, onOpenChat, onBack, refreshTrigger }: Copi
           >
             <ArrowLeft size={12} />
             Back
+          </button>
+
+          {/* Delete lead */}
+          <button
+            onClick={handleDeleteLead}
+            disabled={deleting}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-2.5 text-xs text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+          >
+            {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+            Delete
           </button>
         </div>
 
