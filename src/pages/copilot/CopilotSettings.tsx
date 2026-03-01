@@ -454,7 +454,7 @@ function FieldsTab() {
         const list = normalizeList(res, ["fields", "presets", "data", "items"]);
         const mapped: QuoteField[] = list.map((f: any) => ({
           id: f.id || f._id || crypto.randomUUID(),
-          name: f.name || f.label || "",
+          name: f.label || f.name || "",
           type: f.type || "text",
           is_enabled: f.is_enabled !== false,
           qualification_prompt: f.qualification_prompt || "",

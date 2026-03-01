@@ -660,7 +660,11 @@ const CopilotLeadSummary = ({ leadId, onOpenChat, onBack, refreshTrigger }: Copi
           <div className="space-y-2">
             {fields.map((field) => {
               const key = field.variable_name || field.name;
-              const val = parsed_fields[key] || parsed_fields[field.name] || (field.label ? parsed_fields[field.label] : undefined);
+              const val = parsed_fields[key]
+                || parsed_fields[key.toLowerCase()]
+                || parsed_fields[field.name]
+                || (field.label ? parsed_fields[field.label] : undefined)
+                || (field.label ? parsed_fields[field.label.toLowerCase()] : undefined);
               const collected = val !== undefined && val !== null && val !== "";
               return (
                 <div key={key} className="flex items-start gap-2.5">

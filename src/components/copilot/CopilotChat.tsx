@@ -45,6 +45,18 @@ interface Props {
 const POLL_INTERVAL = 5_000;
 const POLL_INTERVAL_SSE = 60_000; // Much slower polling when SSE is active — just a safety net
 
+/** Remove consecutive duplicate messages (same role + content) */
+const dedup = (msgs: Message[]): Message[] => {
+  if (msgs.length <= 1) return msgs;
+  const out: Message[] = [msgs[0]];
+  for (let i = 1; i < msgs.length; i++) {
+    const prev = out[out.length - 1];
+    if (prev.role === msgs[i].role && prev.content === msgs[i].content) continue;
+    out.push(msgs[i]);
+  }
+  return out;
+};
+
 const formatTime = (ts?: string) => {
   if (!ts) return "";
   const d = new Date(ts);
@@ -81,6 +93,9 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
   // Track the last processed SSE message to avoid re-processing on re-render
   const lastProcessedSSERef = useRef<string | null>(null);
 
+  // Generation counter: incremented on every user message so stale suggestion results are discarded
+  const suggestionGenRef = useRef(0);
+
   const scrollToBottom = () =>
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
 
@@ -96,7 +111,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
       if (!silent) setLoadingMessages(true);
       try {
         const convo = await api.getConversation(companyId, leadId);
-        const serverMsgs: Message[] = Array.isArray(convo?.messages) ? convo.messages : [];
+        const serverMsgs: Message[] = dedup(Array.isArray(convo?.messages) ? convo.messages : []);
         // Smart merge: only accept server data if it has at least as many messages
         // as current state. This prevents wiping optimistic/SSE-pushed messages
         // when the server is slightly behind.
@@ -131,6 +146,10 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
     setLoadingSuggestions(true);
     if (forceRegenerate) regeneratingRef.current = true;
 
+    // Capture generation at call time — if a newer generation starts before
+    // we finish, discard these results so we don't show stale suggestions.
+    const gen = suggestionGenRef.current;
+
     const mapSuggestions = (items: any[], rowId: string) =>
       items.slice(0, 3).map((s: any, i: number) => ({ ...s, id: `${rowId}-${s.index ?? i}`, suggestionRowId: rowId, index: s.index ?? i }));
 
@@ -141,7 +160,9 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
         const items = Array.isArray(latest?.suggestions) ? latest.suggestions : [];
         const rowId = latest?.suggestion_id || latest?.id;
         if (items.length > 0 && rowId) {
-          setSuggestions(mapSuggestions(items, rowId));
+          if (gen === suggestionGenRef.current) {
+            setSuggestions(mapSuggestions(items, rowId));
+          }
           setLoadingSuggestions(false);
           return;
         }
@@ -153,6 +174,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
     // Generate new ones
     try {
       const res = await api.generateSuggestions(conversationId);
+      if (gen !== suggestionGenRef.current) return; // stale — discard
       const items = Array.isArray(res?.suggestions) ? res.suggestions : [];
       let rowId = res?.suggestion_id || res?.id;
       if (!rowId) {
@@ -161,11 +183,15 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
           rowId = latest?.suggestion_id || latest?.id;
         } catch { /* ok */ }
       }
-      setSuggestions(mapSuggestions(items, rowId || "gen"));
+      if (gen === suggestionGenRef.current) {
+        setSuggestions(mapSuggestions(items, rowId || "gen"));
+      }
     } catch {
       // silent fail
     } finally {
-      setLoadingSuggestions(false);
+      if (gen === suggestionGenRef.current) {
+        setLoadingSuggestions(false);
+      }
       regeneratingRef.current = false;
     }
   }, [leadId, conversationId]);
@@ -201,16 +227,18 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
     };
 
     setMessages((prev) => {
-      // Dedup: skip if last message has same content + role (prevents double from optimistic + SSE)
-      const last = prev[prev.length - 1];
-      if (last && last.role === newMsg.role && last.content === newMsg.content) {
+      // Dedup: skip if any of the last 3 messages has same content + role
+      // (prevents double from optimistic + SSE + polling overlap)
+      const tail = prev.slice(-3);
+      if (tail.some((m) => m.role === newMsg.role && m.content === newMsg.content)) {
         return prev;
       }
       return [...prev, newMsg];
     });
 
-    // When a new user (lead) message arrives, auto-generate fresh suggestions
+    // When a new user (lead) message arrives, invalidate old suggestions and regenerate
     if (sseMessage.role === "user") {
+      suggestionGenRef.current += 1;
       setSuggestions([]);
       fetchSuggestions(true);
     }
@@ -260,6 +288,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
       if (e.key === "r" || e.key === "R") {
         if (!loadingSuggestions) {
           e.preventDefault();
+          suggestionGenRef.current += 1;
           setSuggestions([]);
           fetchSuggestions(true);
         }
@@ -465,6 +494,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
           <span className="text-sm font-bold text-foreground">AI Suggestions</span>
           <button
             onClick={() => {
+              suggestionGenRef.current += 1;
               setSuggestions([]);
               fetchSuggestions(true);
             }}
