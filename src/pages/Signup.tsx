@@ -2,6 +2,8 @@ import { useState, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Eye, EyeOff, Search, ChevronDown } from "lucide-react";
 
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
 const COUNTRIES = [
   { code: 'US', name: 'United States', flag: '🇺🇸', dialCode: '+1' },
   { code: 'GB', name: 'United Kingdom', flag: '🇬🇧', dialCode: '+44' },
@@ -124,14 +126,37 @@ const Signup = () => {
             <p className="text-sm text-muted-foreground mt-1">Create your agency account</p>
           </div>
 
+          {/* Google Sign Up */}
+          <a
+            href={`${API_BASE}/api/auth/google`}
+            className="flex items-center justify-center gap-3 w-full border border-border rounded-lg px-4 py-3 text-sm font-medium text-foreground hover:bg-secondary transition-colors"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18">
+              <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
+              <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+              <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+              <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/>
+            </svg>
+            Continue with Google
+          </a>
+
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-card px-3 text-xs text-muted-foreground">or continue with email</span>
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Company Name</label>
-              <input type="text" value={companyName} onChange={(e) => { setCompanyName(e.target.value); setError(""); }} placeholder="Acme Inc." className="dark-input w-full" autoFocus disabled={loading} />
+              <input type="text" value={companyName} onChange={(e) => { setCompanyName(e.target.value); setError(""); }} placeholder="Acme Inc." className="dark-input w-full" autoFocus />
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Email</label>
-              <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }} placeholder="you@company.com" className="dark-input w-full" disabled={loading} />
+              <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }} placeholder="you@company.com" className="dark-input w-full" />
             </div>
 
             {/* Country */}
@@ -217,7 +242,7 @@ const Signup = () => {
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Password</label>
               <div className="relative">
-                <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }} placeholder="••••••••" className="dark-input w-full pr-10" disabled={loading} />
+                <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => { setPassword(e.target.value); setError(""); }} placeholder="••••••••" className="dark-input w-full pr-10" />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" tabIndex={-1}>
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -236,7 +261,7 @@ const Signup = () => {
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Confirm Password</label>
               <div className="relative">
-                <input type={showConfirm ? "text" : "password"} value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setError(""); }} placeholder="••••••••" className="dark-input w-full pr-10" disabled={loading} />
+                <input type={showConfirm ? "text" : "password"} value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setError(""); }} placeholder="••••••••" className="dark-input w-full pr-10" />
                 <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" tabIndex={-1}>
                   {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
