@@ -883,9 +883,10 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  generateCopilotPersona: (files: File[]) => {
+  generateCopilotPersona: (files: File[], senderName?: string) => {
     const fd = new FormData();
     files.forEach((f) => fd.append("files", f));
+    if (senderName) fd.append("sender_name", senderName);
     return formDataRequest<any>("/api/copilot/settings/generate-persona", fd);
   },
 

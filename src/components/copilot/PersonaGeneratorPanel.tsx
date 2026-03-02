@@ -11,6 +11,8 @@ import {
   FileText,
   FileJson,
   File,
+  Plus,
+  User,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -67,6 +69,11 @@ function fileIcon(name: string) {
   if (name.endsWith(".json")) return <FileJson size={14} className="text-primary" />;
   if (name.endsWith(".txt")) return <FileText size={14} className="text-muted-foreground" />;
   return <File size={14} className="text-muted-foreground" />;
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  return `${(bytes / 1024).toFixed(0)} KB`;
 }
 
 // ---------------------------------------------------------------------------
@@ -336,11 +343,16 @@ interface Props {
 
 export default function PersonaGeneratorPanel({ onApplied }: Props) {
   const [files, setFiles] = useState<File[]>([]);
+  const [senderName, setSenderName] = useState("");
   const [dragging, setDragging] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [persona, setPersona] = useState<PersonaFields | null>(null);
   const [styleSummary, setStyleSummary] = useState("");
+
+  // Hidden file input ref — kept OUTSIDE the drop zone to avoid nested click loops
   const inputRef = useRef<HTMLInputElement>(null);
+  // Track drag depth so onDragLeave doesn't fire when moving over child elements
+  const dragDepthRef = useRef(0);
 
   // --- File handling ---
 
@@ -349,17 +361,44 @@ export default function PersonaGeneratorPanel({ onApplied }: Props) {
       [".json", ".txt", ".docx", ".xlsx"].some((ext) => f.name.toLowerCase().endsWith(ext))
     );
     if (valid.length < incoming.length) {
-      toast({ title: "Unsupported file type", description: "Only .json, .txt, .docx, .xlsx are accepted", variant: "destructive" });
+      toast({
+        title: "Unsupported file type",
+        description: "Only .json, .txt, .docx, .xlsx are accepted",
+        variant: "destructive",
+      });
     }
+    if (valid.length === 0) return;
     setFiles((prev) => {
       const names = new Set(prev.map((f) => f.name));
-      return [...prev, ...valid.filter((f) => !names.has(f.name))];
+      const fresh = valid.filter((f) => !names.has(f.name));
+      return [...prev, ...fresh];
     });
+  }, []);
+
+  // Drag handlers with depth counter to avoid false onDragLeave from child elements
+  const onDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragDepthRef.current += 1;
+    setDragging(true);
+  }, []);
+
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+  }, []);
+
+  const onDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragDepthRef.current -= 1;
+    if (dragDepthRef.current <= 0) {
+      dragDepthRef.current = 0;
+      setDragging(false);
+    }
   }, []);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
+      dragDepthRef.current = 0;
       setDragging(false);
       addFiles(Array.from(e.dataTransfer.files));
     },
@@ -368,11 +407,14 @@ export default function PersonaGeneratorPanel({ onApplied }: Props) {
 
   const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) addFiles(Array.from(e.target.files));
+    // Reset input so the same file can be re-added after removal
     e.target.value = "";
   };
 
   const removeFile = (name: string) =>
     setFiles((prev) => prev.filter((f) => f.name !== name));
+
+  const openPicker = () => inputRef.current?.click();
 
   // --- Generate ---
 
@@ -385,7 +427,7 @@ export default function PersonaGeneratorPanel({ onApplied }: Props) {
     setPersona(null);
     setStyleSummary("");
     try {
-      const result = await api.generateCopilotPersona(files);
+      const result = await api.generateCopilotPersona(files, senderName.trim() || undefined);
       const p = result?.persona ?? result;
       setPersona({
         agent_name: p.agent_name ?? "",
@@ -424,49 +466,88 @@ export default function PersonaGeneratorPanel({ onApplied }: Props) {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="mt-4 space-y-4">
+    // Outer wrapper is the full drag target — covers drop zone + file list area
+    <div
+      className="mt-4 space-y-4"
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
+      {/* Hidden file input — lives OUTSIDE the drop zone to avoid nested click loops */}
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        accept={ACCEPTED}
+        className="hidden"
+        onChange={onInputChange}
+      />
+
       {/* Drop zone */}
-      <div
-        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={onDrop}
-        onClick={() => inputRef.current?.click()}
-        className={`cursor-pointer rounded-xl border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-3 py-8 px-4 text-center ${
-          dragging
-            ? "border-primary bg-primary/5"
-            : "border-border hover:border-primary/50 bg-card/50"
-        }`}
-      >
-        <Upload size={28} className="text-muted-foreground" />
-        <div>
-          <p className="text-sm font-medium text-foreground">Drop files here or click to browse</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Instagram DMs, transcripts, or documents</p>
+      {files.length === 0 ? (
+        // Empty state: full drop zone
+        <div
+          onClick={openPicker}
+          className={`cursor-pointer rounded-xl border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-3 py-8 px-4 text-center ${
+            dragging
+              ? "border-primary bg-primary/5"
+              : "border-border hover:border-primary/50 bg-card/50"
+          }`}
+        >
+          <Upload size={28} className={dragging ? "text-primary" : "text-muted-foreground"} />
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              {dragging ? "Drop files here" : "Drop files here or click to browse"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Instagram DMs, transcripts, or documents
+            </p>
+          </div>
+          {/* Format badges */}
+          <div className="flex flex-wrap gap-2 justify-center mt-1">
+            {[
+              { label: "IG DMs (.json)", color: "bg-primary/10 text-primary border-primary/20" },
+              { label: "Transcripts (.txt)", color: "bg-muted text-muted-foreground border-border" },
+              { label: "Docs (.docx/.xlsx)", color: "bg-muted text-muted-foreground border-border" },
+            ].map((b) => (
+              <span key={b.label} className={`text-[10px] font-medium px-2 py-0.5 rounded-md border ${b.color}`}>
+                {b.label}
+              </span>
+            ))}
+          </div>
         </div>
-        {/* Format badges */}
-        <div className="flex flex-wrap gap-2 justify-center mt-1">
-          {[
-            { label: "IG DMs (.json)", color: "bg-primary/10 text-primary border-primary/20" },
-            { label: "Transcripts (.txt)", color: "bg-muted text-muted-foreground border-border" },
-            { label: "Docs (.docx/.xlsx)", color: "bg-muted text-muted-foreground border-border" },
-          ].map((b) => (
-            <span key={b.label} className={`text-[10px] font-medium px-2 py-0.5 rounded-md border ${b.color}`}>
-              {b.label}
-            </span>
-          ))}
+      ) : (
+        // Files loaded: compact drop bar at top
+        <div
+          onClick={openPicker}
+          className={`cursor-pointer rounded-xl border border-dashed transition-colors flex items-center gap-3 px-4 py-3 ${
+            dragging
+              ? "border-primary bg-primary/5"
+              : "border-border hover:border-primary/50 bg-card/50"
+          }`}
+        >
+          <Upload size={16} className={dragging ? "text-primary" : "text-muted-foreground"} />
+          <span className="text-sm text-muted-foreground flex-1">
+            {dragging ? "Drop to add more files" : "Drop more files or click to add"}
+          </span>
+          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-md">
+            {files.length} file{files.length !== 1 ? "s" : ""}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); openPicker(); }}
+            className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+          >
+            <Plus size={13} />
+            Add
+          </button>
         </div>
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          accept={ACCEPTED}
-          className="hidden"
-          onChange={onInputChange}
-        />
-      </div>
+      )}
 
       {/* File list */}
       {files.length > 0 && (
-        <div className="space-y-1">
+        <div className="space-y-1 max-h-52 overflow-y-auto">
           {files.map((f) => (
             <div
               key={f.name}
@@ -475,12 +556,12 @@ export default function PersonaGeneratorPanel({ onApplied }: Props) {
               {fileIcon(f.name)}
               <span className="flex-1 text-xs text-foreground truncate">{f.name}</span>
               <span className="text-[10px] text-muted-foreground shrink-0">
-                {(f.size / 1024).toFixed(0)} KB
+                {formatBytes(f.size)}
               </span>
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); removeFile(f.name); }}
-                className="text-muted-foreground hover:text-destructive transition-colors"
+                onClick={() => removeFile(f.name)}
+                className="text-muted-foreground hover:text-destructive transition-colors ml-1"
               >
                 <X size={13} />
               </button>
@@ -488,6 +569,24 @@ export default function PersonaGeneratorPanel({ onApplied }: Props) {
           ))}
         </div>
       )}
+
+      {/* Sender name field */}
+      <div>
+        <label className="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
+          <User size={12} />
+          Your name in these chats
+          <span className="text-muted-foreground/50 font-normal">(optional but recommended)</span>
+        </label>
+        <input
+          value={senderName}
+          onChange={(e) => setSenderName(e.target.value)}
+          className="dark-input w-full"
+          placeholder="e.g. Marco"
+        />
+        <p className="text-[10px] text-muted-foreground mt-1">
+          Helps AI focus only on your messages in the conversations — if left blank, AI will try to figure it out automatically
+        </p>
+      </div>
 
       {/* Generate button */}
       <button
