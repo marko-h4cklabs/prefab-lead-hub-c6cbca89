@@ -39,7 +39,11 @@ const CopilotConversations = () => {
   selectedLeadRef.current = selectedLeadId;
 
   const handleSSEEvent = useCallback((event: SSEEvent) => {
-    if (event.type === "connected") return;
+    if (event.type === "connected") {
+      // On (re)connect, refresh DM list to catch any events missed during disconnection gap
+      bumpDMRefresh();
+      return;
+    }
 
     if (event.type === "new_message") {
       // Always refresh the DM list (new message updates preview, ordering) — debounced

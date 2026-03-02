@@ -43,7 +43,7 @@ interface Props {
 }
 
 const POLL_INTERVAL = 5_000;
-const POLL_INTERVAL_SSE = 60_000; // Much slower polling when SSE is active — just a safety net
+const POLL_INTERVAL_SSE = 15_000; // Safety-net polling when SSE is active (catches missed events)
 
 /** Remove consecutive duplicate messages (same role + content) */
 const dedup = (msgs: Message[]): Message[] => {
