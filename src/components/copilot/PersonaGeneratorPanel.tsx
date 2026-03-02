@@ -341,8 +341,29 @@ interface Props {
   onApplied?: () => void;
 }
 
+interface FileEntry {
+  id: string;
+  file: File;
+  displayName: string; // may differ from file.name when duplicates exist
+}
+
+/** Unique fingerprint per file — allows same-named files of different content */
+function fileKey(f: File) {
+  return `${f.name}|${f.size}|${f.lastModified}`;
+}
+
+/** Build display name: first occurrence keeps original, duplicates get "(2)", "(3)", … suffix */
+function buildDisplayName(fileName: string, countSoFar: number): string {
+  if (countSoFar === 0) return fileName;
+  const dot = fileName.lastIndexOf(".");
+  if (dot > 0) {
+    return `${fileName.slice(0, dot)} (${countSoFar + 1})${fileName.slice(dot)}`;
+  }
+  return `${fileName} (${countSoFar + 1})`;
+}
+
 export default function PersonaGeneratorPanel({ onApplied }: Props) {
-  const [files, setFiles] = useState<File[]>([]);
+  const [fileEntries, setFileEntries] = useState<FileEntry[]>([]);
   const [senderName, setSenderName] = useState("");
   const [dragging, setDragging] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -368,10 +389,26 @@ export default function PersonaGeneratorPanel({ onApplied }: Props) {
       });
     }
     if (valid.length === 0) return;
-    setFiles((prev) => {
-      const names = new Set(prev.map((f) => f.name));
-      const fresh = valid.filter((f) => !names.has(f.name));
-      return [...prev, ...fresh];
+    setFileEntries((prev) => {
+      // Dedup by content fingerprint (name + size + lastModified), not just name
+      const existingKeys = new Set(prev.map((e) => fileKey(e.file)));
+      // Track how many times each base name already appears so we can number new dupes
+      const nameCount = new Map<string, number>();
+      prev.forEach((e) => nameCount.set(e.file.name, (nameCount.get(e.file.name) ?? 0) + 1));
+
+      const newEntries: FileEntry[] = [];
+      for (const f of valid) {
+        if (existingKeys.has(fileKey(f))) continue; // true duplicate — skip
+        const count = nameCount.get(f.name) ?? 0;
+        newEntries.push({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          file: f,
+          displayName: buildDisplayName(f.name, count),
+        });
+        nameCount.set(f.name, count + 1);
+        existingKeys.add(fileKey(f));
+      }
+      return [...prev, ...newEntries];
     });
   }, []);
 
@@ -411,15 +448,15 @@ export default function PersonaGeneratorPanel({ onApplied }: Props) {
     e.target.value = "";
   };
 
-  const removeFile = (name: string) =>
-    setFiles((prev) => prev.filter((f) => f.name !== name));
+  const removeFile = (id: string) =>
+    setFileEntries((prev) => prev.filter((e) => e.id !== id));
 
   const openPicker = () => inputRef.current?.click();
 
   // --- Generate ---
 
   const handleGenerate = async () => {
-    if (files.length === 0) {
+    if (fileEntries.length === 0) {
       toast({ title: "No files selected", description: "Upload at least one file to analyze", variant: "destructive" });
       return;
     }
@@ -427,7 +464,7 @@ export default function PersonaGeneratorPanel({ onApplied }: Props) {
     setPersona(null);
     setStyleSummary("");
     try {
-      const result = await api.generateCopilotPersona(files, senderName.trim() || undefined);
+      const result = await api.generateCopilotPersona(fileEntries.map((e) => e.file), senderName.trim() || undefined);
       const p = result?.persona ?? result;
       setPersona({
         agent_name: p.agent_name ?? "",
@@ -485,7 +522,7 @@ export default function PersonaGeneratorPanel({ onApplied }: Props) {
       />
 
       {/* Drop zone */}
-      {files.length === 0 ? (
+      {fileEntries.length === 0 ? (
         // Empty state: full drop zone
         <div
           onClick={openPicker}
@@ -532,7 +569,7 @@ export default function PersonaGeneratorPanel({ onApplied }: Props) {
             {dragging ? "Drop to add more files" : "Drop more files or click to add"}
           </span>
           <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-md">
-            {files.length} file{files.length !== 1 ? "s" : ""}
+            {fileEntries.length} file{fileEntries.length !== 1 ? "s" : ""}
           </span>
           <button
             type="button"
@@ -546,21 +583,21 @@ export default function PersonaGeneratorPanel({ onApplied }: Props) {
       )}
 
       {/* File list */}
-      {files.length > 0 && (
+      {fileEntries.length > 0 && (
         <div className="space-y-1 max-h-52 overflow-y-auto">
-          {files.map((f) => (
+          {fileEntries.map((e) => (
             <div
-              key={f.name}
+              key={e.id}
               className="flex items-center gap-2 rounded-lg bg-card border border-border px-3 py-2"
             >
-              {fileIcon(f.name)}
-              <span className="flex-1 text-xs text-foreground truncate">{f.name}</span>
+              {fileIcon(e.file.name)}
+              <span className="flex-1 text-xs text-foreground truncate">{e.displayName}</span>
               <span className="text-[10px] text-muted-foreground shrink-0">
-                {formatBytes(f.size)}
+                {formatBytes(e.file.size)}
               </span>
               <button
                 type="button"
-                onClick={() => removeFile(f.name)}
+                onClick={() => removeFile(e.id)}
                 className="text-muted-foreground hover:text-destructive transition-colors ml-1"
               >
                 <X size={13} />
@@ -592,9 +629,9 @@ export default function PersonaGeneratorPanel({ onApplied }: Props) {
       <button
         type="button"
         onClick={handleGenerate}
-        disabled={generating || files.length === 0}
+        disabled={generating || fileEntries.length === 0}
         className={`dark-btn w-full ${
-          files.length === 0
+          fileEntries.length === 0
             ? "bg-muted text-muted-foreground"
             : "bg-primary text-primary-foreground hover:bg-primary/90"
         }`}
