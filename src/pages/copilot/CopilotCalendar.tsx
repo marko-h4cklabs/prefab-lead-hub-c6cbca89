@@ -135,7 +135,7 @@ const CopilotCalendar = () => {
 
   useEffect(() => {
     if (status?.connected) fetchEvents();
-  }, [weekOffset, statusFilter]);
+  }, [fetchEvents, status]);
 
   // Save Calendly token
   const handleConnect = async () => {
