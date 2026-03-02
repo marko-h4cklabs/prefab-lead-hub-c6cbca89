@@ -2,6 +2,11 @@ import { useEffect, useState, useRef } from "react";
 import { api } from "@/lib/apiClient";
 import { Save, Loader2, Check, X } from "lucide-react";
 
+const CONVERSATION_APPROACH = [
+  { value: "field_focused", label: "Straight to Fields", desc: "Efficient — guide toward required info quickly" },
+  { value: "rapport_building", label: "Rapport Building", desc: "Match vibe, connect first, collect fields naturally" },
+];
+
 const FOLLOW_UP = [
   { value: "gentle", label: "Gentle", desc: "Soft nudges, no pressure" },
   { value: "persistent", label: "Persistent", desc: "Clear CTAs, creates mild urgency" },
@@ -28,6 +33,7 @@ const PRICE_OPTIONS = [
 
 interface StrategyState {
   primary_goal: string;
+  conversation_approach: string;
   follow_up_style: string;
   closing_style: string;
   competitor_mentions: string;
@@ -36,6 +42,7 @@ interface StrategyState {
 
 const DEFAULTS: StrategyState = {
   primary_goal: "",
+  conversation_approach: "field_focused",
   follow_up_style: "gentle",
   closing_style: "soft",
   competitor_mentions: "deflect",
@@ -58,6 +65,7 @@ const ConversationStrategySection = ({ onSaved, onDirty, mode = 'autopilot' }: {
         if (hasRealData) {
           const merged: StrategyState = {
             primary_goal: res.primary_goal || res.conversation_goal || "",
+            conversation_approach: res.conversation_approach || "field_focused",
             follow_up_style: res.follow_up_style || "gentle",
             closing_style: res.closing_style || "soft",
             competitor_mentions: res.competitor_mentions || "deflect",
@@ -138,6 +146,12 @@ const ConversationStrategySection = ({ onSaved, onDirty, mode = 'autopilot' }: {
         <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Primary Goal</label>
         <input value={data.primary_goal} onChange={(e) => update({ primary_goal: e.target.value })} className="dark-input w-full" placeholder="e.g. Book a 30-minute discovery call, Get them to fill out our form..." />
         <p className="text-[11px] text-muted-foreground mt-1">What should every conversation ultimately lead to?</p>
+      </div>
+
+      <div>
+        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Field Collection Approach</label>
+        <p className="text-[11px] text-muted-foreground mb-2">How should the AI prioritize collecting required fields vs. building rapport?</p>
+        <ToggleGroup options={CONVERSATION_APPROACH} value={data.conversation_approach} onChange={(v) => update({ conversation_approach: v })} />
       </div>
 
       <div>

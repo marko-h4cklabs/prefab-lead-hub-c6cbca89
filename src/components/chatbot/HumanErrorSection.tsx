@@ -15,12 +15,14 @@ interface HumanErrorState {
   human_error_enabled: boolean;
   human_error_types: string[];
   human_error_random: boolean;
+  no_trailing_period: boolean;
 }
 
 const DEFAULTS: HumanErrorState = {
   human_error_enabled: false,
   human_error_types: [],
   human_error_random: false,
+  no_trailing_period: false,
 };
 
 const HumanErrorSection = ({ onSaved, onDirty, mode = 'autopilot' }: { onSaved?: () => void; onDirty?: () => void; mode?: 'autopilot' | 'copilot' }) => {
@@ -39,6 +41,7 @@ const HumanErrorSection = ({ onSaved, onDirty, mode = 'autopilot' }: { onSaved?:
           human_error_enabled: res.human_error_enabled ?? false,
           human_error_types: Array.isArray(res.human_error_types) ? res.human_error_types : [],
           human_error_random: res.human_error_random ?? false,
+          no_trailing_period: res.no_trailing_period ?? false,
         };
         setData(merged);
         initialRef.current = JSON.stringify(merged);
@@ -78,7 +81,7 @@ const HumanErrorSection = ({ onSaved, onDirty, mode = 'autopilot' }: { onSaved?:
     setSaveStatus("saving");
     setSaveError("");
     try {
-      const payload = { human_error_enabled: data.human_error_enabled, human_error_types: data.human_error_types, human_error_random: data.human_error_random };
+      const payload = { human_error_enabled: data.human_error_enabled, human_error_types: data.human_error_types, human_error_random: data.human_error_random, no_trailing_period: data.no_trailing_period };
       await (mode === 'copilot' ? api.putCopilotBehavior(payload as any) : api.putChatbotBehavior(payload as any));
       initialRef.current = JSON.stringify(data);
       setIsDirty(false);
@@ -100,6 +103,15 @@ const HumanErrorSection = ({ onSaved, onDirty, mode = 'autopilot' }: { onSaved?:
       <p className="text-[11px] text-muted-foreground -mt-2">
         Make your chatbot write with small imperfections — typos, missing punctuation, casual language. Makes it feel more like a real person texting.
       </p>
+
+      {/* Standalone: No trailing period */}
+      <div className="flex items-center justify-between">
+        <div>
+          <label className="text-sm font-medium text-foreground">No Dot at End of Messages</label>
+          <p className="text-[10px] text-muted-foreground">Bot won't put a period at the end of messages — feels more like texting</p>
+        </div>
+        <Switch checked={data.no_trailing_period} onCheckedChange={(v) => update({ no_trailing_period: v })} />
+      </div>
 
       {/* Master toggle */}
       <div className="flex items-center justify-between">
