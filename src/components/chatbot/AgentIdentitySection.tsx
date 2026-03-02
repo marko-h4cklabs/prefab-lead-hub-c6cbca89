@@ -18,9 +18,8 @@ const EMPTY: IdentityState = {
   additional_context: "",
 };
 
-const STORAGE_KEY = "chatbot_identity_draft";
-
-const AgentIdentitySection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirty?: () => void }) => {
+const AgentIdentitySection = ({ onSaved, onDirty, mode = 'autopilot' }: { onSaved?: () => void; onDirty?: () => void; mode?: 'autopilot' | 'copilot' }) => {
+  const STORAGE_KEY = mode === 'copilot' ? "copilot_identity_draft" : "chatbot_identity_draft";
   const [data, setData] = useState<IdentityState>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -30,7 +29,7 @@ const AgentIdentitySection = ({ onSaved, onDirty }: { onSaved?: () => void; onDi
 
   useEffect(() => {
     Promise.all([
-      api.getAgentIdentity().catch(() => null),
+      (mode === 'copilot' ? api.getCopilotAgentIdentity() : api.getAgentIdentity()).catch(() => null),
       api.getCompanyInfo().catch(() => null),
     ]).then(([identity, company]) => {
       const hasRealData = identity?.agent_name || identity?.business_description;
@@ -75,7 +74,7 @@ const AgentIdentitySection = ({ onSaved, onDirty }: { onSaved?: () => void; onDi
     setSaveStatus('saving');
     setSaveError('');
     try {
-      await api.putAgentIdentity(data);
+      await (mode === 'copilot' ? api.putCopilotAgentIdentity(data) : api.putAgentIdentity(data));
       initialRef.current = JSON.stringify(data);
       setIsDirty(false);
       setSaveStatus('saved');

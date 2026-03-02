@@ -23,9 +23,8 @@ const DEFAULTS: HumanErrorState = {
   human_error_random: false,
 };
 
-const STORAGE_KEY = "chatbot_human_error_draft";
-
-const HumanErrorSection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirty?: () => void }) => {
+const HumanErrorSection = ({ onSaved, onDirty, mode = 'autopilot' }: { onSaved?: () => void; onDirty?: () => void; mode?: 'autopilot' | 'copilot' }) => {
+  const STORAGE_KEY = mode === 'copilot' ? "copilot_human_error_draft" : "chatbot_human_error_draft";
   const [data, setData] = useState<HumanErrorState>(DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -34,7 +33,7 @@ const HumanErrorSection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirty
   const initialRef = useRef(JSON.stringify(DEFAULTS));
 
   useEffect(() => {
-    api.getChatbotBehavior()
+    (mode === 'copilot' ? api.getCopilotBehavior() : api.getChatbotBehavior())
       .then((res: any) => {
         const merged: HumanErrorState = {
           human_error_enabled: res.human_error_enabled ?? false,
@@ -79,11 +78,8 @@ const HumanErrorSection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirty
     setSaveStatus("saving");
     setSaveError("");
     try {
-      await api.putChatbotBehavior({
-        human_error_enabled: data.human_error_enabled,
-        human_error_types: data.human_error_types,
-        human_error_random: data.human_error_random,
-      } as any);
+      const payload = { human_error_enabled: data.human_error_enabled, human_error_types: data.human_error_types, human_error_random: data.human_error_random };
+      await (mode === 'copilot' ? api.putCopilotBehavior(payload as any) : api.putChatbotBehavior(payload as any));
       initialRef.current = JSON.stringify(data);
       setIsDirty(false);
       setSaveStatus("saved");

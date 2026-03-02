@@ -62,9 +62,8 @@ const DEFAULTS: StyleState = {
   delay_random_enabled: false,
 };
 
-const STORAGE_KEY = "chatbot_style_draft";
-
-const CommunicationStyleSection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirty?: () => void }) => {
+const CommunicationStyleSection = ({ onSaved, onDirty, mode = 'autopilot' }: { onSaved?: () => void; onDirty?: () => void; mode?: 'autopilot' | 'copilot' }) => {
+  const STORAGE_KEY = mode === 'copilot' ? "copilot_style_draft" : "chatbot_style_draft";
   const [data, setData] = useState<StyleState>(DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -73,7 +72,7 @@ const CommunicationStyleSection = ({ onSaved, onDirty }: { onSaved?: () => void;
   const initialRef = useRef(JSON.stringify(DEFAULTS));
 
   useEffect(() => {
-    api.getChatbotBehavior()
+    (mode === 'copilot' ? api.getCopilotBehavior() : api.getChatbotBehavior())
       .then((res) => {
         const hasRealData = res.tone || res.response_length;
         if (hasRealData) {
@@ -128,17 +127,20 @@ const CommunicationStyleSection = ({ onSaved, onDirty }: { onSaved?: () => void;
     setSaveStatus('saving');
     setSaveError('');
     try {
-      await api.putChatbotBehavior({
+      const payload: any = {
         tone: data.tone,
         response_length: data.response_length,
         opener_style: data.opener_style,
         emojis_enabled: data.emojis_enabled,
         language_code: data.language,
-        response_delay_seconds: data.response_delay_seconds,
-        delay_min_seconds: data.delay_min_seconds,
-        delay_max_seconds: data.delay_max_seconds,
-        delay_random_enabled: data.delay_random_enabled,
-      } as any);
+        ...(mode !== 'copilot' && {
+          response_delay_seconds: data.response_delay_seconds,
+          delay_min_seconds: data.delay_min_seconds,
+          delay_max_seconds: data.delay_max_seconds,
+          delay_random_enabled: data.delay_random_enabled,
+        }),
+      };
+      await (mode === 'copilot' ? api.putCopilotBehavior(payload) : api.putChatbotBehavior(payload));
       initialRef.current = JSON.stringify(data);
       setIsDirty(false);
       setSaveStatus('saved');
@@ -215,8 +217,8 @@ const CommunicationStyleSection = ({ onSaved, onDirty }: { onSaved?: () => void;
         <Switch checked={data.emojis_enabled} onCheckedChange={(v) => update({ emojis_enabled: v })} />
       </div>
 
-      {/* Smart Reply Delay */}
-      <div className="rounded-lg border border-border bg-card/50 p-4 space-y-3">
+      {/* Smart Reply Delay — autopilot only */}
+      {mode !== 'copilot' && <div className="rounded-lg border border-border bg-card/50 p-4 space-y-3">
         <div className="flex items-center gap-1.5">
           <label className="text-sm font-semibold text-foreground">Smart Delay Setup</label>
           <TooltipProvider>
@@ -307,7 +309,7 @@ const CommunicationStyleSection = ({ onSaved, onDirty }: { onSaved?: () => void;
             </div>
           </>
         )}
-      </div>
+      </div>}
 
       {/* Language */}
       <div>

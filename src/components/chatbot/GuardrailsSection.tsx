@@ -22,9 +22,8 @@ const DEFAULTS: GuardrailsState = {
 // are still sent to the API for backward compat, but the UI for advanced
 // handoff rules is now in the Human-Break panel (right side).
 
-const STORAGE_KEY = "chatbot_guardrails_draft";
-
-const GuardrailsSection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirty?: () => void }) => {
+const GuardrailsSection = ({ onSaved, onDirty, mode = 'autopilot' }: { onSaved?: () => void; onDirty?: () => void; mode?: 'autopilot' | 'copilot' }) => {
+  const STORAGE_KEY = mode === 'copilot' ? "copilot_guardrails_draft" : "chatbot_guardrails_draft";
   const [data, setData] = useState<GuardrailsState>(DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -33,7 +32,7 @@ const GuardrailsSection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirty
   const initialRef = useRef(JSON.stringify(DEFAULTS));
 
   useEffect(() => {
-    api.getGuardrails()
+    (mode === 'copilot' ? api.getCopilotGuardrails() : api.getGuardrails())
       .then((res) => {
         const hasRealData = res.bot_deny_response || res.prohibited_topics || res.handoff_trigger;
         if (hasRealData) {
@@ -84,7 +83,7 @@ const GuardrailsSection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirty
     setSaveStatus('saving');
     setSaveError('');
     try {
-      await api.putGuardrails(data);
+      await (mode === 'copilot' ? api.putCopilotGuardrails(data) : api.putGuardrails(data));
       initialRef.current = JSON.stringify(data);
       setIsDirty(false);
       setSaveStatus('saved');

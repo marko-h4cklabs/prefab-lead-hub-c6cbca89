@@ -42,9 +42,8 @@ const DEFAULTS: StrategyState = {
   price_reveal: "qualify",
 };
 
-const STORAGE_KEY = "chatbot_strategy_draft";
-
-const ConversationStrategySection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirty?: () => void }) => {
+const ConversationStrategySection = ({ onSaved, onDirty, mode = 'autopilot' }: { onSaved?: () => void; onDirty?: () => void; mode?: 'autopilot' | 'copilot' }) => {
+  const STORAGE_KEY = mode === 'copilot' ? "copilot_strategy_draft" : "chatbot_strategy_draft";
   const [data, setData] = useState<StrategyState>(DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -53,7 +52,7 @@ const ConversationStrategySection = ({ onSaved, onDirty }: { onSaved?: () => voi
   const initialRef = useRef(JSON.stringify(DEFAULTS));
 
   useEffect(() => {
-    api.getConversationStrategy()
+    (mode === 'copilot' ? api.getCopilotStrategy() : api.getConversationStrategy())
       .then((res) => {
         const hasRealData = res.primary_goal || res.conversation_goal || res.follow_up_style;
         if (hasRealData) {
@@ -104,7 +103,7 @@ const ConversationStrategySection = ({ onSaved, onDirty }: { onSaved?: () => voi
     setSaveStatus('saving');
     setSaveError('');
     try {
-      await api.putConversationStrategy(data);
+      await (mode === 'copilot' ? api.putCopilotStrategy(data) : api.putConversationStrategy(data));
       initialRef.current = JSON.stringify(data);
       setIsDirty(false);
       setSaveStatus('saved');

@@ -15,7 +15,7 @@ function normalizeList(payload: unknown, keys: string[] = []): any[] {
 
 const TONES = ["professional", "friendly", "confident", "relatable"];
 
-const PersonasSection = () => {
+const PersonasSection = ({ mode = 'autopilot' }: { mode?: 'autopilot' | 'copilot' }) => {
   const [personas, setPersonas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -24,7 +24,7 @@ const PersonasSection = () => {
   const [form, setForm] = useState({ name: "", agent_name: "", tone: "professional", opener_style: "greeting", system_prompt: "" });
 
   const fetch = () => {
-    api.getPersonas()
+    (mode === 'copilot' ? api.getCopilotPersonas() : api.getPersonas())
       .then((res) => setPersonas(normalizeList(res, ["items", "personas", "data"])))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -39,8 +39,8 @@ const PersonasSection = () => {
     if (!form.name.trim()) return;
     setSaving(true);
     try {
-      if (editing) await api.updatePersona(editing.id, form);
-      else await api.createPersona(form);
+      if (editing) await (mode === 'copilot' ? api.updateCopilotPersona(editing.id, form) : api.updatePersona(editing.id, form));
+      else await (mode === 'copilot' ? api.createCopilotPersona(form) : api.createPersona(form));
       toast({ title: editing ? "Persona updated" : "Persona created" });
       setModalOpen(false);
       fetch();
@@ -51,11 +51,11 @@ const PersonasSection = () => {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this persona?")) return;
-    try { await api.deletePersona(id); toast({ title: "Persona deleted" }); fetch(); } catch (err) { toast({ title: "Failed", description: getErrorMessage(err), variant: "destructive" }); }
+    try { await (mode === 'copilot' ? api.deleteCopilotPersona(id) : api.deletePersona(id)); toast({ title: "Persona deleted" }); fetch(); } catch (err) { toast({ title: "Failed", description: getErrorMessage(err), variant: "destructive" }); }
   };
 
   const handleActivate = async (id: string) => {
-    try { await api.activatePersona(id); toast({ title: "Persona activated" }); fetch(); } catch (err) { toast({ title: "Failed", description: getErrorMessage(err), variant: "destructive" }); }
+    try { await (mode === 'copilot' ? api.activateCopilotPersona(id) : api.activatePersona(id)); toast({ title: "Persona activated" }); fetch(); } catch (err) { toast({ title: "Failed", description: getErrorMessage(err), variant: "destructive" }); }
   };
 
   return (

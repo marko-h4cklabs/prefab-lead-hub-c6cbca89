@@ -20,9 +20,8 @@ const PLACEHOLDER = `• "We helped a coaching business go from 3 to 12 clients 
 • "Our average client sees ROI within the first 30 days"
 • "Over 500 businesses have used our system"`;
 
-const STORAGE_KEY = "chatbot_social_draft";
-
-const SocialProofSection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirty?: () => void }) => {
+const SocialProofSection = ({ onSaved, onDirty, mode = 'autopilot' }: { onSaved?: () => void; onDirty?: () => void; mode?: 'autopilot' | 'copilot' }) => {
+  const STORAGE_KEY = mode === 'copilot' ? "copilot_social_draft" : "chatbot_social_draft";
   const [data, setData] = useState<SocialProofState>(DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -39,7 +38,7 @@ const SocialProofSection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirt
 
   useEffect(() => {
     Promise.all([
-      api.getSocialProof().catch(() => null),
+      (mode === 'copilot' ? api.getCopilotSocialProof() : api.getSocialProof()).catch(() => null),
       api.getSocialProofImages().catch(() => []),
     ]).then(([res, imgs]) => {
       if (res) {
@@ -90,7 +89,7 @@ const SocialProofSection = ({ onSaved, onDirty }: { onSaved?: () => void; onDirt
     setSaveStatus('saving');
     setSaveError('');
     try {
-      await api.putSocialProof(data);
+      await (mode === 'copilot' ? api.putCopilotSocialProof(data) : api.putSocialProof(data));
       initialRef.current = JSON.stringify(data);
       setIsDirty(false);
       setSaveStatus('saved');

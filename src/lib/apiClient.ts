@@ -801,6 +801,34 @@ export const api = {
   activateCopilotPersona: (id: string) =>
     request<any>(`/api/copilot/settings/personas/${id}/activate`, { method: "POST" }),
 
+  // Copilot Agent Identity (full — agent name, backstory, business info)
+  getCopilotAgentIdentity: () =>
+    request<any>("/api/copilot/settings/agent-identity"),
+
+  putCopilotAgentIdentity: (data: any) =>
+    request<any>("/api/copilot/settings/agent-identity", { method: "PUT", body: JSON.stringify(data) }),
+
+  // Copilot Conversation Strategy
+  getCopilotStrategy: () =>
+    request<any>("/api/copilot/settings/strategy"),
+
+  putCopilotStrategy: (data: any) =>
+    request<any>("/api/copilot/settings/strategy", { method: "PUT", body: JSON.stringify(data) }),
+
+  // Copilot Guardrails
+  getCopilotGuardrails: () =>
+    request<any>("/api/copilot/settings/guardrails"),
+
+  putCopilotGuardrails: (data: any) =>
+    request<any>("/api/copilot/settings/guardrails", { method: "PUT", body: JSON.stringify(data) }),
+
+  // Copilot Social Proof (images remain company-wide via /api/chatbot/social-proof-images)
+  getCopilotSocialProof: () =>
+    request<any>("/api/copilot/settings/social-proof"),
+
+  putCopilotSocialProof: (data: any) =>
+    request<any>("/api/copilot/settings/social-proof", { method: "PUT", body: JSON.stringify(data) }),
+
   // Copilot Team
   getCopilotTeam: () =>
     request<any>("/api/copilot/team"),
