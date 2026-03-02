@@ -42,6 +42,8 @@ interface Props {
   refreshTrigger?: number;
   /** When SSE is connected, use longer polling interval */
   sseConnected?: boolean;
+  /** Lead IDs to instantly hide (optimistic deletes) */
+  filterLeadIds?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +109,7 @@ const getInitials = (name: string): string => {
 
 const POLL_INTERVAL_SSE = 2_000; // Fast polling even when SSE is active
 
-const ActiveDMList = ({ selectedLeadId, onSelectLead, refreshTrigger, sseConnected }: Props) => {
+const ActiveDMList = ({ selectedLeadId, onSelectLead, refreshTrigger, sseConnected, filterLeadIds }: Props) => {
   // Data
   const [dms, setDms] = useState<DM[]>([]);
   const [loading, setLoading] = useState(true);
@@ -208,9 +210,10 @@ const ActiveDMList = ({ selectedLeadId, onSelectLead, refreshTrigger, sseConnect
   // Derived data
   // ---------------------------------------------------------------------------
 
+  const visibleDms = filterLeadIds?.length ? dms.filter((dm) => !filterLeadIds.includes(dm.lead_id)) : dms;
   const filtered = search.trim()
-    ? dms.filter((dm) => dm.lead_name.toLowerCase().includes(search.toLowerCase()))
-    : dms;
+    ? visibleDms.filter((dm) => dm.lead_name.toLowerCase().includes(search.toLowerCase()))
+    : visibleDms;
 
   const needsResponseCount = dms.filter((d) => d.needs_response).length;
 

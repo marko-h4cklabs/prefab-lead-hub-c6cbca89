@@ -262,7 +262,6 @@ const CopilotLeadSummary = ({ leadId, onOpenChat, onBack, onLeadDeleted, refresh
   // Assign / stage / delete mutation loading
   const [assigning, setAssigning] = useState(false);
   const [changingStage, setChangingStage] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -395,15 +394,13 @@ const CopilotLeadSummary = ({ leadId, onOpenChat, onBack, onLeadDeleted, refresh
 
   const handleDeleteLead = async () => {
     if (!confirm("Delete this lead and all its conversations? This cannot be undone.")) return;
-    setDeleting(true);
+    // Optimistic: close the panel immediately before the API call
+    onLeadDeleted ? onLeadDeleted() : onBack();
     try {
       await api.deleteCopilotLead(leadId);
       toast({ title: "Lead deleted" });
-      onLeadDeleted ? onLeadDeleted() : onBack();
     } catch {
       toast({ title: "Failed to delete lead", variant: "destructive" });
-    } finally {
-      setDeleting(false);
     }
   };
 
@@ -625,10 +622,9 @@ const CopilotLeadSummary = ({ leadId, onOpenChat, onBack, onLeadDeleted, refresh
           {/* Delete lead */}
           <button
             onClick={handleDeleteLead}
-            disabled={deleting}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-2.5 text-xs text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-2.5 text-xs text-destructive hover:bg-destructive/10 transition-colors"
           >
-            {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+            <Trash2 size={12} />
             Delete
           </button>
         </div>

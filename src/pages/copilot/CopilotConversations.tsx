@@ -14,6 +14,7 @@ const CopilotConversations = () => {
 
   // SSE-driven refresh triggers (increment to trigger immediate refetch)
   const [dmRefreshTrigger, setDmRefreshTrigger] = useState(0);
+  const [hiddenLeadIds, setHiddenLeadIds] = useState<string[]>([]);
   const [suggestionTrigger, setSuggestionTrigger] = useState(0);
   const [summaryRefreshTrigger, setSummaryRefreshTrigger] = useState(0);
 
@@ -101,6 +102,7 @@ const CopilotConversations = () => {
         onSelectLead={handleSelectLead}
         refreshTrigger={dmRefreshTrigger}
         sseConnected={connected}
+        filterLeadIds={hiddenLeadIds}
       />
 
       {/* Center/Right: Lead Summary or Chat */}
@@ -137,10 +139,10 @@ const CopilotConversations = () => {
                 setView("summary");
               }}
               onLeadDeleted={() => {
+                if (selectedLeadId) setHiddenLeadIds((prev) => [...prev, selectedLeadId]);
                 setSelectedLeadId(null);
                 setSelectedConversationId(null);
                 setView("summary");
-                bumpDMRefresh();
               }}
               refreshTrigger={summaryRefreshTrigger}
             />
