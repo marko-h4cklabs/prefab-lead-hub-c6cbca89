@@ -57,6 +57,7 @@ interface QuoteField {
   type: string;
   is_enabled: boolean;
   qualification_prompt: string;
+  qualification_requirement: string;
 }
 
 interface Persona {
@@ -458,6 +459,7 @@ function FieldsTab() {
           type: f.type || "text",
           is_enabled: f.is_enabled !== false,
           qualification_prompt: f.qualification_prompt || "",
+          qualification_requirement: f.qualification_requirement || "",
         }));
         setFields(mapped);
         initialRef.current = JSON.stringify(mapped);
@@ -480,7 +482,7 @@ function FieldsTab() {
 
   const addField = () => {
     setFields((prev) => {
-      const next = [...prev, { id: crypto.randomUUID(), name: "", type: "text", is_enabled: true, qualification_prompt: "" }];
+      const next = [...prev, { id: crypto.randomUUID(), name: "", type: "text", is_enabled: true, qualification_prompt: "", qualification_requirement: "" }];
       markDirty(next);
       return next;
     });
@@ -541,27 +543,41 @@ function FieldsTab() {
                 <div className="pt-2 text-muted-foreground/50">
                   <GripVertical size={14} />
                 </div>
-                <div className="flex-1 grid grid-cols-[1fr_2fr] gap-3">
-                  {/* Field Name */}
-                  <div>
-                    <label className="block text-[11px] font-medium text-muted-foreground mb-1">Field Name</label>
-                    <input
-                      type="text"
-                      value={field.name}
-                      onChange={(e) => updateField(idx, { name: e.target.value })}
-                      placeholder="e.g. Person Age"
-                      className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
-                    />
+                <div className="flex-1 space-y-2">
+                  <div className="grid grid-cols-[1fr_2fr] gap-3">
+                    {/* Field Name */}
+                    <div>
+                      <label className="block text-[11px] font-medium text-muted-foreground mb-1">Field Name</label>
+                      <input
+                        type="text"
+                        value={field.name}
+                        onChange={(e) => updateField(idx, { name: e.target.value })}
+                        placeholder="e.g. Person Age"
+                        className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+                      />
+                    </div>
+
+                    {/* What to search for */}
+                    <div>
+                      <label className="block text-[11px] font-medium text-muted-foreground mb-1">What to search for</label>
+                      <input
+                        type="text"
+                        value={field.qualification_prompt}
+                        onChange={(e) => updateField(idx, { qualification_prompt: e.target.value })}
+                        placeholder="e.g. I want to know how old the client is"
+                        className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+                      />
+                    </div>
                   </div>
 
-                  {/* What to search for */}
+                  {/* Qualification Requirement */}
                   <div>
-                    <label className="block text-[11px] font-medium text-muted-foreground mb-1">What to search for</label>
+                    <label className="block text-[11px] font-medium text-muted-foreground mb-1">Qualification Requirement</label>
                     <input
                       type="text"
-                      value={field.qualification_prompt}
-                      onChange={(e) => updateField(idx, { qualification_prompt: e.target.value })}
-                      placeholder="e.g. I want to know how old the client is"
+                      value={field.qualification_requirement}
+                      onChange={(e) => updateField(idx, { qualification_requirement: e.target.value })}
+                      placeholder="e.g. must be above 35"
                       className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
                     />
                   </div>
