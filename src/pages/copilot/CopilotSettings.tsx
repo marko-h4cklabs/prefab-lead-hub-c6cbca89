@@ -92,6 +92,16 @@ function normalizeList(payload: unknown, keys: string[] = []): any[] {
 
 const CopilotSettings = () => {
   const [activeTab, setActiveTab] = useState<TabKey>("identity");
+  const [mountedTabs, setMountedTabs] = useState<Set<TabKey>>(new Set(["identity" as TabKey]));
+
+  const handleTabChange = (tab: TabKey) => {
+    setMountedTabs((prev) => {
+      const next = new Set(prev);
+      next.add(tab);
+      return next;
+    });
+    setActiveTab(tab);
+  };
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-[hsl(0_0%_4%)]">
@@ -107,7 +117,7 @@ const CopilotSettings = () => {
             return (
               <button
                 key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() => handleTabChange(tab.key)}
                 className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors -mb-px ${
                   active
                     ? "border-b-2 border-primary text-foreground"
@@ -125,14 +135,14 @@ const CopilotSettings = () => {
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="max-w-2xl">
-          {activeTab === "identity" && <IdentityTab />}
-          {activeTab === "personas" && <PersonasTab />}
-          {activeTab === "behavior" && <BehaviorTab />}
-          {activeTab === "social-proof" && <SocialProofTab />}
-          {activeTab === "fields" && <FieldsTab />}
-          {activeTab === "followups" && <FollowUpsTab />}
-          {activeTab === "integrations" && <IntegrationsTab />}
-          {activeTab === "notifications" && <NotificationsTab />}
+          {mountedTabs.has("identity") && <div className={activeTab !== "identity" ? "hidden" : ""}><IdentityTab /></div>}
+          {mountedTabs.has("personas") && <div className={activeTab !== "personas" ? "hidden" : ""}><PersonasTab /></div>}
+          {mountedTabs.has("behavior") && <div className={activeTab !== "behavior" ? "hidden" : ""}><BehaviorTab /></div>}
+          {mountedTabs.has("social-proof") && <div className={activeTab !== "social-proof" ? "hidden" : ""}><SocialProofTab /></div>}
+          {mountedTabs.has("fields") && <div className={activeTab !== "fields" ? "hidden" : ""}><FieldsTab /></div>}
+          {mountedTabs.has("followups") && <div className={activeTab !== "followups" ? "hidden" : ""}><FollowUpsTab /></div>}
+          {mountedTabs.has("integrations") && <div className={activeTab !== "integrations" ? "hidden" : ""}><IntegrationsTab /></div>}
+          {mountedTabs.has("notifications") && <div className={activeTab !== "notifications" ? "hidden" : ""}><NotificationsTab /></div>}
         </div>
       </div>
     </div>

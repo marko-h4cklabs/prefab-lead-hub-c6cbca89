@@ -106,7 +106,7 @@ const CopilotConversations = () => {
       />
 
       {/* Center/Right: Lead Summary or Chat */}
-      <div className="flex-1 overflow-hidden relative">
+      <div className="flex-1 flex flex-col overflow-hidden relative">
         {/* SSE Connection Status */}
         <div className="absolute top-2 right-3 z-10" title={connected ? "Real-time updates active" : "Reconnecting... using polling"}>
           {connected ? (
