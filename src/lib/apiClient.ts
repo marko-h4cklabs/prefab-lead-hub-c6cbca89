@@ -830,6 +830,15 @@ export const api = {
   disconnectCalendly: () =>
     request<any>("/api/copilot/settings/calendly", { method: "DELETE" }),
 
+  getCalendlyBookingUrl: () =>
+    request<any>("/api/copilot/settings/calendly-url"),
+
+  saveCalendlyBookingUrl: (calendly_url: string) =>
+    request<any>("/api/copilot/settings/calendly-url", {
+      method: "PUT",
+      body: JSON.stringify({ calendly_url }),
+    }),
+
   // --- Team Invites ---
   createTeamInvite: (data: { role?: string; max_uses?: number; expires_days?: number }) =>
     request<any>("/api/copilot/team/invite", { method: "POST", body: JSON.stringify(data) }),

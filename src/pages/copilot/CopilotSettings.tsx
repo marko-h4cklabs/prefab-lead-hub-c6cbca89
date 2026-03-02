@@ -1410,6 +1410,7 @@ function IntegrationsTab() {
   const [calToken, setCalToken] = useState("");
   const [calSaving, setCalSaving] = useState(false);
   const [showCalToken, setShowCalToken] = useState(false);
+  const [urlSaving, setUrlSaving] = useState(false);
 
   useEffect(() => {
     const loadAll = async () => {
@@ -1417,7 +1418,7 @@ function IntegrationsTab() {
         const [mcRes, whRes, bookRes, calRes] = await Promise.allSettled([
           api.getManychatSettings(),
           api.getWebhookUrl(),
-          api.getBookingSettings(),
+          api.getCalendlyBookingUrl(),
           api.getCalendlyStatus(),
         ]);
         if (mcRes.status === "fulfilled") {
@@ -1431,7 +1432,7 @@ function IntegrationsTab() {
         }
         if (bookRes.status === "fulfilled") {
           const b = bookRes.value as any;
-          setCalendlyUrl(b?.calendly_url || b?.booking_url || "");
+          setCalendlyUrl(b?.calendly_url || "");
         }
         if (calRes.status === "fulfilled") {
           setCalStatus(calRes.value);
@@ -1678,26 +1679,49 @@ function IntegrationsTab() {
           </div>
         )}
 
-        {/* Booking URL (from behavior settings) */}
-        {calendlyUrl && (
-          <div className="mt-4 pt-4 border-t border-border">
-            <p className="text-xs text-muted-foreground mb-1">Booking URL (for AI to share)</p>
+        {/* Booking URL — editable */}
+        <div className="mt-4 pt-4 border-t border-border">
+          <FieldGroup label="Booking URL" hint="Paste your Calendly link here. The AI will share this link when suggesting a booking.">
             <div className="flex items-center gap-2">
-              <div className="flex-1 bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground truncate">
-                {calendlyUrl}
-              </div>
-              <a
-                href={calendlyUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="shrink-0 p-2 rounded-lg bg-secondary border border-border text-muted-foreground hover:text-foreground transition-colors"
-                title="Open booking link"
-              >
-                <ExternalLink size={14} />
-              </a>
+              <input
+                type="url"
+                value={calendlyUrl}
+                onChange={(e) => setCalendlyUrl(e.target.value)}
+                placeholder="https://calendly.com/yourname/30min"
+                className="flex-1 bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+              />
+              {calendlyUrl && (
+                <a
+                  href={calendlyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 p-2 rounded-lg bg-secondary border border-border text-muted-foreground hover:text-foreground transition-colors"
+                  title="Open booking link"
+                >
+                  <ExternalLink size={14} />
+                </a>
+              )}
             </div>
-          </div>
-        )}
+          </FieldGroup>
+          <button
+            onClick={async () => {
+              setUrlSaving(true);
+              try {
+                await api.saveCalendlyBookingUrl(calendlyUrl.trim());
+                toast({ title: "Booking URL saved" });
+              } catch (err) {
+                toast({ title: "Failed to save booking URL", description: getErrorMessage(err), variant: "destructive" });
+              } finally {
+                setUrlSaving(false);
+              }
+            }}
+            disabled={urlSaving}
+            className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {urlSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {urlSaving ? "Saving..." : "Save Booking URL"}
+          </button>
+        </div>
       </SectionCard>
     </div>
   );
