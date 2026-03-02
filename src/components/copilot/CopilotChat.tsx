@@ -139,24 +139,36 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
     [companyId, leadId],
   );
 
-  // --- Fetch suggestions ---
+  const mapSuggestions = useCallback((items: any[], rowId: string) =>
+    items.slice(0, 3).map((s: any, i: number) => ({ ...s, id: `${rowId}-${s.index ?? i}`, suggestionRowId: rowId, index: s.index ?? i })), []);
+
+  // --- Load existing suggestions only (no generation) ---
+  const loadExistingSuggestions = useCallback(async () => {
+    const gen = suggestionGenRef.current;
+    try {
+      const latest = await api.getLatestSuggestions(leadId);
+      const items = Array.isArray(latest?.suggestions) ? latest.suggestions : [];
+      const rowId = latest?.suggestion_id || latest?.id;
+      if (items.length > 0 && rowId && gen === suggestionGenRef.current) {
+        setSuggestions(mapSuggestions(items, rowId));
+        setLoadingSuggestions(false);
+      }
+    } catch { /* silent */ }
+  }, [leadId, mapSuggestions]);
+
+  // --- Fetch suggestions (may generate if none exist) ---
   const fetchSuggestions = useCallback(async (forceRegenerate = false) => {
-    // If a regeneration is in-flight and this is an SSE-triggered fetch, skip to avoid duplicates
+    // If a regeneration is already in-flight, skip non-force calls
     if (!forceRegenerate && regeneratingRef.current) return;
 
     setLoadingSuggestions(true);
     if (forceRegenerate) regeneratingRef.current = true;
 
-    // Capture generation at call time — if a newer generation starts before
-    // we finish, discard these results so we don't show stale suggestions.
     const gen = suggestionGenRef.current;
 
-    const mapSuggestions = (items: any[], rowId: string) =>
-      items.slice(0, 3).map((s: any, i: number) => ({ ...s, id: `${rowId}-${s.index ?? i}`, suggestionRowId: rowId, index: s.index ?? i }));
-
+    // Try existing suggestions first (skip when force-regenerating)
     if (!forceRegenerate) {
       try {
-        // Try existing suggestions first
         const latest = await api.getLatestSuggestions(leadId);
         const items = Array.isArray(latest?.suggestions) ? latest.suggestions : [];
         const rowId = latest?.suggestion_id || latest?.id;
@@ -165,6 +177,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
             setSuggestions(mapSuggestions(items, rowId));
           }
           setLoadingSuggestions(false);
+          regeneratingRef.current = false;
           return;
         }
       } catch {
@@ -195,7 +208,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
       }
       regeneratingRef.current = false;
     }
-  }, [leadId, conversationId]);
+  }, [leadId, conversationId, mapSuggestions]);
 
   // --- Initial load ---
   useEffect(() => {
@@ -246,12 +259,13 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
     // No reconciliation fetch — the 60s polling safety net handles canonical sync.
   }, [sseMessage, leadId]);
 
-  // SSE suggestion trigger
+  // SSE suggestion_ready trigger — only LOAD existing, never generate
+  // (generation happens in fetchSuggestions; this just picks up results)
   useEffect(() => {
     if (suggestionTrigger && suggestionTrigger > 0) {
-      fetchSuggestions();
+      loadExistingSuggestions();
     }
-  }, [suggestionTrigger]);
+  }, [suggestionTrigger, loadExistingSuggestions]);
 
   // --- Auto-scroll on new messages ---
   useEffect(() => {
@@ -332,8 +346,6 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
         return [...prev, { role: "assistant", content: text, timestamp: new Date().toISOString() }];
       });
       setSuggestions([]);
-      // Auto-regenerate after a short delay
-      setTimeout(() => fetchSuggestions(), 500);
     } catch {
       toast({ title: "Failed to send message", variant: "destructive" });
     } finally {
@@ -367,7 +379,6 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
       });
       setCustomDraft("");
       setSuggestions([]);
-      setTimeout(() => fetchSuggestions(), 500);
     } catch {
       toast({ title: "Failed to send message", variant: "destructive" });
     } finally {
