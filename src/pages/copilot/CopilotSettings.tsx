@@ -30,6 +30,9 @@ import {
   Volume2,
   VolumeX,
   Star,
+  Sparkles,
+  ChevronUp,
+  Cpu,
 } from "lucide-react";
 import AgentIdentitySection from "@/components/chatbot/AgentIdentitySection";
 import AILearningGround from "@/components/chatbot/AILearningGround";
@@ -39,6 +42,7 @@ import ConversationStrategySection from "@/components/chatbot/ConversationStrate
 import GuardrailsSection from "@/components/chatbot/GuardrailsSection";
 import HumanErrorSection from "@/components/chatbot/HumanErrorSection";
 import SocialProofSection from "@/components/chatbot/SocialProofSection";
+import PersonaGeneratorPanel from "@/components/copilot/PersonaGeneratorPanel";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -90,6 +94,157 @@ function normalizeList(payload: unknown, keys: string[] = []): any[] {
 // Main Page
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// PersonaSection — rendered above the tab bar
+// ---------------------------------------------------------------------------
+
+function PersonaSection() {
+  const [personaSource, setPersonaSource] = useState<"manual" | "ai_generated">("manual");
+  const [hasAiPersona, setHasAiPersona] = useState(false);
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [switching, setSwitching] = useState(false);
+  const [aiCardExpanded, setAiCardExpanded] = useState(false);
+
+  const loadConfig = async () => {
+    try {
+      const res = await api.getCopilotPersonaConfig();
+      setPersonaSource(res.source ?? "manual");
+      setHasAiPersona(res.has_ai_persona ?? false);
+      setGeneratedAt(res.generated_at ?? null);
+      setAiSummary(res.summary ?? null);
+    } catch {
+      // silently skip — section will show defaults
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadConfig(); }, []);
+
+  const switchSource = async (source: "manual" | "ai_generated") => {
+    if (source === personaSource) return;
+    if (source === "ai_generated" && !hasAiPersona) {
+      toast({ title: "No AI persona yet", description: "Generate an AI persona first before activating it.", variant: "destructive" });
+      return;
+    }
+    setSwitching(true);
+    try {
+      await api.putCopilotPersonaSource(source);
+      setPersonaSource(source);
+      toast({ title: source === "ai_generated" ? "AI persona activated" : "Manual persona activated" });
+    } catch (err: any) {
+      toast({ title: "Failed to switch", description: err?.message, variant: "destructive" });
+    } finally {
+      setSwitching(false);
+    }
+  };
+
+  const onPersonaApplied = () => {
+    setHasAiPersona(true);
+    setPersonaSource("ai_generated");
+    setAiCardExpanded(false);
+    loadConfig();
+  };
+
+  if (loading) return null;
+
+  const formattedDate = generatedAt
+    ? new Date(generatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    : null;
+
+  return (
+    <div className="mb-5 space-y-4 max-w-2xl">
+      {/* Active persona toggle banner */}
+      <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+        <Cpu size={16} className="text-muted-foreground shrink-0" />
+        <span className="text-sm font-medium text-foreground flex-1">Active Persona</span>
+        {switching && <Loader2 size={14} className="animate-spin text-muted-foreground" />}
+        <div className="flex rounded-lg border border-border overflow-hidden">
+          {(["manual", "ai_generated"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => switchSource(s)}
+              disabled={switching}
+              className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+                personaSource === s
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-card text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {s === "manual" ? "Manual" : "AI-Generated"}
+            </button>
+          ))}
+        </div>
+        {personaSource === "ai_generated" && formattedDate && (
+          <span className="text-[10px] text-muted-foreground hidden sm:block">Generated {formattedDate}</span>
+        )}
+      </div>
+
+      {/* Two option cards */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* AI card */}
+        <div
+          className={`rounded-xl border transition-colors ${
+            aiCardExpanded ? "border-primary/50 bg-primary/5" : "border-border bg-card"
+          }`}
+        >
+          <button
+            type="button"
+            onClick={() => setAiCardExpanded((v) => !v)}
+            className="w-full text-left px-4 py-3.5"
+          >
+            <div className="flex items-start gap-2.5">
+              <Sparkles size={16} className="text-primary mt-0.5 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-foreground">Generate from DMs</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {hasAiPersona && formattedDate
+                    ? `Last generated ${formattedDate}`
+                    : "Upload DMs or transcripts — AI builds your persona"}
+                </p>
+              </div>
+              {aiCardExpanded ? (
+                <ChevronUp size={14} className="text-muted-foreground shrink-0 mt-0.5" />
+              ) : (
+                <ChevronDown size={14} className="text-muted-foreground shrink-0 mt-0.5" />
+              )}
+            </div>
+            {hasAiPersona && aiSummary && !aiCardExpanded && (
+              <p className="text-[10px] text-muted-foreground mt-2 line-clamp-2 ml-6">{aiSummary}</p>
+            )}
+          </button>
+
+          {aiCardExpanded && (
+            <div className="px-4 pb-4">
+              <PersonaGeneratorPanel onApplied={onPersonaApplied} />
+            </div>
+          )}
+        </div>
+
+        {/* Manual card */}
+        <div className="rounded-xl border border-border bg-card px-4 py-3.5">
+          <div className="flex items-start gap-2.5">
+            <Settings size={16} className="text-muted-foreground mt-0.5 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-foreground">Configure Manually</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Edit identity, behavior, and style in the tabs below
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main Page
+// ---------------------------------------------------------------------------
+
 const CopilotSettings = () => {
   const [activeTab, setActiveTab] = useState<TabKey>("identity");
   const [mountedTabs, setMountedTabs] = useState<Set<TabKey>>(new Set(["identity" as TabKey]));
@@ -108,9 +263,15 @@ const CopilotSettings = () => {
       {/* Header */}
       <div className="shrink-0 px-6 pt-6 pb-0">
         <h1 className="text-xl font-bold text-foreground mb-4">Copilot Settings</h1>
+      </div>
+
+      {/* Scrollable content area — persona section + tab content both scroll */}
+      <div className="flex-1 overflow-y-auto px-6">
+        {/* Persona section above tabs */}
+        <PersonaSection />
 
         {/* Tab bar */}
-        <div className="flex gap-1 border-b border-border">
+        <div className="flex gap-1 border-b border-border sticky top-0 bg-[hsl(0_0%_4%)] z-10 -mx-6 px-6">
           {TABS.map((tab) => {
             const active = activeTab === tab.key;
             const Icon = tab.icon;
@@ -130,19 +291,19 @@ const CopilotSettings = () => {
             );
           })}
         </div>
-      </div>
 
-      {/* Tab content */}
-      <div className="flex-1 overflow-y-auto px-6 py-6">
-        <div className="max-w-2xl">
-          {mountedTabs.has("identity") && <div className={activeTab !== "identity" ? "hidden" : ""}><IdentityTab /></div>}
-          {mountedTabs.has("personas") && <div className={activeTab !== "personas" ? "hidden" : ""}><PersonasTab /></div>}
-          {mountedTabs.has("behavior") && <div className={activeTab !== "behavior" ? "hidden" : ""}><BehaviorTab /></div>}
-          {mountedTabs.has("social-proof") && <div className={activeTab !== "social-proof" ? "hidden" : ""}><SocialProofTab /></div>}
-          {mountedTabs.has("fields") && <div className={activeTab !== "fields" ? "hidden" : ""}><FieldsTab /></div>}
-          {mountedTabs.has("followups") && <div className={activeTab !== "followups" ? "hidden" : ""}><FollowUpsTab /></div>}
-          {mountedTabs.has("integrations") && <div className={activeTab !== "integrations" ? "hidden" : ""}><IntegrationsTab /></div>}
-          {mountedTabs.has("notifications") && <div className={activeTab !== "notifications" ? "hidden" : ""}><NotificationsTab /></div>}
+        {/* Tab content */}
+        <div className="py-6">
+          <div className="max-w-2xl">
+            {mountedTabs.has("identity") && <div className={activeTab !== "identity" ? "hidden" : ""}><IdentityTab /></div>}
+            {mountedTabs.has("personas") && <div className={activeTab !== "personas" ? "hidden" : ""}><PersonasTab /></div>}
+            {mountedTabs.has("behavior") && <div className={activeTab !== "behavior" ? "hidden" : ""}><BehaviorTab /></div>}
+            {mountedTabs.has("social-proof") && <div className={activeTab !== "social-proof" ? "hidden" : ""}><SocialProofTab /></div>}
+            {mountedTabs.has("fields") && <div className={activeTab !== "fields" ? "hidden" : ""}><FieldsTab /></div>}
+            {mountedTabs.has("followups") && <div className={activeTab !== "followups" ? "hidden" : ""}><FollowUpsTab /></div>}
+            {mountedTabs.has("integrations") && <div className={activeTab !== "integrations" ? "hidden" : ""}><IntegrationsTab /></div>}
+            {mountedTabs.has("notifications") && <div className={activeTab !== "notifications" ? "hidden" : ""}><NotificationsTab /></div>}
+          </div>
         </div>
       </div>
     </div>

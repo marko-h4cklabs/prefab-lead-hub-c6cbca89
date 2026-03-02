@@ -867,6 +867,28 @@ export const api = {
       body: JSON.stringify({ calendly_url }),
     }),
 
+  // Copilot AI Persona Generator
+  getCopilotPersonaConfig: () =>
+    request<any>("/api/copilot/settings/persona-config"),
+
+  putCopilotPersonaSource: (source: "manual" | "ai_generated") =>
+    request<any>("/api/copilot/settings/persona-source", {
+      method: "PUT",
+      body: JSON.stringify({ source }),
+    }),
+
+  putCopilotAiPersona: (data: any) =>
+    request<any>("/api/copilot/settings/ai-persona", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  generateCopilotPersona: (files: File[]) => {
+    const fd = new FormData();
+    files.forEach((f) => fd.append("files", f));
+    return formDataRequest<any>("/api/copilot/settings/generate-persona", fd);
+  },
+
   // --- Team Invites ---
   createTeamInvite: (data: { role?: string; max_uses?: number; expires_days?: number }) =>
     request<any>("/api/copilot/team/invite", { method: "POST", body: JSON.stringify(data) }),

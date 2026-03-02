@@ -383,7 +383,9 @@ const CopilotLeadSummary = ({ leadId, onOpenChat, onBack, onLeadDeleted, refresh
     setAddingNote(true);
     try {
       const created = await api.createLeadNote(leadId, { content: text });
-      setLocalNotes((prev) => [created, ...prev]);
+      // Normalize: CRM endpoint returns { body } but Note interface uses { content }
+      const normalized = { id: created.id, content: created.content ?? created.body ?? text, created_at: created.created_at ?? new Date().toISOString() };
+      setLocalNotes((prev) => [normalized, ...prev]);
       setNewNote("");
     } catch {
       toast({ title: "Failed to add note", variant: "destructive" });
