@@ -4,7 +4,7 @@ import { getAuthToken } from "@/lib/apiClient";
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 export interface SSEEvent {
-  type: "connected" | "new_message" | "suggestion_ready" | "dm_assigned" | "lead_updated";
+  type: "connected" | "new_message" | "suggestion_ready" | "dm_assigned" | "lead_updated" | "new_lead";
   leadId?: string;
   conversationId?: string;
   preview?: string;

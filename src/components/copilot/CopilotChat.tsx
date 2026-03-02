@@ -228,9 +228,9 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
     };
 
     setMessages((prev) => {
-      // Dedup: skip if any of the last 3 messages has same content + role
+      // Dedup: skip if any of the last 10 messages has same content + role
       // (prevents double from optimistic + SSE + polling overlap)
-      const tail = prev.slice(-3);
+      const tail = prev.slice(-10);
       if (tail.some((m) => m.role === newMsg.role && m.content === newMsg.content)) {
         return prev;
       }
@@ -325,11 +325,12 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
       } else {
         await api.sendSuggestion(conversationId, rowId, s.index);
       }
-      // Optimistically add to messages
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: text, timestamp: new Date().toISOString() },
-      ]);
+      // Optimistically add to messages (skip if SSE already pushed it)
+      setMessages((prev) => {
+        const tail = prev.slice(-5);
+        if (tail.some((m) => m.role === "assistant" && m.content === text)) return prev;
+        return [...prev, { role: "assistant", content: text, timestamp: new Date().toISOString() }];
+      });
       setSuggestions([]);
       // Auto-regenerate after a short delay
       setTimeout(() => fetchSuggestions(), 500);
@@ -347,22 +348,23 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
     if (!text) return;
     setSendingCustom(true);
     try {
-      // Use the first suggestion's row ID if available, or generate+send
+      // Get a suggestion row ID to send through (endpoint handles stale/used IDs gracefully)
+      let rowId: string | null = null;
       if (suggestions.length > 0) {
-        const rowId = suggestions[0].suggestionRowId || suggestions[0].id;
-        await api.sendEditedSuggestion(conversationId, rowId, text);
-      } else {
-        // Generate then send edited
-        const res = await api.generateSuggestions(conversationId);
-        const rowId = res?.suggestion_id || res?.id;
-        if (rowId) {
-          await api.sendEditedSuggestion(conversationId, rowId, text);
-        }
+        rowId = suggestions[0].suggestionRowId || suggestions[0].id;
       }
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: text, timestamp: new Date().toISOString() },
-      ]);
+      if (!rowId) {
+        // Generate a suggestion row first (needed as a vehicle for custom send)
+        const res = await api.generateSuggestions(conversationId);
+        rowId = res?.suggestion_id || res?.id;
+      }
+      if (!rowId) throw new Error("Could not get suggestion context");
+      await api.sendEditedSuggestion(conversationId, rowId, text);
+      setMessages((prev) => {
+        const tail = prev.slice(-5);
+        if (tail.some((m) => m.role === "assistant" && m.content === text)) return prev;
+        return [...prev, { role: "assistant", content: text, timestamp: new Date().toISOString() }];
+      });
       setCustomDraft("");
       setSuggestions([]);
       setTimeout(() => fetchSuggestions(), 500);
