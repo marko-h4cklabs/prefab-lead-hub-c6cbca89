@@ -305,7 +305,7 @@ function PersonaPreviewForm({
           value={data.bot_deny_response}
           onChange={(e) => update({ bot_deny_response: e.target.value })}
           className="dark-input w-full"
-          placeholder='e.g. "I\'m a real person, just quick at responding!"'
+          placeholder={`e.g. "I'm a real person, just quick at responding!"`}
         />
         <p className="text-[10px] text-muted-foreground mt-1">
           Reply when someone asks if they're talking to a bot
