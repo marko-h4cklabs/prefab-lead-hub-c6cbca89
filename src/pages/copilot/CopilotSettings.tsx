@@ -134,8 +134,13 @@ function AiPage({
       const res = await api.getCopilotPersonaConfig();
       const ps = res.personas ?? [];
       setPersonas(ps);
-      setActivePersonaId(res.active_ai_persona_id ?? null);
-      onSourceChange(res.copilot_persona_source ?? "manual", ps, res.active_ai_persona_id ?? null);
+      const activeId = res.active_ai_persona_id ?? null;
+      setActivePersonaId(activeId);
+      onSourceChange(res.copilot_persona_source ?? "manual", ps, activeId);
+      // Auto-open config tabs for the active persona (or first persona) on load
+      if (ps.length > 0) {
+        setEditingPersonaId(activeId ?? ps[0].id);
+      }
     } catch {
       // silently skip
     } finally {
@@ -193,7 +198,7 @@ function AiPage({
 
   const onPersonaApplied = () => {
     setGeneratorOpen(false);
-    loadPersonas();
+    loadPersonas(); // will auto-open the new persona's config tabs
   };
 
   const onPersonaUpdated = (updated: AiPersona) => {
@@ -291,13 +296,17 @@ function AiPage({
                     <button
                       type="button"
                       onClick={() => setEditingPersonaId(editingPersonaId === persona.id ? null : persona.id)}
-                      className={`text-[11px] font-medium transition-colors px-2 py-1 rounded-md ${
+                      className={`flex items-center gap-1 text-[11px] font-medium transition-colors px-2 py-1 rounded-md ${
                         editingPersonaId === persona.id
                           ? "text-foreground bg-secondary"
                           : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                       }`}
                     >
-                      {editingPersonaId === persona.id ? "Close" : "Configure"}
+                      {editingPersonaId === persona.id ? (
+                        <><ChevronUp size={11} /> Hide settings</>
+                      ) : (
+                        <><ChevronDown size={11} /> Edit settings</>
+                      )}
                     </button>
                     {!isActive && (
                       <button
