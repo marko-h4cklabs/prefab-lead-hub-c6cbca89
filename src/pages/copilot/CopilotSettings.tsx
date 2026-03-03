@@ -32,7 +32,6 @@ import {
   Star,
   Sparkles,
   ChevronUp,
-  Cpu,
 } from "lucide-react";
 import AgentIdentitySection from "@/components/chatbot/AgentIdentitySection";
 import AILearningGround from "@/components/chatbot/AILearningGround";
@@ -102,71 +101,69 @@ interface AiPersona {
   id: string;
   name: string;
   style_summary: string | null;
+  knowledge_base: string | null;
   snapshot: Record<string, any>;
   created_at: string;
   updated_at: string;
 }
 
 // ---------------------------------------------------------------------------
-// PersonaSection — rendered above the tab bar
+// AI Page — persona list + generator
 // ---------------------------------------------------------------------------
 
-function PersonaSection({ onPersonaChanged }: { onPersonaChanged?: () => void }) {
-  const [personaSource, setPersonaSource] = useState<"manual" | "ai_generated">("manual");
+function AiPage({
+  conversationSource,
+  onSourceChange,
+}: {
+  conversationSource: "manual" | "ai_generated";
+  onSourceChange: (src: "manual" | "ai_generated", personas: AiPersona[], activeId: string | null) => void;
+}) {
   const [personas, setPersonas] = useState<AiPersona[]>([]);
   const [activePersonaId, setActivePersonaId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [switching, setSwitching] = useState(false);
-  const [generatorOpen, setGeneratorOpen] = useState(false);
   const [activating, setActivating] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [generatorOpen, setGeneratorOpen] = useState(false);
+  const [expandedKbId, setExpandedKbId] = useState<string | null>(null);
 
-  const loadConfig = async () => {
+  const loadPersonas = useCallback(async () => {
     try {
       const res = await api.getCopilotPersonaConfig();
-      setPersonaSource(res.copilot_persona_source ?? "manual");
+      const ps = res.personas ?? [];
+      setPersonas(ps);
       setActivePersonaId(res.active_ai_persona_id ?? null);
-      setPersonas(res.personas ?? []);
+      onSourceChange(res.copilot_persona_source ?? "manual", ps, res.active_ai_persona_id ?? null);
     } catch {
       // silently skip
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { loadConfig(); }, []);
-
-  const switchSource = async (source: "manual" | "ai_generated") => {
-    if (source === personaSource) return;
-    if (source === "ai_generated" && !activePersonaId) {
-      toast({ title: "No AI persona selected", description: "Generate or activate a persona first.", variant: "destructive" });
-      return;
-    }
-    setSwitching(true);
-    try {
-      await api.putCopilotPersonaSource(source);
-      setPersonaSource(source);
-      toast({ title: source === "ai_generated" ? "AI persona activated" : "Switched to manual" });
-      onPersonaChanged?.();
-    } catch (err: any) {
-      toast({ title: "Failed to switch", description: getErrorMessage(err), variant: "destructive" });
-    } finally {
-      setSwitching(false);
-    }
-  };
+  useEffect(() => { loadPersonas(); }, [loadPersonas]);
 
   const activatePersona = async (id: string) => {
     setActivating(id);
     try {
       await api.activateCopilotAiPersona(id);
       setActivePersonaId(id);
-      setPersonaSource("ai_generated");
-      toast({ title: "Persona activated", description: personas.find((p) => p.id === id)?.name });
-      onPersonaChanged?.();
+      const persona = personas.find((p) => p.id === id);
+      toast({ title: `"${persona?.name}" is now active`, description: "AI-Generated mode activated for all conversations." });
+      onSourceChange("ai_generated", personas, id);
     } catch (err: any) {
       toast({ title: "Failed to activate", description: getErrorMessage(err), variant: "destructive" });
     } finally {
       setActivating(null);
+    }
+  };
+
+  const deactivate = async () => {
+    try {
+      await api.putCopilotPersonaSource("manual");
+      onSourceChange("manual", personas, activePersonaId);
+      toast({ title: "Switched to Manual configuration" });
+    } catch (err: any) {
+      toast({ title: "Failed to switch", description: getErrorMessage(err), variant: "destructive" });
     }
   };
 
@@ -175,11 +172,13 @@ function PersonaSection({ onPersonaChanged }: { onPersonaChanged?: () => void })
     try {
       await api.deleteCopilotAiPersona(id);
       const removed = personas.find((p) => p.id === id);
-      setPersonas((prev) => prev.filter((p) => p.id !== id));
+      const updated = personas.filter((p) => p.id !== id);
+      setPersonas(updated);
       if (activePersonaId === id) {
         setActivePersonaId(null);
-        setPersonaSource("manual");
-        onPersonaChanged?.();
+        onSourceChange("manual", updated, null);
+      } else {
+        onSourceChange(conversationSource, updated, activePersonaId);
       }
       toast({ title: `"${removed?.name}" deleted` });
     } catch (err: any) {
@@ -191,58 +190,66 @@ function PersonaSection({ onPersonaChanged }: { onPersonaChanged?: () => void })
 
   const onPersonaApplied = () => {
     setGeneratorOpen(false);
-    loadConfig().then(() => onPersonaChanged?.());
+    loadPersonas();
   };
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 size={20} className="animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const isAiActive = conversationSource === "ai_generated";
 
   return (
-    <div className="mb-5 space-y-3 max-w-2xl">
-      {/* Active persona toggle banner */}
-      <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
-        <Cpu size={16} className="text-muted-foreground shrink-0" />
-        <span className="text-sm font-medium text-foreground flex-1">Active Persona</span>
-        {switching && <Loader2 size={14} className="animate-spin text-muted-foreground" />}
-        <div className="flex rounded-lg border border-border overflow-hidden">
-          {(["manual", "ai_generated"] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => switchSource(s)}
-              disabled={switching}
-              className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
-                personaSource === s
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {s === "manual" ? "Manual" : "AI-Generated"}
-            </button>
-          ))}
+    <div className="max-w-2xl space-y-4 py-6">
+      {/* Status row */}
+      <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${isAiActive ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
+        <Sparkles size={16} className={isAiActive ? "text-primary shrink-0" : "text-muted-foreground shrink-0"} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-foreground">
+            {isAiActive
+              ? `Active: ${personas.find((p) => p.id === activePersonaId)?.name ?? "AI-Generated"}`
+              : "Not active — using Manual configuration"}
+          </p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            {isAiActive ? "All copilot suggestions use this AI persona" : "Activate a persona below to use it in conversations"}
+          </p>
         </div>
-        {personaSource === "ai_generated" && activePersonaId && (
-          <span className="text-[10px] text-muted-foreground hidden sm:block">
-            {personas.find((p) => p.id === activePersonaId)?.name ?? "Active"}
-          </span>
+        {isAiActive && (
+          <button
+            type="button"
+            onClick={deactivate}
+            className="text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md hover:bg-muted"
+          >
+            Deactivate
+          </button>
         )}
       </div>
 
-      {/* Saved AI Personas list */}
-      {personas.length > 0 && (
+      {/* Saved personas */}
+      {personas.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border bg-card px-6 py-10 text-center">
+          <Sparkles size={24} className="text-muted-foreground mx-auto mb-3" />
+          <p className="text-sm font-medium text-foreground mb-1">No AI personas yet</p>
+          <p className="text-[12px] text-muted-foreground">Upload DM exports or screenshots below to generate your first persona.</p>
+        </div>
+      ) : (
         <div className="space-y-2">
           {personas.map((persona) => {
-            const isActive = persona.id === activePersonaId && personaSource === "ai_generated";
+            const isActive = persona.id === activePersonaId && conversationSource === "ai_generated";
             const createdDate = new Date(persona.created_at).toLocaleDateString(undefined, {
               month: "short", day: "numeric", year: "numeric",
             });
+            const kbExpanded = expandedKbId === persona.id;
             return (
               <div
                 key={persona.id}
-                className={`rounded-xl border px-4 py-3 transition-colors ${
-                  isActive ? "border-primary/50 bg-primary/5" : "border-border bg-card"
-                }`}
+                className={`rounded-xl border transition-colors ${isActive ? "border-primary/50 bg-primary/5" : "border-border bg-card"}`}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-3 px-4 py-3">
                   <Sparkles size={15} className={`mt-0.5 shrink-0 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -256,6 +263,21 @@ function PersonaSection({ onPersonaChanged }: { onPersonaChanged?: () => void })
                     </div>
                     {persona.style_summary && (
                       <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{persona.style_summary}</p>
+                    )}
+                    {persona.knowledge_base && (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedKbId(kbExpanded ? null : persona.id)}
+                        className="text-[10px] text-primary/70 hover:text-primary mt-1 flex items-center gap-1 transition-colors"
+                      >
+                        {kbExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                        Knowledge base
+                      </button>
+                    )}
+                    {kbExpanded && persona.knowledge_base && (
+                      <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed rounded-lg bg-muted/50 px-3 py-2">
+                        {persona.knowledge_base}
+                      </p>
                     )}
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
@@ -285,52 +307,80 @@ function PersonaSection({ onPersonaChanged }: { onPersonaChanged?: () => void })
         </div>
       )}
 
-      {/* Generate from DMs card + Manual card */}
-      <div className="grid grid-cols-2 gap-3">
-        {/* AI card */}
-        <div
-          className={`rounded-xl border transition-colors ${
-            generatorOpen ? "border-primary/50 bg-primary/5" : "border-border bg-card"
-          }`}
+      {/* Generator */}
+      <div className={`rounded-xl border transition-colors ${generatorOpen ? "border-primary/50 bg-primary/5" : "border-border bg-card"}`}>
+        <button
+          type="button"
+          onClick={() => setGeneratorOpen((v) => !v)}
+          className="w-full text-left px-4 py-3.5"
         >
-          <button
-            type="button"
-            onClick={() => setGeneratorOpen((v) => !v)}
-            className="w-full text-left px-4 py-3.5"
-          >
-            <div className="flex items-start gap-2.5">
-              <Sparkles size={16} className="text-primary mt-0.5 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-foreground">Generate from DMs</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Upload DMs or transcripts — AI builds your persona
-                </p>
-              </div>
-              {generatorOpen ? (
-                <ChevronUp size={14} className="text-muted-foreground shrink-0 mt-0.5" />
-              ) : (
-                <ChevronDown size={14} className="text-muted-foreground shrink-0 mt-0.5" />
-              )}
-            </div>
-          </button>
-          {generatorOpen && (
-            <div className="px-4 pb-4">
-              <PersonaGeneratorPanel onApplied={onPersonaApplied} />
-            </div>
-          )}
-        </div>
-
-        {/* Manual card */}
-        <div className="rounded-xl border border-border bg-card px-4 py-3.5">
-          <div className="flex items-start gap-2.5">
-            <Settings size={16} className="text-muted-foreground mt-0.5 shrink-0" />
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-foreground">Configure Manually</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                Edit identity, behavior, and style in the tabs below
-              </p>
-            </div>
+          <div className="flex items-center gap-2.5">
+            <Sparkles size={15} className="text-primary shrink-0" />
+            <span className="text-sm font-semibold text-foreground flex-1">Generate from DMs / Screenshots</span>
+            {generatorOpen ? <ChevronUp size={14} className="text-muted-foreground" /> : <ChevronDown size={14} className="text-muted-foreground" />}
           </div>
+          <p className="text-[11px] text-muted-foreground mt-1 ml-6">
+            Upload IG DM exports, transcripts, or conversation screenshots
+          </p>
+        </button>
+        {generatorOpen && (
+          <div className="px-4 pb-4">
+            <PersonaGeneratorPanel onApplied={onPersonaApplied} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Manual Page — standard tabs, always reads raw chatbot_behavior (no AI merge)
+// ---------------------------------------------------------------------------
+
+function ManualPage() {
+  const [activeTab, setActiveTab] = useState<TabKey>("identity");
+  const [mountedTabs, setMountedTabs] = useState<Set<TabKey>>(new Set(["identity" as TabKey]));
+
+  const handleTabChange = (tab: TabKey) => {
+    setMountedTabs((prev) => {
+      const next = new Set(prev);
+      next.add(tab);
+      return next;
+    });
+    setActiveTab(tab);
+  };
+
+  return (
+    <div className="flex flex-col">
+      {/* Tab bar */}
+      <div className="flex gap-1 border-b border-border sticky top-0 bg-[hsl(0_0%_4%)] z-10 -mx-6 px-6">
+        {TABS.map((tab) => {
+          const active = activeTab === tab.key;
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => handleTabChange(tab.key)}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors -mb-px ${
+                active ? "border-b-2 border-primary text-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon size={15} />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+      <div className="py-6">
+        <div className="max-w-2xl">
+          {mountedTabs.has("identity") && <div className={activeTab !== "identity" ? "hidden" : ""}><IdentityTab /></div>}
+          {mountedTabs.has("personas") && <div className={activeTab !== "personas" ? "hidden" : ""}><PersonasTab /></div>}
+          {mountedTabs.has("behavior") && <div className={activeTab !== "behavior" ? "hidden" : ""}><BehaviorTab /></div>}
+          {mountedTabs.has("social-proof") && <div className={activeTab !== "social-proof" ? "hidden" : ""}><SocialProofTab /></div>}
+          {mountedTabs.has("fields") && <div className={activeTab !== "fields" ? "hidden" : ""}><FieldsTab /></div>}
+          {mountedTabs.has("followups") && <div className={activeTab !== "followups" ? "hidden" : ""}><FollowUpsTab /></div>}
+          {mountedTabs.has("integrations") && <div className={activeTab !== "integrations" ? "hidden" : ""}><IntegrationsTab /></div>}
+          {mountedTabs.has("notifications") && <div className={activeTab !== "notifications" ? "hidden" : ""}><NotificationsTab /></div>}
         </div>
       </div>
     </div>
@@ -342,73 +392,74 @@ function PersonaSection({ onPersonaChanged }: { onPersonaChanged?: () => void })
 // ---------------------------------------------------------------------------
 
 const CopilotSettings = () => {
-  const [activeTab, setActiveTab] = useState<TabKey>("identity");
-  const [mountedTabs, setMountedTabs] = useState<Set<TabKey>>(new Set(["identity" as TabKey]));
-  const [tabsRefreshKey, setTabsRefreshKey] = useState(0);
+  // Which page the user is VIEWING (independent from which mode is active for conversations)
+  const [viewMode, setViewMode] = useState<"ai" | "manual">("manual");
+  // Which mode is currently ACTIVE for conversations
+  const [conversationSource, setConversationSource] = useState<"manual" | "ai_generated">("manual");
+  const [activePersonaName, setActivePersonaName] = useState<string | null>(null);
 
-  const handleTabChange = (tab: TabKey) => {
-    setMountedTabs((prev) => {
-      const next = new Set(prev);
-      next.add(tab);
-      return next;
-    });
-    setActiveTab(tab);
+  const handleSourceChange = (src: "manual" | "ai_generated", personas: AiPersona[], activeId: string | null) => {
+    setConversationSource(src);
+    if (src === "ai_generated" && activeId) {
+      setActivePersonaName(personas.find((p) => p.id === activeId)?.name ?? null);
+    } else {
+      setActivePersonaName(null);
+    }
   };
 
-  // When a persona is activated/deactivated, force all tab sections to remount so
-  // they reload their data from the API (which now merges the active AI persona snapshot).
-  const handlePersonaChanged = () => {
-    setMountedTabs(new Set([activeTab]));
-    setTabsRefreshKey((k) => k + 1);
-  };
+  const isAiActive = conversationSource === "ai_generated";
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-[hsl(0_0%_4%)]">
       {/* Header */}
-      <div className="shrink-0 px-6 pt-6 pb-0">
-        <h1 className="text-xl font-bold text-foreground mb-4">Copilot Settings</h1>
-      </div>
-
-      {/* Scrollable content area — persona section + tab content both scroll */}
-      <div className="flex-1 overflow-y-auto px-6">
-        {/* Persona section above tabs */}
-        <PersonaSection onPersonaChanged={handlePersonaChanged} />
-
-        {/* Tab bar */}
-        <div className="flex gap-1 border-b border-border sticky top-0 bg-[hsl(0_0%_4%)] z-10 -mx-6 px-6">
-          {TABS.map((tab) => {
-            const active = activeTab === tab.key;
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => handleTabChange(tab.key)}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors -mb-px ${
-                  active
-                    ? "border-b-2 border-primary text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Icon size={15} />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Tab content — key forces remount when active persona changes */}
-        <div className="py-6" key={tabsRefreshKey}>
-          <div className="max-w-2xl">
-            {mountedTabs.has("identity") && <div className={activeTab !== "identity" ? "hidden" : ""}><IdentityTab /></div>}
-            {mountedTabs.has("personas") && <div className={activeTab !== "personas" ? "hidden" : ""}><PersonasTab /></div>}
-            {mountedTabs.has("behavior") && <div className={activeTab !== "behavior" ? "hidden" : ""}><BehaviorTab /></div>}
-            {mountedTabs.has("social-proof") && <div className={activeTab !== "social-proof" ? "hidden" : ""}><SocialProofTab /></div>}
-            {mountedTabs.has("fields") && <div className={activeTab !== "fields" ? "hidden" : ""}><FieldsTab /></div>}
-            {mountedTabs.has("followups") && <div className={activeTab !== "followups" ? "hidden" : ""}><FollowUpsTab /></div>}
-            {mountedTabs.has("integrations") && <div className={activeTab !== "integrations" ? "hidden" : ""}><IntegrationsTab /></div>}
-            {mountedTabs.has("notifications") && <div className={activeTab !== "notifications" ? "hidden" : ""}><NotificationsTab /></div>}
+      <div className="shrink-0 px-6 pt-5 pb-0">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h1 className="text-xl font-bold text-foreground">Copilot Settings</h1>
+            {/* Conversation mode status badge */}
+            <div className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+              isAiActive
+                ? "bg-primary/15 text-primary border border-primary/30"
+                : "bg-muted text-muted-foreground border border-border"
+            }`}>
+              {isAiActive ? <Sparkles size={10} /> : <Settings size={10} />}
+              {isAiActive
+                ? `AI-Generated${activePersonaName ? `: ${activePersonaName}` : ""}`
+                : "Manual configuration"}
+            </div>
           </div>
         </div>
+
+        {/* Page switcher */}
+        <div className="flex gap-1 rounded-xl bg-muted p-1 w-fit">
+          {([
+            { key: "ai", label: "AI-Generated", icon: Sparkles },
+            { key: "manual", label: "Manual", icon: Settings },
+          ] as const).map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setViewMode(key)}
+              className={`flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                viewMode === key
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon size={14} />
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Page content */}
+      <div className="flex-1 overflow-y-auto px-6">
+        {viewMode === "ai" ? (
+          <AiPage conversationSource={conversationSource} onSourceChange={handleSourceChange} />
+        ) : (
+          <ManualPage />
+        )}
       </div>
     </div>
   );

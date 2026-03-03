@@ -11,6 +11,7 @@ import {
   FileText,
   FileJson,
   File,
+  Image,
   Plus,
   User,
 } from "lucide-react";
@@ -19,7 +20,7 @@ import {
 // Constants / helpers
 // ---------------------------------------------------------------------------
 
-const ACCEPTED = ".json,.txt,.docx,.xlsx";
+const ACCEPTED = ".json,.txt,.docx,.xlsx,.jpg,.jpeg,.png,.webp,.heic";
 
 const TONE_OPTIONS = [
   { value: "professional", label: "Professional" },
@@ -65,9 +66,14 @@ const ERROR_TYPES = [
   { key: "double_messages", label: "Split messages", desc: "Send in 2 parts" },
 ];
 
+const IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png", ".webp", ".heic"]);
+function isImageName(name: string) {
+  return IMAGE_EXTS.has(name.slice(name.lastIndexOf(".")).toLowerCase());
+}
 function fileIcon(name: string) {
   if (name.endsWith(".json")) return <FileJson size={14} className="text-primary" />;
   if (name.endsWith(".txt")) return <FileText size={14} className="text-muted-foreground" />;
+  if (isImageName(name)) return <Image size={14} className="text-blue-400" />;
   return <File size={14} className="text-muted-foreground" />;
 }
 
@@ -388,6 +394,7 @@ export default function PersonaGeneratorPanel({ onApplied }: Props) {
   const [generating, setGenerating] = useState(false);
   const [persona, setPersona] = useState<PersonaFields | null>(null);
   const [styleSummary, setStyleSummary] = useState("");
+  const [knowledgeBase, setKnowledgeBase] = useState("");
 
   // Hidden file input ref — kept OUTSIDE the drop zone to avoid nested click loops
   const inputRef = useRef<HTMLInputElement>(null);
@@ -397,13 +404,14 @@ export default function PersonaGeneratorPanel({ onApplied }: Props) {
   // --- File handling ---
 
   const addFiles = useCallback((incoming: File[]) => {
+    const ALLOWED_EXTS = [".json", ".txt", ".docx", ".xlsx", ".jpg", ".jpeg", ".png", ".webp", ".heic"];
     const valid = incoming.filter((f) =>
-      [".json", ".txt", ".docx", ".xlsx"].some((ext) => f.name.toLowerCase().endsWith(ext))
+      ALLOWED_EXTS.some((ext) => f.name.toLowerCase().endsWith(ext))
     );
     if (valid.length < incoming.length) {
       toast({
         title: "Unsupported file type",
-        description: "Only .json, .txt, .docx, .xlsx are accepted",
+        description: "Accepted: .json, .txt, .docx, .xlsx, .jpg, .png, .webp (screenshots)",
         variant: "destructive",
       });
     }
@@ -482,6 +490,7 @@ export default function PersonaGeneratorPanel({ onApplied }: Props) {
     setGenerating(true);
     setPersona(null);
     setStyleSummary("");
+    setKnowledgeBase("");
     try {
       const result = await api.generateCopilotPersona(fileEntries.map((e) => e.file), senderName.trim() || undefined);
       const p = result?.persona ?? result;
@@ -502,6 +511,7 @@ export default function PersonaGeneratorPanel({ onApplied }: Props) {
         bot_deny_response: p.bot_deny_response ?? "",
       });
       setStyleSummary(result?.style_summary ?? p.style_summary ?? "");
+      setKnowledgeBase(result?.knowledge_base ?? "");
     } catch (err: any) {
       toast({ title: "Generation failed", description: err?.message ?? "Could not analyze files", variant: "destructive" });
     } finally {
@@ -517,6 +527,7 @@ export default function PersonaGeneratorPanel({ onApplied }: Props) {
       name: personaName,
       snapshot,
       style_summary: styleSummary || undefined,
+      knowledge_base: knowledgeBase || undefined,
     });
     await api.activateCopilotAiPersona(created.id);
     toast({ title: `"${personaName}" saved & activated`, description: "AI persona is now active across all conversations." });
@@ -572,6 +583,7 @@ export default function PersonaGeneratorPanel({ onApplied }: Props) {
               { label: "IG DMs (.json)", color: "bg-primary/10 text-primary border-primary/20" },
               { label: "Transcripts (.txt)", color: "bg-muted text-muted-foreground border-border" },
               { label: "Docs (.docx/.xlsx)", color: "bg-muted text-muted-foreground border-border" },
+              { label: "Screenshots (.jpg/.png)", color: "bg-blue-500/10 text-blue-400 border-blue-500/20" },
             ].map((b) => (
               <span key={b.label} className={`text-[10px] font-medium px-2 py-0.5 rounded-md border ${b.color}`}>
                 {b.label}

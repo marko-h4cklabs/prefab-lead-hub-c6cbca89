@@ -894,7 +894,7 @@ export const api = {
   listCopilotAiPersonas: () =>
     request<any[]>("/api/copilot/settings/ai-personas"),
 
-  createCopilotAiPersona: (data: { name: string; snapshot: any; style_summary?: string }) =>
+  createCopilotAiPersona: (data: { name: string; snapshot: any; style_summary?: string; knowledge_base?: string }) =>
     request<any>("/api/copilot/settings/ai-personas", {
       method: "POST",
       body: JSON.stringify(data),
