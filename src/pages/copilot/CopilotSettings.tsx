@@ -32,6 +32,8 @@ import {
   Star,
   Sparkles,
   ChevronUp,
+  FileText,
+  Sliders,
 } from "lucide-react";
 import AgentIdentitySection from "@/components/chatbot/AgentIdentitySection";
 import AILearningGround from "@/components/chatbot/AILearningGround";
@@ -125,6 +127,7 @@ function AiPage({
   const [deleting, setDeleting] = useState<string | null>(null);
   const [generatorOpen, setGeneratorOpen] = useState(false);
   const [expandedKbId, setExpandedKbId] = useState<string | null>(null);
+  const [editingPersonaId, setEditingPersonaId] = useState<string | null>(null);
 
   const loadPersonas = useCallback(async () => {
     try {
@@ -191,6 +194,10 @@ function AiPage({
   const onPersonaApplied = () => {
     setGeneratorOpen(false);
     loadPersonas();
+  };
+
+  const onPersonaUpdated = (updated: AiPersona) => {
+    setPersonas((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
   };
 
   if (loading) {
@@ -281,6 +288,17 @@ function AiPage({
                     )}
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setEditingPersonaId(editingPersonaId === persona.id ? null : persona.id)}
+                      className={`text-[11px] font-medium transition-colors px-2 py-1 rounded-md ${
+                        editingPersonaId === persona.id
+                          ? "text-foreground bg-secondary"
+                          : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                      }`}
+                    >
+                      {editingPersonaId === persona.id ? "Close" : "Configure"}
+                    </button>
                     {!isActive && (
                       <button
                         type="button"
@@ -301,8 +319,18 @@ function AiPage({
                     </button>
                   </div>
                 </div>
-              </div>
-            );
+              {/* Inline config panel — inside the card, expands below the header row */}
+              {editingPersonaId === persona.id && (
+                <div className="px-2 pb-3">
+                  <AiPersonaConfigTabs
+                    persona={persona}
+                    onUpdated={onPersonaUpdated}
+                    onClose={() => setEditingPersonaId(null)}
+                  />
+                </div>
+              )}
+            </div>
+          );
           })}
         </div>
       )}
@@ -326,6 +354,437 @@ function AiPage({
         {generatorOpen && (
           <div className="px-4 pb-4">
             <PersonaGeneratorPanel onApplied={onPersonaApplied} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ToggleGroup — reusable pill selector
+// ---------------------------------------------------------------------------
+
+function ToggleGroup<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          onClick={() => onChange(opt.value)}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            value === opt.value
+              ? "bg-primary text-primary-foreground"
+              : "bg-secondary text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// AiPersonaConfigTabs — editable configuration panel for a single AI persona
+// ---------------------------------------------------------------------------
+
+const AI_CONFIG_TABS = [
+  { key: "identity", label: "Identity", icon: Bot },
+  { key: "behavior", label: "Behavior", icon: Sliders },
+  { key: "strategy", label: "Strategy", icon: Settings },
+  { key: "additional", label: "Additional Info", icon: FileText },
+  { key: "fields", label: "Fields", icon: GripVertical },
+  { key: "followups", label: "Follow-ups", icon: CalendarClock },
+] as const;
+
+type AiConfigTabKey = (typeof AI_CONFIG_TABS)[number]["key"];
+
+const HUMAN_ERROR_OPTIONS = [
+  { value: "typos", label: "Typos" },
+  { value: "no_periods", label: "No periods" },
+  { value: "lowercase_starts", label: "Lowercase starts" },
+  { value: "short_forms", label: "Short forms" },
+];
+
+function AiPersonaConfigTabs({
+  persona,
+  onUpdated,
+  onClose,
+}: {
+  persona: AiPersona;
+  onUpdated: (updated: AiPersona) => void;
+  onClose: () => void;
+}) {
+  const [activeTab, setActiveTab] = useState<AiConfigTabKey>("identity");
+  const snap = persona.snapshot || {};
+
+  // Identity
+  const [agentName, setAgentName] = useState<string>(String(snap.agent_name || ""));
+  const [agentBackstory, setAgentBackstory] = useState<string>(String(snap.agent_backstory || ""));
+
+  // Behavior
+  const [tone, setTone] = useState<string>(snap.tone || "friendly");
+  const [responseLength, setResponseLength] = useState<string>(snap.response_length || "medium");
+  const [emojisEnabled, setEmojisEnabled] = useState<boolean>(Boolean(snap.emojis_enabled));
+  const [openerStyle, setOpenerStyle] = useState<string>(snap.opener_style || "casual");
+  const [noTrailingPeriod, setNoTrailingPeriod] = useState<boolean>(Boolean(snap.no_trailing_period));
+  const [humanErrorEnabled, setHumanErrorEnabled] = useState<boolean>(Boolean(snap.human_error_enabled));
+  const [humanErrorTypes, setHumanErrorTypes] = useState<string[]>(
+    Array.isArray(snap.human_error_types) ? snap.human_error_types : []
+  );
+  const [humanErrorRandom, setHumanErrorRandom] = useState<boolean>(Boolean(snap.human_error_random));
+
+  // Strategy
+  const [conversationApproach, setConversationApproach] = useState<string>(
+    snap.conversation_approach || "rapport_building"
+  );
+  const [followUpStyle, setFollowUpStyle] = useState<string>(snap.follow_up_style || "gentle");
+  const [closingStyle, setClosingStyle] = useState<string>(snap.closing_style || "soft");
+  const [botDenyResponse, setBotDenyResponse] = useState<string>(
+    String(snap.bot_deny_response || "I'm a real person, just quick at responding!")
+  );
+
+  // Additional Info
+  const [additionalInstructions, setAdditionalInstructions] = useState<string>(
+    String(snap.additional_instructions || "")
+  );
+
+  const [saving, setSaving] = useState(false);
+  const [savedOk, setSavedOk] = useState(false);
+
+  const buildSnapshot = () => ({
+    ...snap,
+    agent_name: agentName,
+    agent_backstory: agentBackstory,
+    tone,
+    response_length: responseLength,
+    emojis_enabled: emojisEnabled,
+    opener_style: openerStyle,
+    no_trailing_period: noTrailingPeriod,
+    human_error_enabled: humanErrorEnabled,
+    human_error_types: humanErrorTypes,
+    human_error_random: humanErrorRandom,
+    conversation_approach: conversationApproach,
+    follow_up_style: followUpStyle,
+    closing_style: closingStyle,
+    bot_deny_response: botDenyResponse,
+    additional_instructions: additionalInstructions,
+  });
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const updatedSnapshot = buildSnapshot();
+      await api.updateCopilotAiPersona(persona.id, { snapshot: updatedSnapshot });
+      onUpdated({ ...persona, snapshot: updatedSnapshot });
+      setSavedOk(true);
+      toast({ title: "Persona configuration saved" });
+      setTimeout(() => setSavedOk(false), 2000);
+    } catch (err: any) {
+      toast({ title: "Failed to save", description: getErrorMessage(err), variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const isPersonaTab = (tab: AiConfigTabKey) =>
+    tab === "identity" || tab === "behavior" || tab === "strategy" || tab === "additional";
+
+  const toggleErrorType = (type: string) => {
+    setHumanErrorTypes((prev) =>
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+    );
+  };
+
+  return (
+    <div className="rounded-xl border border-primary/30 bg-card mt-2">
+      {/* Panel header */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+        <Sparkles size={14} className="text-primary shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-foreground">Configuring: {persona.name}</p>
+          <p className="text-[11px] text-muted-foreground">Changes saved to this persona's snapshot and applied when AI-Generated is active</p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+        >
+          <X size={14} />
+        </button>
+      </div>
+
+      {/* Tab bar */}
+      <div className="flex gap-0.5 px-4 pt-2 overflow-x-auto">
+        {AI_CONFIG_TABS.map((tab) => {
+          const Icon = tab.icon;
+          const active = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                active
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon size={12} />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+      <div className="border-b border-border" />
+
+      {/* Tab content */}
+      <div className="px-4 py-4">
+        {/* IDENTITY TAB */}
+        {activeTab === "identity" && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Agent Name</label>
+              <input
+                type="text"
+                value={agentName}
+                onChange={(e) => setAgentName(e.target.value)}
+                placeholder="e.g. Alex"
+                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Agent Backstory</label>
+              <p className="text-[11px] text-muted-foreground mb-2">Describes this persona's personality, background, and approach — the AI uses this to adopt the exact style.</p>
+              <textarea
+                value={agentBackstory}
+                onChange={(e) => setAgentBackstory(e.target.value)}
+                rows={8}
+                placeholder="Describe the persona's communication style, sales approach, personality..."
+                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors resize-none"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* BEHAVIOR TAB */}
+        {activeTab === "behavior" && (
+          <div className="space-y-5">
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-2">Tone</label>
+              <ToggleGroup
+                options={[
+                  { value: "professional", label: "Professional" },
+                  { value: "friendly", label: "Friendly" },
+                  { value: "confident", label: "Confident" },
+                  { value: "relatable", label: "Relatable" },
+                ]}
+                value={tone}
+                onChange={setTone}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-2">Response Length</label>
+              <ToggleGroup
+                options={[
+                  { value: "short", label: "Short" },
+                  { value: "medium", label: "Medium" },
+                  { value: "long", label: "Long" },
+                ]}
+                value={responseLength}
+                onChange={setResponseLength}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-2">Opener Style</label>
+              <ToggleGroup
+                options={[
+                  { value: "casual", label: "Casual" },
+                  { value: "formal", label: "Formal" },
+                  { value: "question", label: "Question" },
+                  { value: "direct", label: "Direct" },
+                ]}
+                value={openerStyle}
+                onChange={setOpenerStyle}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-foreground">Use Emojis</p>
+                <p className="text-[11px] text-muted-foreground">Include emojis in AI replies</p>
+              </div>
+              <Switch checked={emojisEnabled} onCheckedChange={setEmojisEnabled} />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-foreground">No Trailing Period</p>
+                <p className="text-[11px] text-muted-foreground">Skip end punctuation — more natural texting style</p>
+              </div>
+              <Switch checked={noTrailingPeriod} onCheckedChange={setNoTrailingPeriod} />
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-foreground">Human Writing Style</p>
+                  <p className="text-[11px] text-muted-foreground">Add intentional imperfections to feel more human</p>
+                </div>
+                <Switch checked={humanErrorEnabled} onCheckedChange={setHumanErrorEnabled} />
+              </div>
+              {humanErrorEnabled && (
+                <div className="space-y-2 pl-2">
+                  <p className="text-[11px] text-muted-foreground">Active imperfections:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {HUMAN_ERROR_OPTIONS.map((opt) => {
+                      const active = humanErrorTypes.includes(opt.value);
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => toggleErrorType(opt.value)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                            active
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-secondary text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <div>
+                      <p className="text-[11px] text-foreground">Randomize imperfections</p>
+                      <p className="text-[10px] text-muted-foreground">Apply inconsistently for more realism</p>
+                    </div>
+                    <Switch checked={humanErrorRandom} onCheckedChange={setHumanErrorRandom} />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* STRATEGY TAB */}
+        {activeTab === "strategy" && (
+          <div className="space-y-5">
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-2">Conversation Approach</label>
+              <ToggleGroup
+                options={[
+                  { value: "rapport_building", label: "Rapport Building" },
+                  { value: "field_focused", label: "Field Focused" },
+                ]}
+                value={conversationApproach}
+                onChange={setConversationApproach}
+              />
+              <p className="text-[11px] text-muted-foreground mt-1.5">
+                {conversationApproach === "rapport_building"
+                  ? "Warm up the conversation before asking qualifying questions"
+                  : "Get to qualifying questions quickly and efficiently"}
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-2">Follow-up Style</label>
+              <ToggleGroup
+                options={[
+                  { value: "gentle", label: "Gentle" },
+                  { value: "persistent", label: "Persistent" },
+                  { value: "value_first", label: "Value First" },
+                ]}
+                value={followUpStyle}
+                onChange={setFollowUpStyle}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-2">Closing Style</label>
+              <ToggleGroup
+                options={[
+                  { value: "soft", label: "Soft" },
+                  { value: "direct", label: "Direct" },
+                  { value: "assumptive", label: "Assumptive" },
+                ]}
+                value={closingStyle}
+                onChange={setClosingStyle}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Response When Asked "Are You a Bot?"</label>
+              <textarea
+                value={botDenyResponse}
+                onChange={(e) => setBotDenyResponse(e.target.value)}
+                rows={3}
+                placeholder="e.g. I'm a real person, just quick at responding!"
+                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors resize-none"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ADDITIONAL INFO TAB */}
+        {activeTab === "additional" && (
+          <div className="space-y-4">
+            <div className="rounded-lg bg-primary/5 border border-primary/20 px-3 py-2.5">
+              <p className="text-xs text-primary font-semibold mb-1">Custom Rules for This Persona</p>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Add any specific instructions, quirks, or rules you noticed while reviewing the conversations. These will be injected directly into the AI prompt and must be respected in every conversation.
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Additional Instructions</label>
+              <textarea
+                value={additionalInstructions}
+                onChange={(e) => setAdditionalInstructions(e.target.value)}
+                rows={10}
+                placeholder={`Examples:\n- Always ask about their timeline before discussing price\n- Never mention competitor X by name\n- When they ask about results, always mention the 3-month transformation story\n- Keep energy high even when leads are slow to respond\n- Always end by leaving the ball in their court`}
+                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors resize-none"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {additionalInstructions.length > 0 ? `${additionalInstructions.length} characters` : "No custom instructions yet"}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* FIELDS TAB — global, reuse existing component */}
+        {activeTab === "fields" && <FieldsTab />}
+
+        {/* FOLLOW-UPS TAB — global, reuse existing component */}
+        {activeTab === "followups" && <FollowUpsTab />}
+
+        {/* Save button for persona-specific tabs */}
+        {isPersonaTab(activeTab) && (
+          <div className="flex items-center gap-3 mt-5 pt-4 border-t border-border">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || savedOk}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : savedOk ? (
+                <Check size={14} />
+              ) : (
+                <Save size={14} />
+              )}
+              {saving ? "Saving..." : savedOk ? "Saved" : "Save Changes"}
+            </button>
+            {savedOk && (
+              <p className="text-xs text-green-500 flex items-center gap-1">
+                <Check size={12} /> Changes saved
+              </p>
+            )}
           </div>
         )}
       </div>
