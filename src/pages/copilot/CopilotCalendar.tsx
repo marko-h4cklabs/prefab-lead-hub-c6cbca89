@@ -91,20 +91,25 @@ const CopilotCalendar = () => {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "canceled">("all");
   const [weekOffset, setWeekOffset] = useState(0);
 
+  // Booking URL from Settings > Integrations (fallback when no API token)
+  const [bookingUrl, setBookingUrl] = useState<string | null>(null);
+
   // Setup state
   const [apiToken, setApiToken] = useState("");
   const [saving, setSaving] = useState(false);
   const [showToken, setShowToken] = useState(false);
 
-  // Check Calendly connection status
+  // Check Calendly connection status + booking URL from Integrations
   useEffect(() => {
-    api.getCalendlyStatus()
-      .then((res) => {
-        setStatus(res);
-        if (res?.connected) fetchEvents();
-      })
-      .catch(() => setStatus({ connected: false }))
-      .finally(() => setLoading(false));
+    Promise.all([
+      api.getCalendlyStatus().catch(() => ({ connected: false })),
+      api.getCalendlyBookingUrl().catch(() => null),
+    ]).then(([statusRes, urlRes]) => {
+      setStatus(statusRes as CalendlyStatus);
+      const url = (urlRes as any)?.calendly_url || null;
+      setBookingUrl(url || null);
+      if ((statusRes as CalendlyStatus)?.connected) fetchEvents();
+    }).finally(() => setLoading(false));
   }, []);
 
   // Fetch events
@@ -183,8 +188,45 @@ const CopilotCalendar = () => {
     );
   }
 
-  // Not connected — show setup screen
+  // Not connected via API token — check if booking URL is configured
   if (!status?.connected) {
+    // If a booking URL exists from Settings > Integrations, embed it
+    if (bookingUrl) {
+      return (
+        <div className="h-full flex flex-col overflow-hidden">
+          <div className="shrink-0 px-6 py-4 border-b border-border bg-[hsl(0_0%_4%)]">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-foreground">Calendar</h2>
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Link2 size={11} />
+                  {bookingUrl}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <p className="text-[11px] text-muted-foreground">
+                  Connect your API token in{" "}
+                  <a href="/copilot/settings" className="text-primary hover:underline">
+                    Settings &rarr; Integrations
+                  </a>{" "}
+                  to also see booked events.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <iframe
+              src={bookingUrl}
+              title="Calendly Booking"
+              className="w-full h-full border-0"
+              allow="payment"
+            />
+          </div>
+        </div>
+      );
+    }
+
+    // No booking URL and no API token — show setup screen
     return (
       <div className="h-full p-6 overflow-auto">
         <div className="max-w-lg mx-auto mt-12">
@@ -194,7 +236,11 @@ const CopilotCalendar = () => {
             </div>
             <h2 className="text-xl font-bold text-foreground mb-2">Connect Calendly</h2>
             <p className="text-sm text-muted-foreground">
-              Connect your Calendly account to see all your booked calls here.
+              Add your Calendly booking link in{" "}
+              <a href="/copilot/settings" className="text-primary hover:underline font-semibold">
+                Settings &rarr; Integrations
+              </a>{" "}
+              to embed your booking page here, or connect your API token below to view scheduled events.
             </p>
           </div>
 
