@@ -890,6 +890,28 @@ export const api = {
     return formDataRequest<any>("/api/copilot/settings/generate-persona", fd);
   },
 
+  // Copilot Named AI Personas
+  listCopilotAiPersonas: () =>
+    request<any[]>("/api/copilot/settings/ai-personas"),
+
+  createCopilotAiPersona: (data: { name: string; snapshot: any; style_summary?: string }) =>
+    request<any>("/api/copilot/settings/ai-personas", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateCopilotAiPersona: (id: string, data: { name?: string; snapshot?: any; style_summary?: string }) =>
+    request<any>(`/api/copilot/settings/ai-personas/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  deleteCopilotAiPersona: (id: string) =>
+    request<any>(`/api/copilot/settings/ai-personas/${id}`, { method: "DELETE" }),
+
+  activateCopilotAiPersona: (id: string) =>
+    request<any>(`/api/copilot/settings/ai-personas/${id}/activate`, { method: "PUT" }),
+
   // --- Team Invites ---
   createTeamInvite: (data: { role?: string; max_uses?: number; expires_days?: number }) =>
     request<any>("/api/copilot/team/invite", { method: "POST", body: JSON.stringify(data) }),

@@ -138,9 +138,10 @@ function PersonaPreviewForm({
 }: {
   initial: PersonaFields;
   styleSummary: string;
-  onApply: (data: PersonaFields) => Promise<void>;
+  onApply: (data: PersonaFields, personaName: string) => Promise<void>;
 }) {
   const [data, setData] = useState<PersonaFields>(initial);
+  const [personaName, setPersonaName] = useState(initial.agent_name || "My Persona");
   const [applying, setApplying] = useState(false);
 
   const update = (patch: Partial<PersonaFields>) =>
@@ -154,9 +155,13 @@ function PersonaPreviewForm({
   };
 
   const handleApply = async () => {
+    if (!personaName.trim()) {
+      toast({ title: "Enter a persona name", variant: "destructive" });
+      return;
+    }
     setApplying(true);
     try {
-      await onApply(data);
+      await onApply(data, personaName.trim());
     } finally {
       setApplying(false);
     }
@@ -171,6 +176,20 @@ function PersonaPreviewForm({
           <p className="text-sm text-foreground">{styleSummary}</p>
         </div>
       )}
+
+      {/* Persona template name */}
+      <div>
+        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+          Persona Template Name <span className="text-destructive">*</span>
+        </label>
+        <input
+          value={personaName}
+          onChange={(e) => setPersonaName(e.target.value)}
+          className="dark-input w-full"
+          placeholder="e.g. Jordan — Friendly Closer"
+        />
+        <p className="text-[10px] text-muted-foreground mt-1">Give this persona a name so you can save and switch between multiple.</p>
+      </div>
 
       {/* Agent name */}
       <div>
@@ -327,7 +346,7 @@ function PersonaPreviewForm({
         className="dark-btn w-full bg-primary text-primary-foreground hover:bg-primary/90"
       >
         {applying ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-        {applying ? "Applying…" : "Apply & Activate AI Persona"}
+        {applying ? "Saving…" : "Save & Activate Persona"}
       </button>
     </div>
   );
@@ -490,11 +509,17 @@ export default function PersonaGeneratorPanel({ onApplied }: Props) {
     }
   };
 
-  // --- Apply ---
+  // --- Apply: create named persona, then activate it ---
 
-  const handleApply = async (data: PersonaFields) => {
-    await api.putCopilotAiPersona(data);
-    toast({ title: "AI Persona activated", description: "Your persona has been saved and is now active." });
+  const handleApply = async (data: PersonaFields, personaName: string) => {
+    const { style_summary: _s, ...snapshot } = data as any;
+    const created = await api.createCopilotAiPersona({
+      name: personaName,
+      snapshot,
+      style_summary: styleSummary || undefined,
+    });
+    await api.activateCopilotAiPersona(created.id);
+    toast({ title: `"${personaName}" saved & activated`, description: "AI persona is now active across all conversations." });
     onApplied?.();
   };
 
