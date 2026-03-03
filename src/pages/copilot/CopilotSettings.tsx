@@ -63,6 +63,7 @@ interface QuoteField {
 // Constants
 // ---------------------------------------------------------------------------
 
+// Manual-only tabs (Integrations and Notifications are global, at top-level)
 const TABS = [
   { key: "identity", label: "Identity", icon: Bot },
   { key: "personas", label: "Personas", icon: Users },
@@ -70,11 +71,19 @@ const TABS = [
   { key: "social-proof", label: "Social Proof", icon: Star },
   { key: "fields", label: "Fields", icon: Settings },
   { key: "followups", label: "Follow-ups", icon: CalendarClock },
+] as const;
+
+type TabKey = (typeof TABS)[number]["key"];
+
+// Top-level view switcher (Integrations + Notifications are always accessible)
+const VIEW_TABS = [
+  { key: "ai", label: "AI-Generated", icon: Sparkles },
+  { key: "manual", label: "Manual", icon: Settings },
   { key: "integrations", label: "Integrations", icon: Link2 },
   { key: "notifications", label: "Notifications", icon: Bell },
 ] as const;
 
-type TabKey = (typeof TABS)[number]["key"];
+type ViewMode = (typeof VIEW_TABS)[number]["key"];
 
 
 // ---------------------------------------------------------------------------
@@ -847,8 +856,6 @@ function ManualPage() {
           {mountedTabs.has("social-proof") && <div className={activeTab !== "social-proof" ? "hidden" : ""}><SocialProofTab /></div>}
           {mountedTabs.has("fields") && <div className={activeTab !== "fields" ? "hidden" : ""}><FieldsTab /></div>}
           {mountedTabs.has("followups") && <div className={activeTab !== "followups" ? "hidden" : ""}><FollowUpsTab /></div>}
-          {mountedTabs.has("integrations") && <div className={activeTab !== "integrations" ? "hidden" : ""}><IntegrationsTab /></div>}
-          {mountedTabs.has("notifications") && <div className={activeTab !== "notifications" ? "hidden" : ""}><NotificationsTab /></div>}
         </div>
       </div>
     </div>
@@ -860,11 +867,29 @@ function ManualPage() {
 // ---------------------------------------------------------------------------
 
 const CopilotSettings = () => {
-  // Which page the user is VIEWING (independent from which mode is active for conversations)
-  const [viewMode, setViewMode] = useState<"ai" | "manual">("manual");
-  // Which mode is currently ACTIVE for conversations
+  // Which section the user is VIEWING
+  const [viewMode, setViewMode] = useState<ViewMode>("manual");
+  // Which mode is currently ACTIVE for conversations (fetched from backend on mount)
   const [conversationSource, setConversationSource] = useState<"manual" | "ai_generated">("manual");
   const [activePersonaName, setActivePersonaName] = useState<string | null>(null);
+  const [statusLoading, setStatusLoading] = useState(true);
+
+  // Fetch current persona source on mount so the status badge is always correct
+  // regardless of which view the user is on — fixes the "auto-switches to Manual" bug
+  useEffect(() => {
+    api.getCopilotPersonaConfig()
+      .then((res: any) => {
+        const src = res.copilot_persona_source ?? "manual";
+        const activeId = res.active_ai_persona_id ?? null;
+        const ps: AiPersona[] = res.personas ?? [];
+        setConversationSource(src);
+        if (src === "ai_generated" && activeId) {
+          setActivePersonaName(ps.find((p) => p.id === activeId)?.name ?? null);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setStatusLoading(false));
+  }, []);
 
   const handleSourceChange = (src: "manual" | "ai_generated", personas: AiPersona[], activeId: string | null) => {
     setConversationSource(src);
@@ -885,25 +910,24 @@ const CopilotSettings = () => {
           <div>
             <h1 className="text-xl font-bold text-foreground">Copilot Settings</h1>
             {/* Conversation mode status badge */}
-            <div className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-              isAiActive
-                ? "bg-primary/15 text-primary border border-primary/30"
-                : "bg-muted text-muted-foreground border border-border"
-            }`}>
-              {isAiActive ? <Sparkles size={10} /> : <Settings size={10} />}
-              {isAiActive
-                ? `AI-Generated${activePersonaName ? `: ${activePersonaName}` : ""}`
-                : "Manual configuration"}
-            </div>
+            {!statusLoading && (
+              <div className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                isAiActive
+                  ? "bg-primary/15 text-primary border border-primary/30"
+                  : "bg-muted text-muted-foreground border border-border"
+              }`}>
+                {isAiActive ? <Sparkles size={10} /> : <Settings size={10} />}
+                {isAiActive
+                  ? `AI-Generated${activePersonaName ? `: ${activePersonaName}` : ""}`
+                  : "Manual configuration"}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Page switcher */}
+        {/* Page switcher — Integrations and Notifications are always accessible */}
         <div className="flex gap-1 rounded-xl bg-muted p-1 w-fit">
-          {([
-            { key: "ai", label: "AI-Generated", icon: Sparkles },
-            { key: "manual", label: "Manual", icon: Settings },
-          ] as const).map(({ key, label, icon: Icon }) => (
+          {VIEW_TABS.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               type="button"
@@ -923,10 +947,15 @@ const CopilotSettings = () => {
 
       {/* Page content */}
       <div className="flex-1 overflow-y-auto px-6">
-        {viewMode === "ai" ? (
+        {viewMode === "ai" && (
           <AiPage conversationSource={conversationSource} onSourceChange={handleSourceChange} />
-        ) : (
-          <ManualPage />
+        )}
+        {viewMode === "manual" && <ManualPage />}
+        {viewMode === "integrations" && (
+          <div className="py-6 max-w-2xl"><IntegrationsTab /></div>
+        )}
+        {viewMode === "notifications" && (
+          <div className="py-6 max-w-2xl"><NotificationsTab /></div>
         )}
       </div>
     </div>
