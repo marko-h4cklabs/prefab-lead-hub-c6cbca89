@@ -44,6 +44,10 @@ interface Props {
   sseConnected?: boolean;
   /** Lead IDs to instantly hide (optimistic deletes) */
   filterLeadIds?: string[];
+  /** Lead IDs with unread user messages (new message arrived while chat was not open) */
+  unreadLeadIds?: Set<string>;
+  /** Lead ID that just received a new message — optimistically bubble to top */
+  newMessageLeadId?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +113,7 @@ const getInitials = (name: string): string => {
 
 const POLL_INTERVAL_SSE = 2_000; // Fast polling even when SSE is active
 
-const ActiveDMList = ({ selectedLeadId, onSelectLead, refreshTrigger, sseConnected, filterLeadIds }: Props) => {
+const ActiveDMList = ({ selectedLeadId, onSelectLead, refreshTrigger, sseConnected, filterLeadIds, unreadLeadIds, newMessageLeadId }: Props) => {
   // Data
   const [dms, setDms] = useState<DM[]>([]);
   const [loading, setLoading] = useState(true);
@@ -161,6 +165,18 @@ const ActiveDMList = ({ selectedLeadId, onSelectLead, refreshTrigger, sseConnect
       fetchDMs(true);
     }
   }, [refreshTrigger]);
+
+  // Optimistically bubble conversation to top when new message arrives (before server re-sort)
+  useEffect(() => {
+    if (!newMessageLeadId) return;
+    setDms((prev) => {
+      const idx = prev.findIndex((d) => d.lead_id === newMessageLeadId);
+      if (idx <= 0) return prev; // already at top or not in list
+      const updated = [...prev];
+      const [item] = updated.splice(idx, 1);
+      return [item, ...updated];
+    });
+  }, [newMessageLeadId]);
 
   // Fetch team members when bulk-assign dropdown opens
   useEffect(() => {
@@ -509,13 +525,17 @@ const ActiveDMList = ({ selectedLeadId, onSelectLead, refreshTrigger, sseConnect
             };
             const urgencyBorder = urgencyStyles[urgency] || "";
 
+            const isUnread = unreadLeadIds?.has(dm.lead_id) ?? false;
+
             return (
               <div
                 key={dm.lead_id}
                 className={`w-full text-left px-3 py-2.5 border-b border-border/50 transition-colors flex items-start gap-2 ${
                   selectedLeadId === dm.lead_id
                     ? "bg-primary/10 border-l-2 border-l-primary"
-                    : urgencyBorder || "hover:bg-secondary/50"
+                    : isUnread
+                      ? "border-l-2 border-l-yellow-400 bg-yellow-400/5"
+                      : urgencyBorder || "hover:bg-secondary/50"
                 }`}
               >
                 {/* Checkbox */}
@@ -553,7 +573,12 @@ const ActiveDMList = ({ selectedLeadId, onSelectLead, refreshTrigger, sseConnect
                     <div className="flex-1 min-w-0">
                       {/* Name + time */}
                       <div className="flex items-center justify-between gap-1">
-                        <span className="text-xs font-semibold text-foreground truncate">{dm.lead_name}</span>
+                        <span className="flex items-center gap-1.5 min-w-0">
+                          {isUnread && (
+                            <span className="w-2 h-2 rounded-full bg-yellow-400 shrink-0" />
+                          )}
+                          <span className="text-xs font-semibold text-foreground truncate">{dm.lead_name}</span>
+                        </span>
                         <span className="text-[10px] text-muted-foreground shrink-0">
                           {timeAgo(dm.last_message_at)}
                         </span>

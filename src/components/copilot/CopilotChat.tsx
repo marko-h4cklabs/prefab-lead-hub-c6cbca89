@@ -96,6 +96,8 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
 
   // Generation counter: incremented on every user message so stale suggestion results are discarded
   const suggestionGenRef = useRef(0);
+  // Fallback timer: if backend's suggestion_ready SSE doesn't arrive within 12s, generate locally
+  const suggestionFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scrollToBottom = () =>
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -250,19 +252,31 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
       return [...prev, newMsg];
     });
 
-    // When a new user (lead) message arrives, invalidate old suggestions and regenerate
+    // When a new user (lead) message arrives, invalidate old suggestions.
+    // Backend pre-generates and fires suggestion_ready SSE — wait for that instead of
+    // generating immediately (avoids double Claude call). Fallback after 12s if SSE missed.
     if (sseMessage.role === "user") {
-      suggestionGenRef.current += 1;
+      const gen = suggestionGenRef.current + 1;
+      suggestionGenRef.current = gen;
       setSuggestions([]);
-      fetchSuggestions(true);
+      setLoadingSuggestions(true);
+      if (suggestionFallbackRef.current) clearTimeout(suggestionFallbackRef.current);
+      suggestionFallbackRef.current = setTimeout(() => {
+        if (suggestionGenRef.current === gen) {
+          fetchSuggestions(true);
+        }
+      }, 12_000);
     }
     // No reconciliation fetch — the 60s polling safety net handles canonical sync.
   }, [sseMessage, leadId]);
 
-  // SSE suggestion_ready trigger — only LOAD existing, never generate
-  // (generation happens in fetchSuggestions; this just picks up results)
+  // SSE suggestion_ready trigger — cancel fallback timer and load pre-generated suggestions
   useEffect(() => {
     if (suggestionTrigger && suggestionTrigger > 0) {
+      if (suggestionFallbackRef.current) {
+        clearTimeout(suggestionFallbackRef.current);
+        suggestionFallbackRef.current = null;
+      }
       loadExistingSuggestions();
     }
   }, [suggestionTrigger, loadExistingSuggestions]);

@@ -15,6 +15,11 @@ const CopilotConversations = () => {
   // SSE-driven refresh triggers (increment to trigger immediate refetch)
   const [dmRefreshTrigger, setDmRefreshTrigger] = useState(0);
   const [hiddenLeadIds, setHiddenLeadIds] = useState<string[]>([]);
+
+  // Unread tracking: leads that have received a new user message while their chat wasn't open
+  const [unreadLeadIds, setUnreadLeadIds] = useState<Set<string>>(new Set());
+  // Latest lead to receive a new message — signals ActiveDMList to bubble it to top optimistically
+  const [newMessageLeadId, setNewMessageLeadId] = useState<string | null>(null);
   const [suggestionTrigger, setSuggestionTrigger] = useState(0);
   const [summaryRefreshTrigger, setSummaryRefreshTrigger] = useState(0);
 
@@ -62,6 +67,10 @@ const CopilotConversations = () => {
         }
         // Also refresh lead summary (parsed_fields, intelligence update after each message)
         setSummaryRefreshTrigger((n) => n + 1);
+      } else if (event.role === "user" && event.leadId) {
+        // New user message in a different (non-open) chat — mark unread and bubble to top
+        setUnreadLeadIds((prev) => new Set([...prev, event.leadId!]));
+        setNewMessageLeadId(event.leadId);
       }
     }
 
@@ -92,6 +101,13 @@ const CopilotConversations = () => {
     }
     setSelectedLeadId(leadId);
     setSelectedConversationId(conversationId);
+    // Clear unread indicator when setter opens the conversation
+    setUnreadLeadIds((prev) => {
+      if (!prev.has(leadId)) return prev;
+      const next = new Set(prev);
+      next.delete(leadId);
+      return next;
+    });
   };
 
   return (
@@ -103,6 +119,8 @@ const CopilotConversations = () => {
         refreshTrigger={dmRefreshTrigger}
         sseConnected={connected}
         filterLeadIds={hiddenLeadIds}
+        unreadLeadIds={unreadLeadIds}
+        newMessageLeadId={newMessageLeadId}
       />
 
       {/* Center/Right: Lead Summary or Chat */}
