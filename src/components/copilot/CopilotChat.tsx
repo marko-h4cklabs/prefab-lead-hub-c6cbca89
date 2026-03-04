@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { api, requireCompanyId } from "@/lib/apiClient";
-import { ArrowLeft, Loader2, Mic, Image, RefreshCw, Send } from "lucide-react";
+import { ArrowLeft, Loader2, Mic, Image, RefreshCw, Send, FileText, X } from "lucide-react";
 import CopilotSuggestionCard from "./CopilotSuggestionCard";
 import { toast } from "@/hooks/use-toast";
 
@@ -85,6 +85,13 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
   const [customDraft, setCustomDraft] = useState("");
   const [sendingCustom, setSendingCustom] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  // Template panel state
+  const [showTemplatePanel, setShowTemplatePanel] = useState(false);
+  const [tplList, setTplList] = useState<Array<{ id: string; name: string; content: string }>>([]);
+  const [loadingTpls, setLoadingTpls] = useState(false);
+  const [tplEditId, setTplEditId] = useState<string | null>(null);
+  const [tplEditText, setTplEditText] = useState("");
+  const [sendingTpl, setSendingTpl] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const customInputRef = useRef<HTMLInputElement>(null);
@@ -162,6 +169,16 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
     } catch { /* silent */ }
   }, [leadId, mapSuggestions]);
 
+  // --- Load copilot template messages ---
+  const loadTemplates = useCallback(async () => {
+    setLoadingTpls(true);
+    try {
+      const res = await api.getCopilotTemplates();
+      setTplList(res.templates ?? []);
+    } catch { /* silent */ }
+    finally { setLoadingTpls(false); }
+  }, []);
+
   // --- Fetch suggestions (may generate if none exist) ---
   const fetchSuggestions = useCallback(async (forceRegenerate = false) => {
     // If a regeneration is already in-flight, skip non-force calls
@@ -220,7 +237,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
   useEffect(() => {
     fetchMessages();
     // Load existing suggestions only — don't auto-generate (saves Claude API credits).
-    // Setter clicks "Generate" or waits for the 5-min auto-trigger from backend.
+    // Setter clicks "Generate" button to get suggestions on demand.
     loadExistingSuggestions();
   }, [leadId, conversationId]);
 
@@ -273,7 +290,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
     reconcileRef.current = setTimeout(() => fetchMessages(true), 1000);
 
     // When any new user (lead) message arrived, invalidate old suggestions.
-    // Don't auto-generate — wait for the 5-min backend auto-trigger or manual "Generate" click.
+    // Don't auto-generate — wait for manual "Generate" click.
     if (hasNewUserMessage) {
       suggestionGenRef.current += 1;
       setSuggestions([]);
@@ -408,6 +425,28 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
       toast({ title: "Failed to send message", variant: "destructive" });
     } finally {
       setSendingCustom(false);
+    }
+  };
+
+  // --- Send a template message directly ---
+  const handleTemplateSend = async (text: string) => {
+    if (!text.trim()) return;
+    setSendingTpl(true);
+    try {
+      await api.sendDirectMessage(conversationId, text.trim());
+      setMessages((prev) => {
+        const tail = prev.slice(-5);
+        if (tail.some((m) => m.role === "assistant" && m.content === text.trim())) return prev;
+        return [...prev, { role: "assistant", content: text.trim(), timestamp: new Date().toISOString() }];
+      });
+      setShowTemplatePanel(false);
+      setTplEditId(null);
+      setTplEditText("");
+      setSuggestions([]);
+    } catch {
+      toast({ title: "Failed to send template message", variant: "destructive" });
+    } finally {
+      setSendingTpl(false);
     }
   };
 
@@ -568,18 +607,99 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
           </div>
         )}
 
-        {/* Generate button — shown when no suggestions and not loading */}
+        {/* Generate + Template buttons — shown when no suggestions and not loading */}
         {!loadingSuggestions && suggestions.length === 0 && (
-          <button
-            onClick={() => {
-              suggestionGenRef.current += 1;
-              fetchSuggestions(true);
-            }}
-            className="w-full py-3 rounded-lg border border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary text-sm font-medium transition-colors flex items-center justify-center gap-2"
-          >
-            <RefreshCw size={14} />
-            Generate Suggestions
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                suggestionGenRef.current += 1;
+                fetchSuggestions(true);
+              }}
+              className="flex-1 py-3 rounded-lg border border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary text-sm font-medium transition-colors flex items-center justify-center gap-2"
+            >
+              <RefreshCw size={14} />
+              Generate Suggestions
+            </button>
+            <button
+              onClick={() => {
+                if (!showTemplatePanel) loadTemplates();
+                setShowTemplatePanel(!showTemplatePanel);
+              }}
+              className={`py-3 px-4 rounded-lg border text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                showTemplatePanel
+                  ? "border-primary/40 bg-primary/10 text-primary"
+                  : "border-dashed border-muted-foreground/40 bg-muted/5 hover:bg-muted/10 text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <FileText size={14} />
+              Templates
+            </button>
+          </div>
+        )}
+
+        {/* Template panel */}
+        {showTemplatePanel && (
+          <div className="border border-border rounded-lg bg-card overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-secondary/30">
+              <span className="text-xs font-semibold text-foreground">Template Messages</span>
+              <button
+                onClick={() => { setShowTemplatePanel(false); setTplEditId(null); }}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <div className="max-h-[240px] overflow-y-auto divide-y divide-border">
+              {loadingTpls && (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 size={16} className="animate-spin text-muted-foreground" />
+                </div>
+              )}
+              {!loadingTpls && tplList.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-6">
+                  No templates yet. Create them in Settings &gt; Templates.
+                </p>
+              )}
+              {!loadingTpls && tplList.map((tpl) => (
+                <div key={tpl.id} className="px-3 py-2.5 hover:bg-secondary/20 transition-colors">
+                  {tplEditId === tpl.id ? (
+                    <div className="space-y-2">
+                      <textarea
+                        value={tplEditText}
+                        onChange={(e) => setTplEditText(e.target.value)}
+                        className="dark-input w-full text-sm min-h-[60px] resize-y"
+                        autoFocus
+                      />
+                      <div className="flex justify-end gap-1.5">
+                        <button
+                          onClick={() => { setTplEditId(null); setTplEditText(""); }}
+                          className="text-xs text-muted-foreground hover:text-foreground px-2 py-1"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => handleTemplateSend(tplEditText)}
+                          disabled={!tplEditText.trim() || sendingTpl}
+                          className="inline-flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-1 text-xs font-semibold hover:bg-primary/90 disabled:opacity-50"
+                        >
+                          {sendingTpl ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                          Send
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setTplEditId(tpl.id); setTplEditText(tpl.content); }}
+                      className="w-full text-left"
+                    >
+                      <p className="text-xs font-semibold text-foreground">{tpl.name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{tpl.content}</p>
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* Suggestion cards */}

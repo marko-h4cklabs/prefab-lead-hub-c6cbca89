@@ -34,6 +34,7 @@ import {
   ChevronUp,
   FileText,
   Sliders,
+  Pencil,
 } from "lucide-react";
 import AgentIdentitySection from "@/components/chatbot/AgentIdentitySection";
 import AILearningGround from "@/components/chatbot/AILearningGround";
@@ -79,6 +80,7 @@ type TabKey = (typeof TABS)[number]["key"];
 const VIEW_TABS = [
   { key: "ai", label: "AI-Generated", icon: Sparkles },
   { key: "manual", label: "Manual", icon: Settings },
+  { key: "templates", label: "Templates", icon: FileText },
   { key: "integrations", label: "Integrations", icon: Link2 },
   { key: "notifications", label: "Notifications", icon: Bell },
 ] as const;
@@ -951,6 +953,9 @@ const CopilotSettings = () => {
           <AiPage conversationSource={conversationSource} onSourceChange={handleSourceChange} />
         )}
         {viewMode === "manual" && <ManualPage />}
+        {viewMode === "templates" && (
+          <div className="py-6 max-w-2xl"><TemplatesTab /></div>
+        )}
         {viewMode === "integrations" && (
           <div className="py-6 max-w-2xl"><IntegrationsTab /></div>
         )}
@@ -1648,6 +1653,221 @@ function FollowUpsTab() {
         </SectionCard>
       )}
       </div>
+    </div>
+  );
+}
+
+// ===========================================================================
+// TEMPLATES TAB
+// ===========================================================================
+
+interface CopilotTemplate {
+  id: string;
+  name: string;
+  category: string;
+  content: string;
+  variables: string[];
+  use_count: number;
+  created_at: string;
+}
+
+function TemplatesTab() {
+  const [templates, setTemplates] = useState<CopilotTemplate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newContent, setNewContent] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const loadTemplates = useCallback(async () => {
+    try {
+      const res = await api.getCopilotTemplates();
+      setTemplates(res.templates ?? []);
+    } catch {
+      toast({ title: "Failed to load templates", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTemplates();
+  }, [loadTemplates]);
+
+  const handleCreate = async () => {
+    if (!newName.trim() || !newContent.trim()) return;
+    setSaving(true);
+    try {
+      await api.createCopilotTemplate({ name: newName.trim(), content: newContent.trim() });
+      setNewName("");
+      setNewContent("");
+      setAdding(false);
+      toast({ title: "Template created" });
+      loadTemplates();
+    } catch {
+      toast({ title: "Failed to create template", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUpdate = async (id: string) => {
+    if (!editName.trim() || !editContent.trim()) return;
+    setSaving(true);
+    try {
+      await api.updateCopilotTemplate(id, { name: editName.trim(), content: editContent.trim() });
+      setEditingId(null);
+      toast({ title: "Template updated" });
+      loadTemplates();
+    } catch {
+      toast({ title: "Failed to update template", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await api.deleteCopilotTemplate(id);
+      toast({ title: "Template deleted" });
+      loadTemplates();
+    } catch {
+      toast({ title: "Failed to delete template", variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-foreground">Template Messages</h3>
+          <p className="text-sm text-muted-foreground">Pre-written messages you can quickly send from the chat view.</p>
+        </div>
+        {!adding && (
+          <button
+            onClick={() => setAdding(true)}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            <Plus size={14} />
+            Add Template
+          </button>
+        )}
+      </div>
+
+      {/* Add new template form */}
+      {adding && (
+        <div className="border border-border rounded-lg p-4 space-y-3 bg-card">
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Template name (e.g., Greeting, Follow-up)"
+            className="dark-input w-full text-sm"
+            autoFocus
+          />
+          <textarea
+            value={newContent}
+            onChange={(e) => setNewContent(e.target.value)}
+            placeholder="Template message content..."
+            className="dark-input w-full text-sm min-h-[80px] resize-y"
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => { setAdding(false); setNewName(""); setNewContent(""); }}
+              className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCreate}
+              disabled={!newName.trim() || !newContent.trim() || saving}
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              Save
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Loading state */}
+      {loading && (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 size={20} className="animate-spin text-muted-foreground" />
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && templates.length === 0 && !adding && (
+        <div className="text-center py-12 border border-dashed border-border rounded-lg">
+          <FileText size={32} className="mx-auto text-muted-foreground mb-3" />
+          <p className="text-sm text-muted-foreground">No templates yet. Click "Add Template" to create your first one.</p>
+        </div>
+      )}
+
+      {/* Template list */}
+      {!loading && templates.map((tpl) => (
+        <div key={tpl.id} className="border border-border rounded-lg p-4 bg-card hover:border-primary/20 transition-colors">
+          {editingId === tpl.id ? (
+            <div className="space-y-3">
+              <input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Template name"
+                className="dark-input w-full text-sm"
+                autoFocus
+              />
+              <textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                placeholder="Template message content..."
+                className="dark-input w-full text-sm min-h-[80px] resize-y"
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setEditingId(null)}
+                  className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleUpdate(tpl.id)}
+                  disabled={!editName.trim() || !editContent.trim() || saving}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                >
+                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  Save
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground">{tpl.name}</p>
+                <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{tpl.content}</p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => { setEditingId(tpl.id); setEditName(tpl.name); setEditContent(tpl.content); }}
+                  className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                  title="Edit"
+                >
+                  <Pencil size={14} />
+                </button>
+                <button
+                  onClick={() => handleDelete(tpl.id)}
+                  className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

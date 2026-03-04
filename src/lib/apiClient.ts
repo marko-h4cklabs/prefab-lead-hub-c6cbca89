@@ -721,6 +721,12 @@ export const api = {
       body: JSON.stringify({ text }),
     }),
 
+  sendDirectMessage: (conversationId: string, text: string) =>
+    request<any>(`/api/conversations/${conversationId}/send-direct`, {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    }),
+
   // --- Co-Pilot ---
   getCopilotActiveDMs: (params?: { sort?: string; filter?: string; limit?: number; dm_status_filter?: string }) => {
     const qs = new URLSearchParams();
@@ -890,6 +896,25 @@ export const api = {
 
   activateCopilotAiPersona: (id: string) =>
     request<any>(`/api/copilot/settings/ai-personas/${id}/activate`, { method: "PUT" }),
+
+  // --- Copilot Templates ---
+  getCopilotTemplates: () =>
+    request<any>("/api/copilot/settings/templates"),
+
+  createCopilotTemplate: (data: { name: string; content: string; category?: string }) =>
+    request<any>("/api/copilot/settings/templates", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateCopilotTemplate: (id: string, data: { name?: string; content?: string; category?: string }) =>
+    request<any>(`/api/copilot/settings/templates/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  deleteCopilotTemplate: (id: string) =>
+    request<any>(`/api/copilot/settings/templates/${id}`, { method: "DELETE" }),
 
   // --- Team Invites ---
   createTeamInvite: (data: { role?: string; max_uses?: number; expires_days?: number }) =>
