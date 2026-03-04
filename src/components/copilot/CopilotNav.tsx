@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  MessageSquare, BarChart3, TrendingUp, CalendarDays, Settings, Users, LayoutDashboard,
+  MessageSquare, BarChart3, TrendingUp, Settings, Users, LayoutDashboard,
 } from "lucide-react";
 import { api } from "@/lib/apiClient";
 
@@ -16,7 +16,6 @@ const NAV_ITEMS: NavItem[] = [
   { icon: MessageSquare, label: "DMs", path: "/copilot/conversations" },
   { icon: BarChart3, label: "Dashboard", path: "/copilot/dashboard" },
   { icon: TrendingUp, label: "Pipeline", path: "/copilot/pipeline" },
-  { icon: CalendarDays, label: "Calendar", path: "/copilot/calendar" },
   { icon: Settings, label: "Settings", path: "/copilot/settings", roles: ["owner", "admin"] },
   { icon: Users, label: "Team", path: "/copilot/team", roles: ["owner", "admin"] },
 ];

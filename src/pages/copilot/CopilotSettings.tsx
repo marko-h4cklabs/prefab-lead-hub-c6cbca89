@@ -1666,21 +1666,15 @@ function IntegrationsTab() {
   const [mcSaving, setMcSaving] = useState(false);
   const [mcStatus, setMcStatus] = useState<"idle" | "saved" | "error">("idle");
 
-  // Calendly API integration
-  const [calStatus, setCalStatus] = useState<any>(null);
-  const [calToken, setCalToken] = useState("");
-  const [calSaving, setCalSaving] = useState(false);
-  const [showCalToken, setShowCalToken] = useState(false);
   const [urlSaving, setUrlSaving] = useState(false);
 
   useEffect(() => {
     const loadAll = async () => {
       try {
-        const [mcRes, whRes, bookRes, calRes] = await Promise.allSettled([
+        const [mcRes, whRes, bookRes] = await Promise.allSettled([
           api.getManychatSettings(),
           api.getWebhookUrl(),
           api.getCalendlyBookingUrl(),
-          api.getCalendlyStatus(),
         ]);
         if (mcRes.status === "fulfilled") {
           const mc = mcRes.value as any;
@@ -1694,9 +1688,6 @@ function IntegrationsTab() {
         if (bookRes.status === "fulfilled") {
           const b = bookRes.value as any;
           setCalendlyUrl(b?.calendly_url || "");
-        }
-        if (calRes.status === "fulfilled") {
-          setCalStatus(calRes.value);
         }
       } catch (_) {}
       setLoading(false);
@@ -1730,7 +1721,7 @@ function IntegrationsTab() {
 
   const mcConnected = !!(mcApiKey && mcPageId);
   const whConnected = mcConnected && !!webhookUrl;
-  const calConnected = calStatus?.connected || !!calendlyUrl;
+  const calConnected = !!calendlyUrl;
 
   return (
     <div className="space-y-6">
@@ -1836,153 +1827,51 @@ function IntegrationsTab() {
         )}
       </SectionCard>
 
-      {/* Calendly API Integration */}
+      {/* Booking URL */}
       <SectionCard
-        title="Calendly Integration"
-        description="Connect your Calendly account to display booked calls in the Calendar tab."
+        title="Calendly Booking URL"
+        description="Paste your Calendly link here. The AI will share this link when a lead is qualified and ready to book."
       >
-        {calStatus?.connected ? (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-success/5 border border-success/20">
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-green-500" />
-                <div>
-                  <p className="text-sm font-medium text-foreground">
-                    {calStatus.calendly_name || "Calendly Connected"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {calStatus.calendly_email || calStatus.scheduling_url || ""}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={async () => {
-                  try {
-                    await api.disconnectCalendly();
-                    setCalStatus({ connected: false });
-                    toast({ title: "Calendly disconnected" });
-                  } catch {
-                    toast({ title: "Failed to disconnect", variant: "destructive" });
-                  }
-                }}
-                className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+        <FieldGroup label="Booking URL" hint="The AI will include this exact link in its suggestions when it's time to book a call.">
+          <div className="flex items-center gap-2">
+            <input
+              type="url"
+              value={calendlyUrl}
+              onChange={(e) => setCalendlyUrl(e.target.value)}
+              placeholder="https://calendly.com/yourname/30min"
+              className="flex-1 bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+            />
+            {calendlyUrl && (
+              <a
+                href={calendlyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 p-2 rounded-lg bg-secondary border border-border text-muted-foreground hover:text-foreground transition-colors"
+                title="Open booking link"
               >
-                Disconnect
-              </button>
-            </div>
-            {calStatus.scheduling_url && (
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <ExternalLink size={10} />
-                <a href={calStatus.scheduling_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                  {calStatus.scheduling_url}
-                </a>
-              </p>
+                <ExternalLink size={14} />
+              </a>
             )}
           </div>
-        ) : (
-          <div className="space-y-4">
-            <FieldGroup
-              label="Calendly API Token"
-              hint={
-                <>
-                  Go to{" "}
-                  <a href="https://calendly.com/integrations/api_webhooks" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                    Calendly &rarr; API & Webhooks
-                  </a>{" "}
-                  and generate a Personal Access Token.
-                </>
-              }
-            >
-              <div className="relative">
-                <input
-                  type={showCalToken ? "text" : "password"}
-                  value={calToken}
-                  onChange={(e) => setCalToken(e.target.value)}
-                  placeholder="eyJraWQiOi..."
-                  className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors pr-16"
-                />
-                <button
-                  onClick={() => setShowCalToken(!showCalToken)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors"
-                  title={showCalToken ? "Hide" : "Show"}
-                >
-                  {showCalToken ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
-              </div>
-            </FieldGroup>
-
-            <button
-              onClick={async () => {
-                if (!calToken.trim()) return;
-                setCalSaving(true);
-                try {
-                  const res = await api.saveCalendlyToken(calToken.trim());
-                  setCalStatus({
-                    connected: true,
-                    calendly_name: res?.calendly_name,
-                    calendly_email: res?.calendly_email,
-                    scheduling_url: res?.scheduling_url,
-                  });
-                  setCalToken("");
-                  toast({ title: "Calendly connected successfully" });
-                } catch (err) {
-                  toast({ title: "Failed to connect Calendly", description: getErrorMessage(err), variant: "destructive" });
-                } finally {
-                  setCalSaving(false);
-                }
-              }}
-              disabled={!calToken.trim() || calSaving}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {calSaving ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
-              {calSaving ? "Connecting..." : "Connect Calendly"}
-            </button>
-          </div>
-        )}
-
-        {/* Booking URL — editable */}
-        <div className="mt-4 pt-4 border-t border-border">
-          <FieldGroup label="Booking URL" hint="Paste your Calendly link here. The AI will share this link when suggesting a booking.">
-            <div className="flex items-center gap-2">
-              <input
-                type="url"
-                value={calendlyUrl}
-                onChange={(e) => setCalendlyUrl(e.target.value)}
-                placeholder="https://calendly.com/yourname/30min"
-                className="flex-1 bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
-              />
-              {calendlyUrl && (
-                <a
-                  href={calendlyUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="shrink-0 p-2 rounded-lg bg-secondary border border-border text-muted-foreground hover:text-foreground transition-colors"
-                  title="Open booking link"
-                >
-                  <ExternalLink size={14} />
-                </a>
-              )}
-            </div>
-          </FieldGroup>
-          <button
-            onClick={async () => {
-              setUrlSaving(true);
-              try {
-                await api.saveCalendlyBookingUrl(calendlyUrl.trim());
-                toast({ title: "Booking URL saved" });
-              } catch (err) {
-                toast({ title: "Failed to save booking URL", description: getErrorMessage(err), variant: "destructive" });
-              } finally {
-                setUrlSaving(false);
-              }
-            }}
-            disabled={urlSaving}
-            className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {urlSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            {urlSaving ? "Saving..." : "Save Booking URL"}
-          </button>
-        </div>
+        </FieldGroup>
+        <button
+          onClick={async () => {
+            setUrlSaving(true);
+            try {
+              await api.saveCalendlyBookingUrl(calendlyUrl.trim());
+              toast({ title: "Booking URL saved" });
+            } catch (err) {
+              toast({ title: "Failed to save booking URL", description: getErrorMessage(err), variant: "destructive" });
+            } finally {
+              setUrlSaving(false);
+            }
+          }}
+          disabled={urlSaving}
+          className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {urlSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+          {urlSaving ? "Saving..." : "Save Booking URL"}
+        </button>
       </SectionCard>
     </div>
   );

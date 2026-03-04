@@ -38,7 +38,6 @@ import CopilotLayout from "./pages/copilot/CopilotLayout";
 import CopilotConversations from "./pages/copilot/CopilotConversations";
 import CopilotDashboard from "./pages/copilot/CopilotDashboard";
 import CopilotPipeline from "./pages/copilot/CopilotPipeline";
-import CopilotCalendar from "./pages/copilot/CopilotCalendar";
 import CopilotSettings from "./pages/copilot/CopilotSettings";
 import CopilotTeam from "./pages/copilot/CopilotTeam";
 import TeamMemberSetup from "./pages/TeamMemberSetup";
@@ -177,7 +176,6 @@ const App = () => {
             <Route path="/copilot/conversations" element={<CopilotConversations />} />
             <Route path="/copilot/dashboard" element={<CopilotDashboard />} />
             <Route path="/copilot/pipeline" element={<CopilotPipeline />} />
-            <Route path="/copilot/calendar" element={<CopilotCalendar />} />
             <Route path="/copilot/settings" element={<CopilotSettings />} />
             <Route path="/copilot/team" element={<CopilotTeam />} />
           </Route>
