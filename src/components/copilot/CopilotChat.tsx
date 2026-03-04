@@ -265,10 +265,10 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
     // Clear the queue after processing all messages
     onSSEMessagesProcessed?.();
 
-    // Quick reconciliation: refetch full conversation from DB 2s after the last SSE batch.
+    // Quick reconciliation: refetch full conversation from DB 1s after the last SSE batch.
     // Catches any messages that were stored in DB but whose SSE event was lost.
     if (reconcileRef.current) clearTimeout(reconcileRef.current);
-    reconcileRef.current = setTimeout(() => fetchMessages(true), 2000);
+    reconcileRef.current = setTimeout(() => fetchMessages(true), 1000);
 
     // When any new user (lead) message arrived, invalidate old suggestions.
     // Backend pre-generates and fires suggestion_ready SSE — wait for that instead of
