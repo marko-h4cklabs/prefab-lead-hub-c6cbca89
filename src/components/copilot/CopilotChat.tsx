@@ -100,6 +100,8 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
   const suggestionGenRef = useRef(0);
   // Fallback timer: if backend's suggestion_ready SSE doesn't arrive within 12s, generate locally
   const suggestionFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Reconciliation timer: after SSE messages, refetch full conversation from DB to catch any gaps
+  const reconcileRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scrollToBottom = () =>
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -262,6 +264,11 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
 
     // Clear the queue after processing all messages
     onSSEMessagesProcessed?.();
+
+    // Quick reconciliation: refetch full conversation from DB 2s after the last SSE batch.
+    // Catches any messages that were stored in DB but whose SSE event was lost.
+    if (reconcileRef.current) clearTimeout(reconcileRef.current);
+    reconcileRef.current = setTimeout(() => fetchMessages(true), 2000);
 
     // When any new user (lead) message arrived, invalidate old suggestions.
     // Backend pre-generates and fires suggestion_ready SSE — wait for that instead of
