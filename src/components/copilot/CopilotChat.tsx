@@ -573,18 +573,32 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
         <div className="flex items-center justify-between">
           <span className="text-sm font-bold text-foreground">AI Suggestions</span>
           {suggestions.length > 0 && (
-            <button
-              onClick={() => {
-                suggestionGenRef.current += 1;
-                setSuggestions([]);
-                fetchSuggestions(true);
-              }}
-              disabled={loadingSuggestions}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <RefreshCw size={12} className={loadingSuggestions ? "animate-spin" : ""} />
-              Regenerate
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  if (!showTemplatePanel) loadTemplates();
+                  setShowTemplatePanel(!showTemplatePanel);
+                }}
+                className={`flex items-center gap-1.5 text-xs transition-colors ${
+                  showTemplatePanel ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <FileText size={12} />
+                Templates
+              </button>
+              <button
+                onClick={() => {
+                  suggestionGenRef.current += 1;
+                  setSuggestions([]);
+                  fetchSuggestions(true);
+                }}
+                disabled={loadingSuggestions}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <RefreshCw size={12} className={loadingSuggestions ? "animate-spin" : ""} />
+                Regenerate
+              </button>
+            </div>
           )}
         </div>
 
@@ -625,7 +639,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
                 if (!showTemplatePanel) loadTemplates();
                 setShowTemplatePanel(!showTemplatePanel);
               }}
-              className={`py-3 px-4 rounded-lg border text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+              className={`flex-1 py-3 rounded-lg border text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
                 showTemplatePanel
                   ? "border-primary/40 bg-primary/10 text-primary"
                   : "border-dashed border-muted-foreground/40 bg-muted/5 hover:bg-muted/10 text-muted-foreground hover:text-foreground"
