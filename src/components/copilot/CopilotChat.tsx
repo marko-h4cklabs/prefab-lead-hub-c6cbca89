@@ -34,8 +34,10 @@ interface Props {
   conversationId: string;
   leadName: string;
   onBack?: () => void;
-  /** Direct SSE message push — append immediately without refetch */
-  sseMessage?: SSEMessage | null;
+  /** Queue of SSE messages — processed in order so rapid events are never lost */
+  sseMessageQueue?: SSEMessage[];
+  /** Callback to clear the queue after processing */
+  onSSEMessagesProcessed?: () => void;
   /** Increment to trigger an immediate suggestion refresh (e.g. from SSE suggestion_ready event) */
   suggestionTrigger?: number;
   /** When SSE is connected, use longer polling interval */
@@ -71,7 +73,7 @@ const formatTime = (ts?: string) => {
   return `${date}, ${time}`;
 };
 
-const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, suggestionTrigger, sseConnected }: Props) => {
+const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue, onSSEMessagesProcessed, suggestionTrigger, sseConnected }: Props) => {
   const companyId = requireCompanyId();
   const [messages, setMessages] = useState<Message[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -227,35 +229,44 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
     };
   }, [fetchMessages, sseConnected]);
 
-  // --- SSE-pushed message: append instantly without refetch ---
+  // --- SSE-pushed messages: process entire queue so rapid events are never lost ---
   useEffect(() => {
-    if (!sseMessage || sseMessage.leadId !== leadId) return;
+    if (!sseMessageQueue || sseMessageQueue.length === 0) return;
 
-    // Deduplicate: don't process the same SSE message twice
-    const msgKey = `${sseMessage.role}:${sseMessage.content}:${sseMessage.timestamp}`;
-    if (lastProcessedSSERef.current === msgKey) return;
-    lastProcessedSSERef.current = msgKey;
+    let hasNewUserMessage = false;
 
-    const newMsg: Message = {
-      role: sseMessage.role,
-      content: sseMessage.content,
-      timestamp: sseMessage.timestamp,
-    };
+    for (const msg of sseMessageQueue) {
+      if (msg.leadId !== leadId) continue;
 
-    setMessages((prev) => {
-      // Dedup: skip if any of the last 10 messages has same content + role
-      // (prevents double from optimistic + SSE + polling overlap)
-      const tail = prev.slice(-10);
-      if (tail.some((m) => m.role === newMsg.role && m.content === newMsg.content)) {
-        return prev;
-      }
-      return [...prev, newMsg];
-    });
+      // Deduplicate: don't process the same SSE message twice
+      const msgKey = `${msg.role}:${msg.content}:${msg.timestamp}`;
+      if (lastProcessedSSERef.current === msgKey) continue;
+      lastProcessedSSERef.current = msgKey;
 
-    // When a new user (lead) message arrives, invalidate old suggestions.
+      const newMsg: Message = {
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp,
+      };
+
+      setMessages((prev) => {
+        const tail = prev.slice(-10);
+        if (tail.some((m) => m.role === newMsg.role && m.content === newMsg.content)) {
+          return prev;
+        }
+        return [...prev, newMsg];
+      });
+
+      if (msg.role === "user") hasNewUserMessage = true;
+    }
+
+    // Clear the queue after processing all messages
+    onSSEMessagesProcessed?.();
+
+    // When any new user (lead) message arrived, invalidate old suggestions.
     // Backend pre-generates and fires suggestion_ready SSE — wait for that instead of
     // generating immediately (avoids double Claude call). Fallback after 12s if SSE missed.
-    if (sseMessage.role === "user") {
+    if (hasNewUserMessage) {
       const gen = suggestionGenRef.current + 1;
       suggestionGenRef.current = gen;
       setSuggestions([]);
@@ -267,8 +278,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessage, sug
         }
       }, 12_000);
     }
-    // No reconciliation fetch — the 60s polling safety net handles canonical sync.
-  }, [sseMessage, leadId]);
+  }, [sseMessageQueue, leadId]);
 
   // SSE suggestion_ready trigger — cancel fallback timer and load pre-generated suggestions
   useEffect(() => {

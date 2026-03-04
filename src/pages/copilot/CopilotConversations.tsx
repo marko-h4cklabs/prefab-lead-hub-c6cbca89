@@ -23,13 +23,14 @@ const CopilotConversations = () => {
   const [suggestionTrigger, setSuggestionTrigger] = useState(0);
   const [summaryRefreshTrigger, setSummaryRefreshTrigger] = useState(0);
 
-  // Direct SSE message push for instant chat updates (no refetch needed)
-  const [sseMessage, setSSEMessage] = useState<{
+  // Direct SSE message push for instant chat updates (no refetch needed).
+  // Uses an array queue so rapid SSE events within a single React render cycle are never lost.
+  const [sseMessageQueue, setSSEMessageQueue] = useState<{
     leadId: string;
     role: string;
     content: string;
     timestamp: string;
-  } | null>(null);
+  }[]>([]);
 
   // Debounce DM list refreshes — batch rapid SSE events into one refetch
   const dmDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -58,12 +59,12 @@ const CopilotConversations = () => {
       // If this message is for the currently-selected lead, push it directly to the chat
       if (event.leadId === selectedLeadRef.current) {
         if (event.role && event.content) {
-          setSSEMessage({
-            leadId: event.leadId,
-            role: event.role,
-            content: event.content,
+          setSSEMessageQueue((prev) => [...prev, {
+            leadId: event.leadId!,
+            role: event.role!,
+            content: event.content!,
             timestamp: event.messageTimestamp || event.timestamp || new Date().toISOString(),
-          });
+          }]);
         }
         // Also refresh lead summary (parsed_fields, intelligence update after each message)
         setSummaryRefreshTrigger((n) => n + 1);
@@ -171,7 +172,8 @@ const CopilotConversations = () => {
               conversationId={selectedConversationId}
               leadName="Conversation"
               onBack={() => setView("summary")}
-              sseMessage={sseMessage}
+              sseMessageQueue={sseMessageQueue}
+              onSSEMessagesProcessed={() => setSSEMessageQueue([])}
               suggestionTrigger={suggestionTrigger}
               sseConnected={connected}
             />
