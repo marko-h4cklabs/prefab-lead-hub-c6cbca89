@@ -45,6 +45,7 @@ import GuardrailsSection from "@/components/chatbot/GuardrailsSection";
 import HumanErrorSection from "@/components/chatbot/HumanErrorSection";
 import SocialProofSection from "@/components/chatbot/SocialProofSection";
 import PersonaGeneratorPanel from "@/components/copilot/PersonaGeneratorPanel";
+import VoiceSettingsSection from "@/components/voice/VoiceSettingsSection";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -81,6 +82,7 @@ const VIEW_TABS = [
   { key: "ai", label: "AI-Generated", icon: Sparkles },
   { key: "manual", label: "Manual", icon: Settings },
   { key: "templates", label: "Templates", icon: FileText },
+  { key: "voice", label: "Voice Messages", icon: Volume2 },
   { key: "integrations", label: "Integrations", icon: Link2 },
   { key: "notifications", label: "Notifications", icon: Bell },
 ] as const;
@@ -955,6 +957,9 @@ const CopilotSettings = () => {
         {viewMode === "manual" && <ManualPage />}
         {viewMode === "templates" && (
           <div className="py-6 max-w-2xl"><TemplatesTab /></div>
+        )}
+        {viewMode === "voice" && (
+          <div className="py-6 max-w-2xl"><VoiceSettingsSection /></div>
         )}
         {viewMode === "integrations" && (
           <div className="py-6 max-w-2xl"><IntegrationsTab /></div>

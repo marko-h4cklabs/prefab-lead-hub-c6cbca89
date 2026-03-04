@@ -727,6 +727,19 @@ export const api = {
       body: JSON.stringify({ text }),
     }),
 
+  // --- Copilot Voice Notes ---
+  generateVoiceNote: (text: string) =>
+    request<{ audio_base64: string; content_type: string }>("/api/copilot/voice/generate", {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    }),
+
+  sendVoiceNote: (conversationId: string, audio_base64: string, text: string) =>
+    request<{ success: boolean; message_sent: string; audio_url: string }>(`/api/conversations/${conversationId}/send-voice`, {
+      method: "POST",
+      body: JSON.stringify({ audio_base64, text }),
+    }),
+
   // --- Co-Pilot ---
   getCopilotActiveDMs: (params?: { sort?: string; filter?: string; limit?: number; dm_status_filter?: string }) => {
     const qs = new URLSearchParams();

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { api, requireCompanyId } from "@/lib/apiClient";
-import { ArrowLeft, Loader2, Mic, Image, RefreshCw, Send, FileText, X } from "lucide-react";
+import { ArrowLeft, Loader2, Mic, Image, RefreshCw, Send, FileText, X, Volume2 } from "lucide-react";
 import CopilotSuggestionCard from "./CopilotSuggestionCard";
 import { toast } from "@/hooks/use-toast";
 
@@ -92,6 +92,13 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
   const [tplEditId, setTplEditId] = useState<string | null>(null);
   const [tplEditText, setTplEditText] = useState("");
   const [sendingTpl, setSendingTpl] = useState(false);
+  // Voice note panel state
+  const [showVoicePanel, setShowVoicePanel] = useState(false);
+  const [voiceText, setVoiceText] = useState("");
+  const [voiceAudioBase64, setVoiceAudioBase64] = useState<string | null>(null);
+  const [voiceAudioUrl, setVoiceAudioUrl] = useState<string | null>(null);
+  const [generatingVoice, setGeneratingVoice] = useState(false);
+  const [sendingVoice, setSendingVoice] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const customInputRef = useRef<HTMLInputElement>(null);
@@ -450,6 +457,63 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
     }
   };
 
+  // --- Generate voice preview ---
+  const handleGenerateVoice = async () => {
+    if (!voiceText.trim()) return;
+    setGeneratingVoice(true);
+    setVoiceAudioBase64(null);
+    setVoiceAudioUrl(null);
+    try {
+      const result = await api.generateVoiceNote(voiceText.trim());
+      setVoiceAudioBase64(result.audio_base64);
+      setVoiceAudioUrl(`data:${result.content_type || "audio/wav"};base64,${result.audio_base64}`);
+    } catch (err: any) {
+      const msg = err?.message || "Failed to generate voice note";
+      toast({
+        title: "Voice generation failed",
+        description: msg.includes("No voice selected")
+          ? "Configure a voice in Settings > Voice Messages first."
+          : msg,
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingVoice(false);
+    }
+  };
+
+  // --- Send voice note ---
+  const handleSendVoice = async () => {
+    if (!voiceAudioBase64 || !voiceText.trim()) return;
+    setSendingVoice(true);
+    try {
+      await api.sendVoiceNote(conversationId, voiceAudioBase64, voiceText.trim());
+      setMessages((prev) => {
+        const content = voiceText.trim();
+        const tail = prev.slice(-5);
+        if (tail.some((m) => m.role === "assistant" && m.content === content)) return prev;
+        return [...prev, { role: "assistant", content, timestamp: new Date().toISOString(), type: "voice" as const, is_voice: true }];
+      });
+      setShowVoicePanel(false);
+      setVoiceText("");
+      setVoiceAudioBase64(null);
+      setVoiceAudioUrl(null);
+      setSuggestions([]);
+    } catch {
+      toast({ title: "Failed to send voice note", variant: "destructive" });
+    } finally {
+      setSendingVoice(false);
+    }
+  };
+
+  // --- Cancel voice panel ---
+  const handleCancelVoice = () => {
+    setShowVoicePanel(false);
+    setVoiceText("");
+    setVoiceAudioBase64(null);
+    setVoiceAudioUrl(null);
+    setGeneratingVoice(false);
+  };
+
   // Track editing state from child suggestion cards
   const handleEditingChange = (editing: boolean) => {
     setIsEditing(editing);
@@ -578,6 +642,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
                 onClick={() => {
                   if (!showTemplatePanel) loadTemplates();
                   setShowTemplatePanel(!showTemplatePanel);
+                  setShowVoicePanel(false);
                 }}
                 className={`flex items-center gap-1.5 text-xs transition-colors ${
                   showTemplatePanel ? "text-primary" : "text-muted-foreground hover:text-foreground"
@@ -585,6 +650,18 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
               >
                 <FileText size={12} />
                 Templates
+              </button>
+              <button
+                onClick={() => {
+                  setShowVoicePanel(!showVoicePanel);
+                  setShowTemplatePanel(false);
+                }}
+                className={`flex items-center gap-1.5 text-xs transition-colors ${
+                  showVoicePanel ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Volume2 size={12} />
+                Voice Note
               </button>
               <button
                 onClick={() => {
@@ -638,6 +715,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
               onClick={() => {
                 if (!showTemplatePanel) loadTemplates();
                 setShowTemplatePanel(!showTemplatePanel);
+                setShowVoicePanel(false);
               }}
               className={`flex-1 py-3 rounded-lg border text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
                 showTemplatePanel
@@ -647,6 +725,20 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
             >
               <FileText size={14} />
               Templates
+            </button>
+            <button
+              onClick={() => {
+                setShowVoicePanel(!showVoicePanel);
+                setShowTemplatePanel(false);
+              }}
+              className={`flex-1 py-3 rounded-lg border text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                showVoicePanel
+                  ? "border-primary/40 bg-primary/10 text-primary"
+                  : "border-dashed border-muted-foreground/40 bg-muted/5 hover:bg-muted/10 text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Volume2 size={14} />
+              Voice Note
             </button>
           </div>
         )}
@@ -712,6 +804,99 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Voice note panel */}
+        {showVoicePanel && (
+          <div className="border border-border rounded-lg bg-card overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-secondary/30">
+              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <Volume2 size={12} />
+                Voice Note
+              </span>
+              <button
+                onClick={handleCancelVoice}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <div className="p-3 space-y-3">
+              <textarea
+                value={voiceText}
+                onChange={(e) => {
+                  setVoiceText(e.target.value);
+                  if (voiceAudioBase64) {
+                    setVoiceAudioBase64(null);
+                    setVoiceAudioUrl(null);
+                  }
+                }}
+                placeholder="Type the message to convert to voice..."
+                className="dark-input w-full text-sm min-h-[60px] resize-y"
+                disabled={generatingVoice || sendingVoice}
+              />
+
+              {/* Generate button */}
+              {!voiceAudioUrl && (
+                <button
+                  onClick={handleGenerateVoice}
+                  disabled={!voiceText.trim() || generatingVoice}
+                  className="w-full py-2 rounded-md bg-secondary hover:bg-secondary/80 text-foreground text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {generatingVoice ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      Generating voice...
+                    </>
+                  ) : (
+                    <>
+                      <Mic size={14} />
+                      Generate Voice Preview
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* Audio preview + send/re-generate */}
+              {voiceAudioUrl && (
+                <div className="space-y-2">
+                  <audio
+                    controls
+                    src={voiceAudioUrl}
+                    className="w-full h-10"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setVoiceAudioBase64(null);
+                        setVoiceAudioUrl(null);
+                      }}
+                      className="flex-1 py-2 rounded-md border border-border bg-card hover:bg-secondary text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Re-generate
+                    </button>
+                    <button
+                      onClick={handleSendVoice}
+                      disabled={sendingVoice}
+                      className="flex-1 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {sendingVoice ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Send size={14} />
+                          Send Voice Note
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
