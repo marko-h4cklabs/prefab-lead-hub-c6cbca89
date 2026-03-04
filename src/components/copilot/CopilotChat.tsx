@@ -219,7 +219,9 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
   // --- Initial load ---
   useEffect(() => {
     fetchMessages();
-    fetchSuggestions();
+    // Load existing suggestions only — don't auto-generate (saves Claude API credits).
+    // Setter clicks "Generate" or waits for the 5-min auto-trigger from backend.
+    loadExistingSuggestions();
   }, [leadId, conversationId]);
 
   // --- Poll for new messages (safety net) ---
@@ -271,19 +273,11 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
     reconcileRef.current = setTimeout(() => fetchMessages(true), 1000);
 
     // When any new user (lead) message arrived, invalidate old suggestions.
-    // Backend pre-generates and fires suggestion_ready SSE — wait for that instead of
-    // generating immediately (avoids double Claude call). Fallback after 12s if SSE missed.
+    // Don't auto-generate — wait for the 5-min backend auto-trigger or manual "Generate" click.
     if (hasNewUserMessage) {
-      const gen = suggestionGenRef.current + 1;
-      suggestionGenRef.current = gen;
+      suggestionGenRef.current += 1;
       setSuggestions([]);
-      setLoadingSuggestions(true);
-      if (suggestionFallbackRef.current) clearTimeout(suggestionFallbackRef.current);
-      suggestionFallbackRef.current = setTimeout(() => {
-        if (suggestionGenRef.current === gen) {
-          fetchSuggestions(true);
-        }
-      }, 12_000);
+      setLoadingSuggestions(false);
     }
   }, [sseMessageQueue, leadId]);
 
@@ -539,24 +533,26 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
       <div className="shrink-0 border-t border-border bg-[hsl(0_0%_6%)] p-4 space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-sm font-bold text-foreground">AI Suggestions</span>
-          <button
-            onClick={() => {
-              suggestionGenRef.current += 1;
-              setSuggestions([]);
-              fetchSuggestions(true);
-            }}
-            disabled={loadingSuggestions}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <RefreshCw size={12} className={loadingSuggestions ? "animate-spin" : ""} />
-            Regenerate
-          </button>
+          {suggestions.length > 0 && (
+            <button
+              onClick={() => {
+                suggestionGenRef.current += 1;
+                setSuggestions([]);
+                fetchSuggestions(true);
+              }}
+              disabled={loadingSuggestions}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <RefreshCw size={12} className={loadingSuggestions ? "animate-spin" : ""} />
+              Regenerate
+            </button>
+          )}
         </div>
 
         {/* Skeleton loading */}
         {loadingSuggestions && (
           <div className="space-y-2">
-            {[0, 1, 2].map((i) => (
+            {[0, 1].map((i) => (
               <div
                 key={i}
                 className="bg-card border border-border rounded-lg p-3 animate-pulse"
@@ -570,6 +566,20 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
               AI is generating suggestions...
             </p>
           </div>
+        )}
+
+        {/* Generate button — shown when no suggestions and not loading */}
+        {!loadingSuggestions && suggestions.length === 0 && (
+          <button
+            onClick={() => {
+              suggestionGenRef.current += 1;
+              fetchSuggestions(true);
+            }}
+            className="w-full py-3 rounded-lg border border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary text-sm font-medium transition-colors flex items-center justify-center gap-2"
+          >
+            <RefreshCw size={14} />
+            Generate Suggestions
+          </button>
         )}
 
         {/* Suggestion cards */}
@@ -589,7 +599,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
         {!loadingSuggestions && suggestions.length > 0 && (
           <p className="text-[10px] text-muted-foreground text-center">
             Press <kbd className="px-1 py-0.5 rounded bg-secondary text-[9px] font-mono">1</kbd>-
-            <kbd className="px-1 py-0.5 rounded bg-secondary text-[9px] font-mono">3</kbd> to quick-send,{" "}
+            <kbd className="px-1 py-0.5 rounded bg-secondary text-[9px] font-mono">2</kbd> to quick-send,{" "}
             <kbd className="px-1 py-0.5 rounded bg-secondary text-[9px] font-mono">R</kbd> to regenerate
           </p>
         )}
