@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { api } from "@/lib/apiClient";
 import { toast } from "@/hooks/use-toast";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
@@ -73,6 +73,8 @@ function timeAgo(dateStr?: string): string {
 
 const Pipeline = () => {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const isCopilot = pathname.startsWith("/copilot");
   const [columns, setColumns] = useState<Record<string, PipelineLead[]>>({});
   const [stats, setStats] = useState<PipelineStats>({});
   const [loading, setLoading] = useState(true);
@@ -321,7 +323,7 @@ const Pipeline = () => {
                                 ref={prov.innerRef}
                                 {...prov.draggableProps}
                                 {...prov.dragHandleProps}
-                                onClick={() => navigate(`/leads/${lead.id}`)}
+                                onClick={() => navigate(isCopilot ? `/copilot/conversations?lead=${lead.id}` : `/dashboard/leads/inbox/${lead.id}`)}
                                 className={`bg-card border border-border rounded-lg p-3 cursor-pointer transition-shadow hover:border-primary/40 ${
                                   snap.isDragging ? "shadow-lg shadow-primary/10" : ""
                                 }`}

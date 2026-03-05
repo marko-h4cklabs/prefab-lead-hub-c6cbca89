@@ -27,6 +27,8 @@ interface SSEMessage {
   role: string;
   content: string;
   timestamp: string;
+  is_voice?: boolean;
+  audio_url?: string;
 }
 
 interface Props {
@@ -277,6 +279,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
         role: msg.role,
         content: msg.content,
         timestamp: msg.timestamp,
+        ...(msg.is_voice ? { is_voice: true, type: "voice" as const, audio_url: msg.audio_url } : {}),
       };
 
       setMessages((prev) => {

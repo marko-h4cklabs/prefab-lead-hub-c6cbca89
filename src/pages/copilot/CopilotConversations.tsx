@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import ActiveDMList from "../../components/copilot/ActiveDMList";
 import CopilotLeadSummary from "../../components/copilot/CopilotLeadSummary";
 import CopilotChat from "../../components/copilot/CopilotChat";
@@ -11,6 +11,16 @@ const CopilotConversations = () => {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [view, setView] = useState<View>("summary");
+
+  // Auto-select lead from query param (e.g. navigating from pipeline card)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const leadParam = params.get("lead");
+    if (leadParam && !selectedLeadId) {
+      setSelectedLeadId(leadParam);
+      setView("summary");
+    }
+  }, []);
 
   // SSE-driven refresh triggers (increment to trigger immediate refetch)
   const [dmRefreshTrigger, setDmRefreshTrigger] = useState(0);
