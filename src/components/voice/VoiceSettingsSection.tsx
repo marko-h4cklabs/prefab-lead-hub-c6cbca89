@@ -549,7 +549,7 @@ const VoiceSettingsSection = () => {
             >
               <Upload size={24} className="text-muted-foreground" />
               <p className="text-xs text-muted-foreground">Drag audio files here or click to browse</p>
-              <p className="text-[10px] text-muted-foreground">MP3, WAV, M4A, OGG — max 5 files, 10MB each</p>
+              <p className="text-[10px] text-muted-foreground">MP3, WAV, M4A, OGG — max 5 files, 25MB each</p>
             </div>
             <input
               ref={cloneInputRef}
