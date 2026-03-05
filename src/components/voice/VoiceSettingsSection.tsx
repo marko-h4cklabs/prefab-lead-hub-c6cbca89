@@ -717,7 +717,7 @@ const VoiceSettingsSection = () => {
               <Slider
                 value={[settings.voice_speed]}
                 onValueChange={([v]) => setSettings({ ...settings, voice_speed: v })}
-                min={0.5} max={2.0} step={0.05}
+                min={0.7} max={1.2} step={0.05}
                 className="flex-1"
               />
               <span className="text-[10px] text-muted-foreground shrink-0">Faster</span>
