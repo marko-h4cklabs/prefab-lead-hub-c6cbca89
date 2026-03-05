@@ -910,6 +910,22 @@ export const api = {
     return formDataRequest<{ text: string }>(`/api/copilot/settings/ai-personas/${personaId}/upload-knowledge`, fd);
   },
 
+  // --- Company Knowledge Base ---
+  getCompanyKnowledge: () =>
+    request<{ knowledge_base: string }>("/api/copilot/settings/knowledge"),
+
+  updateCompanyKnowledge: (knowledge_base: string) =>
+    request<{ success: boolean }>("/api/copilot/settings/knowledge", {
+      method: "PUT",
+      body: JSON.stringify({ knowledge_base }),
+    }),
+
+  uploadCompanyKnowledgeDoc: (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return formDataRequest<{ text: string }>("/api/copilot/settings/knowledge/upload", fd);
+  },
+
   deleteCopilotAiPersona: (id: string) =>
     request<any>(`/api/copilot/settings/ai-personas/${id}`, { method: "DELETE" }),
 

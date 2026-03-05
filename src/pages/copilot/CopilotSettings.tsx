@@ -85,6 +85,7 @@ const VIEW_TABS = [
   { key: "manual", label: "Manual", icon: Settings },
   { key: "templates", label: "Templates", icon: FileText },
   { key: "voice", label: "Voice Messages", icon: Volume2 },
+  { key: "knowledge", label: "Knowledge", icon: BookOpen },
   { key: "integrations", label: "Integrations", icon: Link2 },
   { key: "notifications", label: "Notifications", icon: Bell },
 ] as const;
@@ -1033,6 +1034,9 @@ const CopilotSettings = () => {
         )}
         {viewMode === "voice" && (
           <div className="py-6 max-w-2xl"><VoiceSettingsSection /></div>
+        )}
+        {viewMode === "knowledge" && (
+          <div className="py-6 max-w-2xl"><CompanyKnowledgeTab /></div>
         )}
         {viewMode === "integrations" && (
           <div className="py-6 max-w-2xl"><IntegrationsTab /></div>
@@ -2601,6 +2605,125 @@ function LoadingSkeleton({ lines = 3 }: { lines?: number }) {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ===========================================================================
+// COMPANY KNOWLEDGE TAB
+// ===========================================================================
+
+function CompanyKnowledgeTab() {
+  const [knowledgeBase, setKnowledgeBase] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    api.getCompanyKnowledge()
+      .then((res) => setKnowledgeBase(res.knowledge_base || ""))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.updateCompanyKnowledge(knowledgeBase);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      toast({ title: "Failed to save", description: getErrorMessage(err), variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const result = await api.uploadCompanyKnowledgeDoc(file);
+      setKnowledgeBase((prev) => (prev ? prev + "\n\n" + result.text : result.text));
+      toast({ title: "Document imported", description: "Text extracted and added to knowledge base." });
+    } catch (err) {
+      toast({ title: "Upload failed", description: getErrorMessage(err), variant: "destructive" });
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-8 w-48 bg-secondary rounded animate-pulse" />
+        <div className="h-64 w-full bg-secondary rounded animate-pulse" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-base font-bold text-foreground">Knowledge Base</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Add information the AI must use when responding to leads. This applies to all conversations across autopilot and copilot.
+        </p>
+      </div>
+
+      <div className="rounded-lg bg-primary/5 border border-primary/20 px-3 py-2.5">
+        <p className="text-xs text-primary font-semibold mb-1">How it works</p>
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          Everything here is injected into the AI's context for every conversation. Add your offer details, pricing,
+          FAQs, objection handling scripts, qualification criteria — anything the AI should know and follow when
+          responding to leads. The AI treats this as its primary reference.
+        </p>
+      </div>
+
+      {/* Upload document */}
+      <div>
+        <label className="block text-xs font-medium text-muted-foreground mb-1.5">Upload Document</label>
+        <div className="flex gap-2">
+          <input type="file" accept=".docx,.txt,.xlsx" id="company-kb-upload" className="hidden" onChange={handleFileUpload} />
+          <button
+            onClick={() => document.getElementById("company-kb-upload")?.click()}
+            disabled={uploading}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-muted-foreground/40 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors disabled:opacity-50"
+          >
+            {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+            {uploading ? "Extracting text..." : "Upload .docx, .txt, or .xlsx"}
+          </button>
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-1">
+          Document text will be appended below for review before saving.
+        </p>
+      </div>
+
+      {/* Knowledge textarea */}
+      <div>
+        <label className="block text-xs font-medium text-muted-foreground mb-1.5">Knowledge Content</label>
+        <textarea
+          value={knowledgeBase}
+          onChange={(e) => setKnowledgeBase(e.target.value)}
+          rows={20}
+          placeholder="Paste your offer details, pricing, FAQs, objection handling scripts, qualification criteria..."
+          className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors resize-y font-mono"
+        />
+        <p className="text-[11px] text-muted-foreground mt-1">
+          {knowledgeBase.length.toLocaleString()} characters
+        </p>
+      </div>
+
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="dark-btn-primary w-full h-10"
+      >
+        {saving ? <Loader2 size={14} className="animate-spin" /> : saved ? <><Check size={14} /> Saved</> : <><Save size={14} /> Save Knowledge Base</>}
+      </button>
     </div>
   );
 }
