@@ -129,6 +129,9 @@ const ActiveDMList = ({ selectedLeadId, onSelectLead, refreshTrigger, sseConnect
   const [teamLoading, setTeamLoading] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
+  // Disposition confirmation
+  const [confirmDisposition, setConfirmDisposition] = useState<{ leadId: string; status: string; label: string } | null>(null);
+
   const assignDropdownRef = useRef<HTMLDivElement>(null);
 
   // ---------------------------------------------------------------------------
@@ -635,28 +638,53 @@ const ActiveDMList = ({ selectedLeadId, onSelectLead, refreshTrigger, sseConnect
 
                       {/* Disposition buttons */}
                       <div className="flex items-center gap-1 mt-1.5" onClick={(e) => e.stopPropagation()}>
-                        {[
-                          { status: "booked", icon: CheckCircle, label: "Booked", color: "text-green-500 hover:bg-green-500/10" },
-                          { status: "lost", icon: XCircle, label: "Lost", color: "text-red-400 hover:bg-red-400/10" },
-                          { status: "done", icon: MinusCircle, label: "Done", color: "text-muted-foreground hover:bg-muted/20" },
-                        ].map(({ status, icon: Icon, label, color }) => (
-                          <button
-                            key={status}
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              try {
-                                await apiClient.setDmStatus(dm.lead_id, status);
-                                // Remove from list
-                                setDms((prev) => prev.filter((d) => d.lead_id !== dm.lead_id));
-                              } catch { /* handled by api layer */ }
-                            }}
-                            title={label}
-                            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] transition-colors ${color}`}
-                          >
-                            <Icon size={9} />
-                            {label}
-                          </button>
-                        ))}
+                        {confirmDisposition?.leadId === dm.lead_id ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-[9px] text-foreground font-medium">
+                              Mark as {confirmDisposition.label}?
+                            </span>
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  await apiClient.setDmStatus(dm.lead_id, confirmDisposition.status);
+                                  setDms((prev) => prev.filter((d) => d.lead_id !== dm.lead_id));
+                                } catch { /* handled by api layer */ }
+                                setConfirmDisposition(null);
+                              }}
+                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
+                            >
+                              Yes
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setConfirmDisposition(null);
+                              }}
+                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] text-muted-foreground hover:bg-muted/20 transition-colors"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          [{status: "booked", icon: CheckCircle, label: "Booked", color: "text-green-500 hover:bg-green-500/10"},
+                           {status: "lost", icon: XCircle, label: "Lost", color: "text-red-400 hover:bg-red-400/10"},
+                           {status: "done", icon: MinusCircle, label: "Done", color: "text-muted-foreground hover:bg-muted/20"},
+                          ].map(({ status, icon: Icon, label, color }) => (
+                            <button
+                              key={status}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setConfirmDisposition({ leadId: dm.lead_id, status, label });
+                              }}
+                              title={label}
+                              className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] transition-colors ${color}`}
+                            >
+                              <Icon size={9} />
+                              {label}
+                            </button>
+                          ))
+                        )}
                       </div>
                     </div>
                   </div>
