@@ -19,6 +19,7 @@ interface VoiceSettings {
   style: number;
   speaker_boost: boolean;
   voice_style_prompt: string;
+  voice_speed: number;
 }
 
 interface Voice {
@@ -123,11 +124,12 @@ const VoiceSettingsSection = () => {
         style: (s as any).style ?? 0,
         speaker_boost: (s as any).speaker_boost !== false,
         voice_style_prompt: (s as any).voice_style_prompt ?? "",
+        voice_speed: (s as any).voice_speed ?? 1.0,
       } : {
         voice_enabled: false, voice_mode: "match", voice_model: "eleven_turbo_v2_5",
         selected_voice_id: null, selected_voice_name: null,
         stability: 0.5, similarity_boost: 0.75, style: 0, speaker_boost: true,
-        voice_style_prompt: "",
+        voice_style_prompt: "", voice_speed: 1.0,
       };
       setSettings(resolved);
       const voiceList = Array.isArray(v) ? v : (v as any)?.voices ?? [];
@@ -245,6 +247,7 @@ const VoiceSettingsSection = () => {
         style: settings.style,
         speaker_boost: settings.speaker_boost,
         voice_style_prompt: settings.voice_style_prompt,
+        voice_speed: settings.voice_speed,
       });
       setSettingsSaved(true);
       setTimeout(() => setSettingsSaved(false), 2000);
@@ -695,6 +698,25 @@ const VoiceSettingsSection = () => {
               checked={settings.speaker_boost}
               onCheckedChange={(v) => setSettings({ ...settings, speaker_boost: v })}
             />
+          </div>
+
+          {/* Speaking Speed */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium text-foreground">Speaking Speed</label>
+              <span className="text-xs text-primary font-mono">{settings.voice_speed.toFixed(2)}x</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] text-muted-foreground shrink-0">Slower</span>
+              <Slider
+                value={[settings.voice_speed]}
+                onValueChange={([v]) => setSettings({ ...settings, voice_speed: v })}
+                min={0.5} max={2.0} step={0.05}
+                className="flex-1"
+              />
+              <span className="text-[10px] text-muted-foreground shrink-0">Faster</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">Controls how fast the voice speaks. Default is 1.0x. Lower values make it slower and more relaxed.</p>
           </div>
 
           {/* Voice Style Prompt */}
