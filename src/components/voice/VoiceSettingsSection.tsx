@@ -18,6 +18,7 @@ interface VoiceSettings {
   similarity_boost: number;
   style: number;
   speaker_boost: boolean;
+  voice_style_prompt: string;
 }
 
 interface Voice {
@@ -690,6 +691,21 @@ const VoiceSettingsSection = () => {
             <Switch
               checked={settings.speaker_boost}
               onCheckedChange={(v) => setSettings({ ...settings, speaker_boost: v })}
+            />
+          </div>
+
+          {/* Voice Style Prompt */}
+          <div className="border-t border-border pt-4 space-y-2">
+            <label className="text-xs font-medium text-foreground block">Voice Style Prompt</label>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Describe how the voice should sound. This is used to rewrite your text before generating audio — adding natural pauses, pacing, and delivery cues.
+            </p>
+            <textarea
+              value={settings.voice_style_prompt || ""}
+              onChange={(e) => setSettings({ ...settings, voice_style_prompt: e.target.value })}
+              rows={4}
+              placeholder={"Examples:\n- Speak casually like a bro, relaxed and slow\n- Add natural pauses between thoughts\n- End messages softly with a lower tone\n- Take breaths, don't rush"}
+              className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors resize-none"
             />
           </div>
 
