@@ -99,7 +99,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
   const [voiceAudioUrl, setVoiceAudioUrl] = useState<string | null>(null);
   const [generatingVoice, setGeneratingVoice] = useState(false);
   const [sendingVoice, setSendingVoice] = useState(false);
-  const [voiceAmbientNoise, setVoiceAmbientNoise] = useState<string | null>(null); // null = use company default
+  const [voiceAmbientNoise, setVoiceAmbientNoise] = useState<string | null | undefined>(undefined); // undefined = company default, null = none, string = specific
   const [voiceHumanize, setVoiceHumanize] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -467,7 +467,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
     setVoiceAudioUrl(null);
     try {
       const result = await api.generateVoiceNote(voiceText.trim(), {
-        ambient_noise: voiceAmbientNoise,
+        ...(voiceAmbientNoise !== undefined && { ambient_noise: voiceAmbientNoise }),
         humanize: voiceHumanize,
       });
       setVoiceAudioBase64(result.audio_base64);
@@ -848,8 +848,11 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
                 <div className="flex items-center gap-1.5">
                   <label className="text-xs text-muted-foreground whitespace-nowrap">Noise:</label>
                   <select
-                    value={voiceAmbientNoise ?? "default"}
-                    onChange={(e) => setVoiceAmbientNoise(e.target.value === "default" ? null : e.target.value === "none" ? "none" : e.target.value)}
+                    value={voiceAmbientNoise === undefined ? "default" : voiceAmbientNoise === null ? "none" : voiceAmbientNoise}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setVoiceAmbientNoise(v === "default" ? undefined : v === "none" ? null : v);
+                    }}
                     className="dark-input text-xs py-1 px-2 rounded"
                     disabled={generatingVoice || sendingVoice}
                   >
