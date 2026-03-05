@@ -515,8 +515,14 @@ function AiPersonaConfigTabs({
     setSaving(true);
     try {
       const updatedSnapshot = buildSnapshot();
-      await api.updateCopilotAiPersona(persona.id, { snapshot: updatedSnapshot, knowledge_base: knowledgeBase });
-      onUpdated({ ...persona, snapshot: updatedSnapshot, knowledge_base: knowledgeBase });
+      // Only send knowledge_base when saving from the Knowledge tab — prevents
+      // accidental overwrites when saving other tabs (Identity, Behavior, etc.)
+      const payload: { snapshot: any; knowledge_base?: string } = { snapshot: updatedSnapshot };
+      if (activeTab === "knowledge") {
+        payload.knowledge_base = knowledgeBase;
+      }
+      await api.updateCopilotAiPersona(persona.id, payload);
+      onUpdated({ ...persona, snapshot: updatedSnapshot, ...(activeTab === "knowledge" ? { knowledge_base: knowledgeBase } : {}) });
       setSavedOk(true);
       toast({ title: "Persona configuration saved" });
       setTimeout(() => setSavedOk(false), 2000);
