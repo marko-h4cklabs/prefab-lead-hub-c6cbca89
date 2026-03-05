@@ -95,7 +95,6 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
   // Voice note panel state
   const [showVoicePanel, setShowVoicePanel] = useState(false);
   const [voiceText, setVoiceText] = useState("");
-  const [voiceFeedback, setVoiceFeedback] = useState("");
   const [voiceAudioBase64, setVoiceAudioBase64] = useState<string | null>(null);
   const [voiceAudioUrl, setVoiceAudioUrl] = useState<string | null>(null);
   const [generatingVoice, setGeneratingVoice] = useState(false);
@@ -465,7 +464,7 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
     setVoiceAudioBase64(null);
     setVoiceAudioUrl(null);
     try {
-      const result = await api.generateVoiceNote(voiceText.trim(), voiceFeedback.trim() || undefined);
+      const result = await api.generateVoiceNote(voiceText.trim());
       setVoiceAudioBase64(result.audio_base64);
       setVoiceAudioUrl(`data:${result.content_type || "audio/wav"};base64,${result.audio_base64}`);
     } catch (err: any) {
@@ -496,7 +495,6 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
       });
       setShowVoicePanel(false);
       setVoiceText("");
-      setVoiceFeedback("");
       setVoiceAudioBase64(null);
       setVoiceAudioUrl(null);
       setSuggestions([]);
@@ -511,7 +509,6 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
   const handleCancelVoice = () => {
     setShowVoicePanel(false);
     setVoiceText("");
-    setVoiceFeedback("");
     setVoiceAudioBase64(null);
     setVoiceAudioUrl(null);
     setGeneratingVoice(false);
@@ -869,14 +866,6 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
                     controls
                     src={voiceAudioUrl}
                     className="w-full h-10"
-                  />
-                  <input
-                    type="text"
-                    value={voiceFeedback}
-                    onChange={(e) => setVoiceFeedback(e.target.value)}
-                    placeholder="Feedback: e.g. 'slower pace', 'more casual'..."
-                    className="dark-input w-full text-xs"
-                    disabled={generatingVoice}
                   />
                   <div className="flex gap-2">
                     <button
