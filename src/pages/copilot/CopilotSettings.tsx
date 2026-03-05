@@ -1966,6 +1966,7 @@ function TemplatesTab() {
 
 function IntegrationsTab() {
   const [mcApiKey, setMcApiKey] = useState("");
+  const [mcApiKeyMasked, setMcApiKeyMasked] = useState(false);
   const [mcPageId, setMcPageId] = useState("");
   const [webhookUrl, setWebhookUrl] = useState("");
   const [calendlyUrl, setCalendlyUrl] = useState("");
@@ -1986,7 +1987,9 @@ function IntegrationsTab() {
         ]);
         if (mcRes.status === "fulfilled") {
           const mc = mcRes.value as any;
-          setMcApiKey(mc?.api_key || mc?.manychat_api_key || "");
+          const key = mc?.api_key || mc?.manychat_api_key || "";
+          setMcApiKey(key);
+          setMcApiKeyMasked(typeof key === "string" && key.includes("*"));
           setMcPageId(mc?.page_id || mc?.manychat_page_id || "");
         }
         if (whRes.status === "fulfilled") {
@@ -2007,7 +2010,9 @@ function IntegrationsTab() {
     setMcSaving(true);
     setMcStatus("idle");
     try {
-      await api.saveManychatSettings({ manychat_api_key: mcApiKey, manychat_page_id: mcPageId });
+      const payload: any = { manychat_page_id: mcPageId };
+      if (!mcApiKeyMasked) payload.manychat_api_key = mcApiKey;
+      await api.saveManychatSettings(payload);
       setMcStatus("saved");
       toast({ title: "ManyChat settings saved" });
       setTimeout(() => setMcStatus("idle"), 2000);
@@ -2068,7 +2073,7 @@ function IntegrationsTab() {
               <input
                 type={showApiKey ? "text" : "password"}
                 value={mcApiKey}
-                onChange={(e) => setMcApiKey(e.target.value)}
+                onChange={(e) => { setMcApiKey(e.target.value); setMcApiKeyMasked(false); }}
                 placeholder="Enter your ManyChat API key"
                 className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors pr-20"
               />
