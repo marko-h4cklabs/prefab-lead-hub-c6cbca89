@@ -21,6 +21,7 @@ interface VoiceSettings {
   voice_style_prompt: string;
   voice_speed: number;
   voice_ambient_noise: string | null;
+  voice_ambient_level: number;
 }
 
 interface Voice {
@@ -127,11 +128,12 @@ const VoiceSettingsSection = () => {
         voice_style_prompt: (s as any).voice_style_prompt ?? "",
         voice_speed: (s as any).voice_speed ?? 1.0,
         voice_ambient_noise: (s as any).voice_ambient_noise ?? null,
+        voice_ambient_level: (s as any).voice_ambient_level ?? 5,
       } : {
         voice_enabled: false, voice_mode: "match", voice_model: "eleven_turbo_v2_5",
         selected_voice_id: null, selected_voice_name: null,
         stability: 0.5, similarity_boost: 0.75, style: 0, speaker_boost: true,
-        voice_style_prompt: "", voice_speed: 1.0, voice_ambient_noise: null,
+        voice_style_prompt: "", voice_speed: 1.0, voice_ambient_noise: null, voice_ambient_level: 5,
       };
       setSettings(resolved);
       const voiceList = Array.isArray(v) ? v : (v as any)?.voices ?? [];
@@ -251,6 +253,7 @@ const VoiceSettingsSection = () => {
         voice_style_prompt: settings.voice_style_prompt,
         voice_speed: settings.voice_speed,
         voice_ambient_noise: settings.voice_ambient_noise,
+        voice_ambient_level: settings.voice_ambient_level,
       });
       setSettingsSaved(true);
       setTimeout(() => setSettingsSaved(false), 2000);
@@ -723,15 +726,35 @@ const VoiceSettingsSection = () => {
           </div>
 
           {/* Background Ambient Noise */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <p className="text-xs font-medium text-foreground">Background Noise</p>
-              <p className="text-[10px] text-muted-foreground">Adds subtle restaurant ambience (crowd murmur) to voice messages for a more realistic feel.</p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <p className="text-xs font-medium text-foreground">Background Noise</p>
+                <p className="text-[10px] text-muted-foreground">Adds restaurant ambience (crowd murmur) to voice messages for a more realistic feel.</p>
+              </div>
+              <Switch
+                checked={settings.voice_ambient_noise === "restaurant"}
+                onCheckedChange={(v) => setSettings({ ...settings, voice_ambient_noise: v ? "restaurant" : null })}
+              />
             </div>
-            <Switch
-              checked={settings.voice_ambient_noise === "restaurant"}
-              onCheckedChange={(v) => setSettings({ ...settings, voice_ambient_noise: v ? "restaurant" : null })}
-            />
+            {settings.voice_ambient_noise === "restaurant" && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-muted-foreground">Noise Level</label>
+                  <span className="text-xs text-primary font-mono">{settings.voice_ambient_level}/10</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] text-muted-foreground shrink-0">Quiet</span>
+                  <Slider
+                    value={[settings.voice_ambient_level]}
+                    onValueChange={([v]) => setSettings({ ...settings, voice_ambient_level: v })}
+                    min={1} max={10} step={1}
+                    className="flex-1"
+                  />
+                  <span className="text-[10px] text-muted-foreground shrink-0">Loud</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Voice Style Prompt */}
