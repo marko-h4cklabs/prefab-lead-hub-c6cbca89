@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/apiClient";
 import { toast } from "@/hooks/use-toast";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
-import { Instagram, Flame, Package } from "lucide-react";
+import { Instagram, Flame, Package, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -79,6 +79,8 @@ const Pipeline = () => {
   const [moveModal, setMoveModal] = useState<MoveModal | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [dealModal, setDealModal] = useState<{ leadId: string; leadName: string; fromStage: string } | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{ leadId: string; leadName: string; stage: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -222,6 +224,25 @@ const Pipeline = () => {
 
   const cancelMove = () => setMoveModal(null);
 
+  const confirmDelete = async () => {
+    if (!deleteModal) return;
+    setDeleting(true);
+    try {
+      await api.deleteCopilotLead(deleteModal.leadId);
+      setColumns((prev) => ({
+        ...prev,
+        [deleteModal.stage]: prev[deleteModal.stage].filter((l) => l.id !== deleteModal.leadId),
+      }));
+      fetchStats();
+      toast({ title: "Lead deleted" });
+    } catch (err: any) {
+      toast({ title: "Failed to delete lead", description: err?.message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
+      setDeleteModal(null);
+    }
+  };
+
   const fmt = (n?: number) => (n !== undefined && n !== null ? `€${n.toLocaleString()}` : "€0");
 
   if (loading) {
@@ -305,12 +326,22 @@ const Pipeline = () => {
                                   snap.isDragging ? "shadow-lg shadow-primary/10" : ""
                                 }`}
                               >
-                                {/* Name */}
+                                {/* Name + delete */}
                                 <div className="flex items-center gap-1 mb-2">
-                                  <span className="text-sm font-bold text-foreground truncate">
+                                  <span className="text-sm font-bold text-foreground truncate flex-1">
                                     {lead.name}
                                   </span>
                                   {lead.is_hot_lead && <span className="text-xs">🔥</span>}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteModal({ leadId: lead.id, leadName: lead.name, stage: stage.id });
+                                    }}
+                                    className="p-0.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                                    title="Delete lead"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
                                 </div>
 
                                 {/* Score bar */}
@@ -411,6 +442,26 @@ const Pipeline = () => {
         leadName={dealModal?.leadName}
         onSuccess={handleDealSuccess}
       />
+
+      {/* Delete confirmation modal */}
+      <Dialog open={!!deleteModal} onOpenChange={(open) => !open && setDeleteModal(null)}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Delete Lead</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground py-2">
+            Are you sure you want to delete <span className="font-semibold text-foreground">{deleteModal?.leadName}</span>? This will remove the lead and all its conversations. This cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteModal(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
+              {deleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
