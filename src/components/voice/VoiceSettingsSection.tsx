@@ -20,6 +20,7 @@ interface VoiceSettings {
   speaker_boost: boolean;
   voice_style_prompt: string;
   voice_speed: number;
+  voice_ambient_noise: string | null;
 }
 
 interface Voice {
@@ -125,11 +126,12 @@ const VoiceSettingsSection = () => {
         speaker_boost: (s as any).speaker_boost !== false,
         voice_style_prompt: (s as any).voice_style_prompt ?? "",
         voice_speed: (s as any).voice_speed ?? 1.0,
+        voice_ambient_noise: (s as any).voice_ambient_noise ?? null,
       } : {
         voice_enabled: false, voice_mode: "match", voice_model: "eleven_turbo_v2_5",
         selected_voice_id: null, selected_voice_name: null,
         stability: 0.5, similarity_boost: 0.75, style: 0, speaker_boost: true,
-        voice_style_prompt: "", voice_speed: 1.0,
+        voice_style_prompt: "", voice_speed: 1.0, voice_ambient_noise: null,
       };
       setSettings(resolved);
       const voiceList = Array.isArray(v) ? v : (v as any)?.voices ?? [];
@@ -248,6 +250,7 @@ const VoiceSettingsSection = () => {
         speaker_boost: settings.speaker_boost,
         voice_style_prompt: settings.voice_style_prompt,
         voice_speed: settings.voice_speed,
+        voice_ambient_noise: settings.voice_ambient_noise,
       });
       setSettingsSaved(true);
       setTimeout(() => setSettingsSaved(false), 2000);
@@ -717,6 +720,18 @@ const VoiceSettingsSection = () => {
               <span className="text-[10px] text-muted-foreground shrink-0">Faster</span>
             </div>
             <p className="text-[10px] text-muted-foreground mt-1">Controls how fast the voice speaks. Default is 1.0x. Lower values make it slower and more relaxed.</p>
+          </div>
+
+          {/* Background Ambient Noise */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <p className="text-xs font-medium text-foreground">Background Noise</p>
+              <p className="text-[10px] text-muted-foreground">Adds subtle restaurant ambience (crowd murmur) to voice messages for a more realistic feel.</p>
+            </div>
+            <Switch
+              checked={settings.voice_ambient_noise === "restaurant"}
+              onCheckedChange={(v) => setSettings({ ...settings, voice_ambient_noise: v ? "restaurant" : null })}
+            />
           </div>
 
           {/* Voice Style Prompt */}
