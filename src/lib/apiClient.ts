@@ -728,10 +728,10 @@ export const api = {
     }),
 
   // --- Copilot Voice Notes ---
-  generateVoiceNote: (text: string, feedback?: string) =>
+  generateVoiceNote: (text: string, options?: { feedback?: string; ambient_noise?: string | null; ambient_level?: number; humanize?: boolean }) =>
     request<{ audio_base64: string; content_type: string }>("/api/copilot/voice/generate", {
       method: "POST",
-      body: JSON.stringify({ text, ...(feedback ? { feedback } : {}) }),
+      body: JSON.stringify({ text, ...options }),
     }),
 
   sendVoiceNote: (conversationId: string, audio_base64: string, text: string) =>

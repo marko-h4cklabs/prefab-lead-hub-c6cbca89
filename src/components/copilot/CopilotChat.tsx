@@ -99,6 +99,8 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
   const [voiceAudioUrl, setVoiceAudioUrl] = useState<string | null>(null);
   const [generatingVoice, setGeneratingVoice] = useState(false);
   const [sendingVoice, setSendingVoice] = useState(false);
+  const [voiceAmbientNoise, setVoiceAmbientNoise] = useState<string | null>(null); // null = use company default
+  const [voiceHumanize, setVoiceHumanize] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const customInputRef = useRef<HTMLInputElement>(null);
@@ -464,7 +466,10 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
     setVoiceAudioBase64(null);
     setVoiceAudioUrl(null);
     try {
-      const result = await api.generateVoiceNote(voiceText.trim());
+      const result = await api.generateVoiceNote(voiceText.trim(), {
+        ambient_noise: voiceAmbientNoise,
+        humanize: voiceHumanize,
+      });
       setVoiceAudioBase64(result.audio_base64);
       setVoiceAudioUrl(`data:${result.content_type || "audio/wav"};base64,${result.audio_base64}`);
     } catch (err: any) {
@@ -837,6 +842,38 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
                 className="dark-input w-full text-sm min-h-[60px] resize-y"
                 disabled={generatingVoice || sendingVoice}
               />
+
+              {/* Voice options row */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <label className="text-xs text-muted-foreground whitespace-nowrap">Noise:</label>
+                  <select
+                    value={voiceAmbientNoise ?? "default"}
+                    onChange={(e) => setVoiceAmbientNoise(e.target.value === "default" ? null : e.target.value === "none" ? "none" : e.target.value)}
+                    className="dark-input text-xs py-1 px-2 rounded"
+                    disabled={generatingVoice || sendingVoice}
+                  >
+                    <option value="default">Default</option>
+                    <option value="none">None</option>
+                    <option value="restaurant">Restaurant</option>
+                    <option value="cafe">Cafe</option>
+                    <option value="traffic">Traffic</option>
+                    <option value="office">Office</option>
+                    <option value="white_noise">White Noise</option>
+                    <option value="tv">TV</option>
+                  </select>
+                </div>
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={voiceHumanize}
+                    onChange={(e) => setVoiceHumanize(e.target.checked)}
+                    disabled={generatingVoice || sendingVoice}
+                    className="rounded border-border"
+                  />
+                  Humanize
+                </label>
+              </div>
 
               {/* Generate button */}
               {!voiceAudioUrl && (

@@ -727,17 +727,24 @@ const VoiceSettingsSection = () => {
 
           {/* Background Ambient Noise */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <p className="text-xs font-medium text-foreground">Background Noise</p>
-                <p className="text-[10px] text-muted-foreground">Adds restaurant ambience (crowd murmur) to voice messages for a more realistic feel.</p>
-              </div>
-              <Switch
-                checked={settings.voice_ambient_noise === "restaurant"}
-                onCheckedChange={(v) => setSettings({ ...settings, voice_ambient_noise: v ? "restaurant" : null })}
-              />
+            <div>
+              <label className="text-xs font-medium text-foreground mb-1 block">Background Noise</label>
+              <p className="text-[10px] text-muted-foreground mb-2">Adds ambient background sound to voice messages for a more realistic feel.</p>
+              <select
+                value={settings.voice_ambient_noise || "none"}
+                onChange={(e) => setSettings({ ...settings, voice_ambient_noise: e.target.value === "none" ? null : e.target.value })}
+                className="dark-input w-full max-w-xs"
+              >
+                <option value="none">None</option>
+                <option value="restaurant">Restaurant</option>
+                <option value="cafe">Cafe</option>
+                <option value="traffic">Traffic</option>
+                <option value="office">Office</option>
+                <option value="white_noise">White Noise</option>
+                <option value="tv">TV</option>
+              </select>
             </div>
-            {settings.voice_ambient_noise === "restaurant" && (
+            {settings.voice_ambient_noise && (
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-medium text-muted-foreground">Noise Level</label>
