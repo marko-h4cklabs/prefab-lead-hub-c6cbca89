@@ -898,11 +898,17 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  updateCopilotAiPersona: (id: string, data: { name?: string; snapshot?: any; style_summary?: string }) =>
+  updateCopilotAiPersona: (id: string, data: { name?: string; snapshot?: any; style_summary?: string; knowledge_base?: string }) =>
     request<any>(`/api/copilot/settings/ai-personas/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     }),
+
+  uploadKnowledgeDocument: (personaId: string, file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return formDataRequest<{ text: string }>(`/api/copilot/settings/ai-personas/${personaId}/upload-knowledge`, fd);
+  },
 
   deleteCopilotAiPersona: (id: string) =>
     request<any>(`/api/copilot/settings/ai-personas/${id}`, { method: "DELETE" }),

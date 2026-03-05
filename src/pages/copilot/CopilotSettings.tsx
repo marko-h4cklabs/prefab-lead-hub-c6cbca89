@@ -35,6 +35,8 @@ import {
   FileText,
   Sliders,
   Pencil,
+  BookOpen,
+  Upload,
 } from "lucide-react";
 import AgentIdentitySection from "@/components/chatbot/AgentIdentitySection";
 import AILearningGround from "@/components/chatbot/AILearningGround";
@@ -425,6 +427,7 @@ const AI_CONFIG_TABS = [
   { key: "behavior", label: "Behavior", icon: Sliders },
   { key: "strategy", label: "Strategy", icon: Settings },
   { key: "additional", label: "Additional Info", icon: FileText },
+  { key: "knowledge", label: "Knowledge", icon: BookOpen },
   { key: "fields", label: "Fields", icon: GripVertical },
   { key: "followups", label: "Follow-ups", icon: CalendarClock },
 ] as const;
@@ -481,6 +484,10 @@ function AiPersonaConfigTabs({
     String(snap.additional_instructions || "")
   );
 
+  // Knowledge Base (stored on persona row, not snapshot)
+  const [knowledgeBase, setKnowledgeBase] = useState<string>(persona.knowledge_base || "");
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
 
@@ -507,8 +514,8 @@ function AiPersonaConfigTabs({
     setSaving(true);
     try {
       const updatedSnapshot = buildSnapshot();
-      await api.updateCopilotAiPersona(persona.id, { snapshot: updatedSnapshot });
-      onUpdated({ ...persona, snapshot: updatedSnapshot });
+      await api.updateCopilotAiPersona(persona.id, { snapshot: updatedSnapshot, knowledge_base: knowledgeBase });
+      onUpdated({ ...persona, snapshot: updatedSnapshot, knowledge_base: knowledgeBase });
       setSavedOk(true);
       toast({ title: "Persona configuration saved" });
       setTimeout(() => setSavedOk(false), 2000);
@@ -520,7 +527,7 @@ function AiPersonaConfigTabs({
   };
 
   const isPersonaTab = (tab: AiConfigTabKey) =>
-    tab === "identity" || tab === "behavior" || tab === "strategy" || tab === "additional";
+    tab === "identity" || tab === "behavior" || tab === "strategy" || tab === "additional" || tab === "knowledge";
 
   const toggleErrorType = (type: string) => {
     setHumanErrorTypes((prev) =>
@@ -773,6 +780,72 @@ function AiPersonaConfigTabs({
               />
               <p className="text-[11px] text-muted-foreground mt-1">
                 {additionalInstructions.length > 0 ? `${additionalInstructions.length} characters` : "No custom instructions yet"}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* KNOWLEDGE TAB */}
+        {activeTab === "knowledge" && (
+          <div className="space-y-4">
+            <div className="rounded-lg bg-primary/5 border border-primary/20 px-3 py-2.5">
+              <p className="text-xs text-primary font-semibold mb-1">Knowledge Base</p>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Add information about your offer, services, pricing, FAQs, or anything the AI should know
+                when responding to leads. You can paste text directly or upload Word documents.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Upload Document</label>
+              <div className="flex gap-2">
+                <input
+                  type="file"
+                  accept=".docx,.txt,.xlsx"
+                  id="kb-upload"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setUploadingDoc(true);
+                    try {
+                      const result = await api.uploadKnowledgeDocument(persona.id, file);
+                      setKnowledgeBase((prev) => prev ? prev + "\n\n" + result.text : result.text);
+                      toast({ title: "Document imported", description: "Text extracted and added to knowledge base." });
+                    } catch (err: any) {
+                      toast({ title: "Upload failed", description: getErrorMessage(err), variant: "destructive" });
+                    } finally {
+                      setUploadingDoc(false);
+                      e.target.value = "";
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => document.getElementById("kb-upload")?.click()}
+                  disabled={uploadingDoc}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-muted-foreground/40 bg-secondary/30 hover:bg-secondary/60 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                >
+                  {uploadingDoc ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                  {uploadingDoc ? "Extracting text..." : "Upload .docx, .txt, or .xlsx"}
+                </button>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Document text will be appended to your knowledge base below for review.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Knowledge Content</label>
+              <textarea
+                value={knowledgeBase}
+                onChange={(e) => setKnowledgeBase(e.target.value)}
+                rows={16}
+                placeholder={"Paste information about your offer, pricing, FAQs, common objections, product details...\n\nExample:\n- Our program costs $2,997 one-time or 3x $1,099\n- We guarantee results within 90 days\n- Common objection: \"I need to think about it\" → Response: Share transformation story\n- We only work with people who are serious about changing their life"}
+                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors resize-none"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {knowledgeBase.length > 0 ? `${knowledgeBase.length.toLocaleString()} characters` : "No knowledge content yet"}
               </p>
             </div>
           </div>
