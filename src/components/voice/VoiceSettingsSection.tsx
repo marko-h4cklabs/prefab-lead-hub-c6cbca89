@@ -737,11 +737,8 @@ const VoiceSettingsSection = () => {
               >
                 <option value="none">None</option>
                 <option value="restaurant">Restaurant</option>
-                <option value="cafe">Cafe</option>
-                <option value="traffic">Traffic</option>
-                <option value="office">Office</option>
+                <option value="street">Street</option>
                 <option value="white_noise">White Noise</option>
-                <option value="tv">TV</option>
               </select>
             </div>
             {settings.voice_ambient_noise && (

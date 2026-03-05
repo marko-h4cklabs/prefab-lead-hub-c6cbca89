@@ -859,11 +859,8 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
                     <option value="default">Default</option>
                     <option value="none">None</option>
                     <option value="restaurant">Restaurant</option>
-                    <option value="cafe">Cafe</option>
-                    <option value="traffic">Traffic</option>
-                    <option value="office">Office</option>
+                    <option value="street">Street</option>
                     <option value="white_noise">White Noise</option>
-                    <option value="tv">TV</option>
                   </select>
                 </div>
                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
