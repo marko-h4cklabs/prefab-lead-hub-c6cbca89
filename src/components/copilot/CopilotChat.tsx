@@ -880,14 +880,18 @@ const CopilotChat = ({ leadId, conversationId, leadName, onBack, sseMessageQueue
                   />
                   <div className="flex gap-2">
                     <button
-                      onClick={() => {
-                        setVoiceAudioBase64(null);
-                        setVoiceAudioUrl(null);
-                      }}
+                      onClick={handleGenerateVoice}
                       disabled={generatingVoice}
-                      className="flex-1 py-2 rounded-md border border-border bg-card hover:bg-secondary text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                      className="flex-1 py-2 rounded-md border border-border bg-card hover:bg-secondary text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                     >
-                      Re-generate
+                      {generatingVoice ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          Regenerating...
+                        </>
+                      ) : (
+                        <><RefreshCw size={12} /> Re-generate</>
+                      )}
                     </button>
                     <button
                       onClick={handleSendVoice}

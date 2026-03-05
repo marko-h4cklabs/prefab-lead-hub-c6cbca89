@@ -122,10 +122,12 @@ const VoiceSettingsSection = () => {
         similarity_boost: (s as any).similarity_boost ?? 0.75,
         style: (s as any).style ?? 0,
         speaker_boost: (s as any).speaker_boost !== false,
+        voice_style_prompt: (s as any).voice_style_prompt ?? "",
       } : {
         voice_enabled: false, voice_mode: "match", voice_model: "eleven_turbo_v2_5",
         selected_voice_id: null, selected_voice_name: null,
         stability: 0.5, similarity_boost: 0.75, style: 0, speaker_boost: true,
+        voice_style_prompt: "",
       };
       setSettings(resolved);
       const voiceList = Array.isArray(v) ? v : (v as any)?.voices ?? [];
@@ -242,6 +244,7 @@ const VoiceSettingsSection = () => {
         similarity_boost: settings.similarity_boost,
         style: settings.style,
         speaker_boost: settings.speaker_boost,
+        voice_style_prompt: settings.voice_style_prompt,
       });
       setSettingsSaved(true);
       setTimeout(() => setSettingsSaved(false), 2000);
